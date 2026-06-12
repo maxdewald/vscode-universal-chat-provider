@@ -8,12 +8,16 @@ export default defineConfig({
   format: ['cjs'],
   shims: false,
   dts: false,
-  external: [
-    'vscode',
-  ],
+  deps: {
+    neverBundle: ['vscode'],
+    onlyBundle: [
+      '@reactive-vscode/reactivity',
+      'reactive-vscode',
+    ],
+  },
   hooks(hooks) {
     hooks.hookOnce('build:prepare', () => {
-      execSync('nr update')
+      execSync('pnpm generate', { stdio: 'inherit' })
     })
   },
 })

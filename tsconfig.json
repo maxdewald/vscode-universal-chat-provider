@@ -1,14 +1,23 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "lib": ["esnext"],
+    "target": "ES2023",
+    "lib": ["ES2023"],
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    "types": ["node", "vscode"],
     "strict": true,
-    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
     "esModuleInterop": true,
-    "skipDefaultLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
     "skipLibCheck": true
-  }
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "*.ts"
+  ]
 }

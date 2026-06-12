@@ -1,11 +1,19 @@
+engineStrict: true
+ignoreWorkspaceRootCheck: true
+minimumReleaseAgeExclude:
+  - eslint@10.5.0
+nodeLinker: hoisted
 shellEmulator: true
 
 trustPolicy: no-downgrade
+trustPolicyExclude:
+  # Required by @vscode/vsce through parse-semver@1.1.1.
+  - semver@5.7.2
 
 packages:
   - playground
   - examples/*
-onlyBuiltDependencies:
-  - '@vscode/vsce-sign'
-  - esbuild
-  - keytar
+allowBuilds:
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true

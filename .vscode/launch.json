@@ -12,7 +12,7 @@
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"
       ],
-      "preLaunchTask": "npm: dev"
+      "preLaunchTask": "dev"
     }
   ]
 }
