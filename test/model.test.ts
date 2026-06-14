@@ -64,6 +64,100 @@ describe('model mapping', () => {
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'gemini-pro'])
   })
 
+  it('collapses configurable reasoning aliases into one unsuffixed model', () => {
+    const levels = [
+      { effort: 'low' },
+      { effort: 'high' },
+    ]
+    const models = mapProxyModels(
+      [
+        { id: 'gemini-3-pro-high', owned_by: 'antigravity' },
+        { id: 'gemini-3-pro-low', owned_by: 'antigravity' },
+        { id: 'claude-opus-thinking', owned_by: 'antigravity' },
+      ],
+      [
+        {
+          slug: 'gemini-3-pro-high',
+          display_name: 'Gemini 3 Pro (High)',
+          supported_reasoning_levels: levels,
+        },
+        {
+          slug: 'gemini-3-pro-low',
+          display_name: 'Gemini 3 Pro (Low)',
+          supported_reasoning_levels: levels,
+        },
+        {
+          slug: 'claude-opus-thinking',
+          display_name: 'Claude Opus (Thinking)',
+          supported_reasoning_levels: [
+            { effort: 'low' },
+            { effort: 'medium' },
+            { effort: 'high' },
+          ],
+        },
+      ],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(models).toHaveLength(2)
+    expect(models).toMatchObject([
+      {
+        id: 'claude-opus-thinking',
+        proxyModelId: 'claude-opus-thinking',
+        name: 'Claude Opus',
+        reasoningLevels: ['low', 'medium', 'high'],
+      },
+      {
+        id: 'gemini-3-pro-high',
+        proxyModelId: 'gemini-3-pro-high',
+        name: 'Gemini 3 Pro',
+        reasoningLevels: ['low', 'high'],
+      },
+    ])
+  })
+
+  it('keeps fixed reasoning names when no selector can be offered', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'fixed-high', owned_by: 'proxy' }],
+      [{
+        slug: 'fixed-high',
+        display_name: 'Fixed Model (High)',
+        supported_reasoning_levels: [{ effort: 'high' }],
+      }],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(model?.name).toBe('Fixed Model (High)')
+    expect(model?.configurationSchema).toBeUndefined()
+  })
+
+  it('keeps distinct aliases when their reasoning choices differ', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'model-high', owned_by: 'proxy' },
+        { id: 'model-low', owned_by: 'proxy' },
+      ],
+      [
+        {
+          slug: 'model-high',
+          display_name: 'Model (High)',
+          supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
+        },
+        {
+          slug: 'model-low',
+          display_name: 'Model (Low)',
+          supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }],
+        },
+      ],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(models.map(model => model.name)).toEqual(['Model', 'Model (Low)'])
+  })
+
   it('flattens provider catalogs and prefers richer duplicate metadata', () => {
     const catalog = flattenCatalog({
       openai: [{ id: 'shared', context_length: 128_000 }],

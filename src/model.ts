@@ -99,6 +99,7 @@ export function mapProxyModels(
 ): ProviderModel[] {
   const metadataById = new Map(metadata.map(model => [model.slug, model]))
   const seen = new Set<string>()
+  const seenReasoningModels = new Map<string, string>()
   const result: ProviderModel[] = []
 
   for (const entry of available) {
@@ -127,8 +128,20 @@ export function mapProxyModels(
     const maximumContext = positiveInteger(detail?.max_context_window ?? totalContext, totalContext)
     const maxInputTokens = Math.max(1, totalContext - Math.min(outputTokens, totalContext - 1))
     const reasoning = resolveReasoning(detail, catalogModel)
-    const displayName = detail?.display_name ?? catalogModel?.display_name ?? entry.id
+    const advertisedName = detail?.display_name ?? catalogModel?.display_name ?? entry.id
+    let displayName = normalizeReasoningModelName(advertisedName, reasoning.levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
+    if (displayName !== advertisedName) {
+      const reasoningModelKey = `${providerName}\0${displayName}`.toLowerCase()
+      const levelSignature = [...reasoning.levels].sort().join('\0')
+      const existingSignature = seenReasoningModels.get(reasoningModelKey)
+      if (existingSignature === levelSignature)
+        continue
+      if (existingSignature === undefined)
+        seenReasoningModels.set(reasoningModelKey, levelSignature)
+      else
+        displayName = advertisedName
+    }
     const tooltip = buildTooltip(displayName, providerName, totalContext, maximumContext, outputTokens, reasoning.levels)
     const imageInput = detail?.input_modalities?.includes('image')
       ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
@@ -250,6 +263,12 @@ function formatLevel(value: string): string {
   return value === 'xhigh'
     ? 'Extra High'
     : capitalize(value)
+}
+
+function normalizeReasoningModelName(name: string, levels: readonly string[]): string {
+  if (levels.length < 2)
+    return name
+  return name.replace(/\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i, '')
 }
 
 function inferFamily(id: string): string {
