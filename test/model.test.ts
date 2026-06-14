@@ -196,7 +196,7 @@ describe('model mapping', () => {
       maxInputTokens: 950_000,
       maxOutputTokens: 50_000,
       reasoningLevels: ['none', 'auto', 'low', 'medium', 'high'],
-      detail: '1M context · vendor',
+      detail: '1M context · Vendor',
       capabilities: {
         imageInput: true,
         toolCalling: false,
@@ -206,6 +206,31 @@ describe('model mapping', () => {
       default: 'medium',
       enumItemLabels: ['None', 'Auto', 'Low', 'Medium', 'High'],
     })
+  })
+
+  it('capitalizes provider names in model details and tooltips', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'gpt', owned_by: 'openai' },
+        { id: 'gemini', owned_by: 'antigravity' },
+      ],
+      [],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(models).toMatchObject([
+      {
+        id: 'gemini',
+        detail: '128K context · Antigravity',
+        tooltip: expect.stringContaining('(Antigravity)'),
+      },
+      {
+        id: 'gpt',
+        detail: '128K context · OpenAI',
+        tooltip: expect.stringContaining('(OpenAI)'),
+      },
+    ])
   })
 
   it('deduplicates IDs, applies safe numeric fallbacks, and filters catalog media models', () => {

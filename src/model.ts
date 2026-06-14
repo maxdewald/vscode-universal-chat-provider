@@ -131,6 +131,7 @@ export function mapProxyModels(
     const advertisedName = detail?.display_name ?? catalogModel?.display_name ?? entry.id
     let displayName = normalizeReasoningModelName(advertisedName, reasoning.levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
+    const displayProviderName = formatProviderName(providerName)
     if (displayName !== advertisedName) {
       const reasoningModelKey = `${providerName}\0${displayName}`.toLowerCase()
       const levelSignature = [...reasoning.levels].sort().join('\0')
@@ -142,7 +143,7 @@ export function mapProxyModels(
       else
         displayName = advertisedName
     }
-    const tooltip = buildTooltip(displayName, providerName, totalContext, maximumContext, outputTokens, reasoning.levels)
+    const tooltip = buildTooltip(displayName, displayProviderName, totalContext, maximumContext, outputTokens, reasoning.levels)
     const imageInput = detail?.input_modalities?.includes('image')
       ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
       ?? false
@@ -161,7 +162,7 @@ export function mapProxyModels(
       totalContextTokens: totalContext,
       maximumContextTokens: maximumContext,
       reasoningLevels: reasoning.levels,
-      detail: `${formatTokens(totalContext)} context · ${providerName}`,
+      detail: `${formatTokens(totalContext)} context · ${displayProviderName}`,
       tooltip,
       isBYOK: true,
       isUserSelectable: true,
@@ -263,6 +264,17 @@ function formatLevel(value: string): string {
   return value === 'xhigh'
     ? 'Extra High'
     : capitalize(value)
+}
+
+function formatProviderName(value: string): string {
+  const knownProviderNames: Record<string, string> = {
+    openai: 'OpenAI',
+  }
+  const normalized = value.trim()
+  const known = knownProviderNames[normalized.toLowerCase()]
+  if (known !== undefined)
+    return known
+  return normalized.replace(/[A-Za-z][\w'-]*/g, word => capitalize(word))
 }
 
 function normalizeReasoningModelName(name: string, levels: readonly string[]): string {

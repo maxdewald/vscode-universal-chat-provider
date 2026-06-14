@@ -7,9 +7,9 @@
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
+        "${workspaceFolder}/.vscode/extension-dev.code-workspace",
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--enable-proposed-api=maxdewald.modelprovider",
-        "${workspaceFolder}"
+        "--enable-proposed-api=maxdewald.modelprovider"
       ],
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"
