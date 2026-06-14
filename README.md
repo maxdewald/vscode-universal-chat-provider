@@ -1,15 +1,65 @@
-# Model Provider
+# CLIProxyAPI Model Provider
 
-<a href="https://marketplace.visualstudio.com/items?itemName=maxdewald.modelprovider" target="__blank"><img src="https://badgen.net/vs-marketplace/v/maxdewald.modelprovider?color=333&label=VS%20Code%20Marketplace" alt="Visual Studio Marketplace Version" /></a>
-<a href="https://kermanx.github.io/reactive-vscode/" target="__blank"><img src="https://img.shields.io/badge/made_with-reactive--vscode-%23007ACC?style=flat&labelColor=%23229863"  alt="Made with reactive-vscode" /></a>
+Expose the chat-capable models from a local
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) server in GitHub
+Copilot Chat.
 
-VS Code extension for model provider integrations.
+The extension discovers models from CLIProxyAPI, enriches them with context,
+output, tool, image, and reasoning metadata, and refreshes the list while VS
+Code is running. Models with multiple reasoning levels use VS Code's native
+**Thinking Effort** selector; they are not duplicated into separate model
+entries.
+
+## Requirements
+
+- CLIProxyAPI running and reachable, by default at `http://127.0.0.1:8317`
+- A CLIProxyAPI API key
+- VS Code Insiders 1.125 or newer
+- GitHub Copilot Chat
+
+This extension uses the proposed `chatProvider@5` and
+`languageModelThinkingPart@1` APIs. Proposed API extensions must be installed
+from a VSIX and cannot be published as ordinary Marketplace extensions.
+
+## Setup
+
+1. Start CLIProxyAPI and complete the provider login flow there.
+2. Build and package this extension with `pnpm install && pnpm ext:package`.
+3. Install the generated VSIX in VS Code Insiders.
+4. Run **CLIProxyAPI: Import API Key from Config** and confirm the import, or
+   run **CLIProxyAPI: Configure Connection** and enter the key when prompted.
+5. Open Copilot Chat and choose a model under the **CLIProxyAPI** provider.
+
+The API key is stored in VS Code `SecretStorage`. The extension never starts or
+stops CLIProxyAPI itself.
+
+## Model Metadata
+
+The provider reads CLIProxyAPI's standard and enhanced model-list endpoints.
+It reports:
+
+- active and maximum context sizes
+- maximum output tokens
+- image-input and tool-calling support
+- all reported reasoning efforts through the native selector
+- streaming text, thinking summaries, tool calls, and usage
+
+VS Code requires custom language model providers to implement
+`provideTokenCount`; it does not tokenize arbitrary provider requests itself.
+This extension uses `js-tiktoken` with `o200k_base` for local estimates. Exact
+server-side usage is still reported by CLIProxyAPI after a response.
 
 ## Configurations
 
 <!-- configs -->
 
-**No data**
+| Key                                    | Description                                                                           | Type      | Default                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------- | --------- | ------------------------- |
+| `modelProvider.baseUrl`                | Base URL of the CLIProxyAPI server.                                                   | `string`  | `"http://127.0.0.1:8317"` |
+| `modelProvider.configPath`             | Optional path to CLIProxyAPI config.yaml for credential and model metadata discovery. | `string`  | `""`                      |
+| `modelProvider.autoDetectConfig`       | Search common local CLIProxyAPI config locations when no config path is set.          | `boolean` | `true`                    |
+| `modelProvider.refreshIntervalSeconds` | How often to refresh the proxy model list.                                            | `number`  | `60`                      |
+| `modelProvider.defaultMaxOutputTokens` | Fallback output-token limit when CLIProxyAPI provides no model-specific value.        | `number`  | `16384`                   |
 
 <!-- configs -->
 
@@ -17,21 +67,28 @@ VS Code extension for model provider integrations.
 
 <!-- commands -->
 
-**No data**
+| Command                          | Title                                   |
+| -------------------------------- | --------------------------------------- |
+| `modelProvider.manage`           | CLIProxyAPI: Manage Provider            |
+| `modelProvider.configure`        | CLIProxyAPI: Configure Connection       |
+| `modelProvider.importConfig`     | CLIProxyAPI: Import API Key from Config |
+| `modelProvider.refresh`          | CLIProxyAPI: Refresh Models             |
+| `modelProvider.clearCredentials` | CLIProxyAPI: Clear Stored API Key       |
+| `modelProvider.showLogs`         | CLIProxyAPI: Show Logs                  |
 
 <!-- commands -->
 
 ## Development
 
-Requires Node.js 22.18 or newer and pnpm 11.
-
 ```bash
 pnpm install
-pnpm run check
+pnpm vscode:dts
+pnpm check
 ```
 
-Press `F5` in VS Code to launch an Extension Development Host.
+Press `F5` from VS Code Insiders to launch the Extension Development Host with
+the proposed APIs enabled.
 
 ## License
 
-[MIT](./LICENSE.md). Based on [antfu/starter-vscode](https://github.com/antfu/starter-vscode).
+[MIT](./LICENSE.md).

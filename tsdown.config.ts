@@ -10,10 +10,11 @@ export default defineConfig({
   dts: false,
   deps: {
     neverBundle: ['vscode'],
-    onlyBundle: [
-      '@reactive-vscode/reactivity',
-      'reactive-vscode',
+    alwaysBundle: [
+      'js-tiktoken',
+      'yaml',
     ],
+    onlyBundle: false,
   },
   hooks(hooks) {
     hooks.hookOnce('build:prepare', () => {

@@ -8,7 +8,8 @@ export default antfu(
       tsconfigPath: 'tsconfig.json',
     },
     ignores: [
-      // eslint ignore globs here
+      '.vscode-test',
+      'vscode*.d.ts',
     ],
   },
   {
