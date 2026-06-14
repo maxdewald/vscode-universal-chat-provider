@@ -83,7 +83,16 @@ describe('response request conversion', () => {
         tools: [{
           name: 'lookup',
           description: 'Look up a value',
-          inputSchema: { type: 'object', properties: { q: { type: 'string' } } },
+          inputSchema: {
+            $comment: 'tool metadata',
+            type: 'object',
+            properties: {
+              q: {
+                type: 'string',
+                enumDescriptions: ['Query text'],
+              },
+            },
+          },
         }],
       },
       'high',

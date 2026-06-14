@@ -8,15 +8,10 @@ export default defineConfig({
     },
   },
   test: {
-    clearMocks: true,
-    include: ['test/**/*.test.ts'],
-    restoreMocks: true,
-    unstubGlobals: true,
-    coverage: {
-      provider: 'v8',
-      include: ['src/**/*.ts'],
-      exclude: ['src/generated/**'],
-      reporter: ['text', 'html'],
-    },
+    fileParallelism: false,
+    hookTimeout: 60_000,
+    include: ['e2e/**/*.test.ts'],
+    maxWorkers: 1,
+    testTimeout: 70_000,
   },
 })

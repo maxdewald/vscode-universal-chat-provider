@@ -18,6 +18,7 @@
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "e2e/**/*.ts",
     "vscode.d.ts",
     "vscode.proposed.*.d.ts",
     "*.ts"

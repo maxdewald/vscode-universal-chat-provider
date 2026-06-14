@@ -96,6 +96,35 @@ pnpm check
 Press `F5` from VS Code Insiders to launch the Extension Development Host with
 the proposed APIs enabled.
 
+### Live provider smoke test
+
+The opt-in E2E suite verifies real streamed messages through the local
+CLIProxyAPI server:
+
+```bash
+pnpm test:e2e
+```
+
+On successful setup this command makes exactly two live model requests, one to
+`gpt-5.4-mini` and one to `gemini-3.1-flash-lite`. It is intentionally excluded
+from `pnpm test`, `pnpm check`, coverage, and CI because the requests can consume
+subscription quota or incur cost.
+
+The test reads the API key from the same automatically discovered CLIProxyAPI
+`config.yaml` used by the extension. These environment variables override its
+defaults:
+
+| Variable                                | Default                                |
+| --------------------------------------- | -------------------------------------- |
+| `MODELPROVIDER_E2E_BASE_URL`            | `http://127.0.0.1:8317`                |
+| `MODELPROVIDER_E2E_CONFIG_PATH`          | Automatically discovered config        |
+| `MODELPROVIDER_E2E_OPENAI_MODEL`         | `gpt-5.4-mini`                         |
+| `MODELPROVIDER_E2E_GEMINI_MODEL`         | `gemini-3.1-flash-lite`                |
+
+The suite covers request construction, model discovery, streaming transport,
+and SSE parsing. Extension Host registration and Copilot Chat UI behavior
+remain covered by unit and manual tests.
+
 ## License
 
 [MIT](./LICENSE.md).

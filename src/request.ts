@@ -12,6 +12,7 @@ import {
   LanguageModelToolCallPart,
   LanguageModelToolResultPart,
 } from 'vscode'
+import { normalizeToolSchema } from './tool-schema'
 
 export function buildRequest(
   model: ProviderModel,
@@ -34,7 +35,7 @@ export function buildRequest(
       type: 'function',
       name: tool.name,
       description: tool.description,
-      parameters: tool.inputSchema ?? { type: 'object', properties: {} },
+      parameters: normalizeToolSchema(tool.inputSchema ?? {}),
       strict: false,
     }))
     request.tool_choice = options.toolMode === LanguageModelChatToolMode.Required ? 'required' : 'auto'
