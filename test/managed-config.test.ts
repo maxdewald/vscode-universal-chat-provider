@@ -14,6 +14,8 @@ describe('managed config', () => {
       authDir: join('/tmp/store', 'auth'),
       configPath: join('/tmp/store', 'config.yaml'),
       logPath: join('/tmp/store', 'cliproxy.log'),
+      leaseDir: join('/tmp/store', 'leases'),
+      pidPath: join('/tmp/store', 'server.pid'),
     })
   })
 

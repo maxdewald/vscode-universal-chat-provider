@@ -2,11 +2,13 @@ import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
 import type { ManagedPaths } from './config'
 import { spawn } from 'node:child_process'
-import { closeSync, openSync } from 'node:fs'
+import { closeSync, openSync, rmSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { createServer } from 'node:net'
+import process from 'node:process'
 import { acquireBinary } from './binary'
 import { DEFAULT_PORT, setConfigPort } from './config'
+import { readServerPid, writeServerPid } from './lifecycle'
 
 const HEALTH_TIMEOUT_MS = 1500
 const STARTUP_TIMEOUT_MS = 20_000
@@ -92,9 +94,36 @@ export class ManagedServer {
 
   dispose(): void {
     // A detached daemon is meant to outlive a single window: drop our handle
-    // without killing it. Use `stop()` / restart for explicit teardown.
+    // without killing it. Use `stop()` / `shutdown()` for explicit teardown.
     this.child?.removeAllListeners()
     this.child = undefined
+  }
+
+  /**
+   * Stop the shared sidecar for good — called when the last window closes so no
+   * orphan is left behind. Works even for a window that merely adopted the
+   * server (and so holds no child handle) by falling back to the recorded pid.
+   */
+  shutdown(): void {
+    this.stopping = true
+    const child = this.child
+    this.child = undefined
+    this.adopted = false
+    this.port = undefined
+    if (child !== undefined && child.exitCode === null) {
+      child.kill()
+    }
+    else {
+      const pid = readServerPid(this.deps.paths.pidPath)
+      if (pid !== undefined) {
+        try {
+          process.kill(pid)
+        }
+        catch {}
+      }
+    }
+    rmSync(this.deps.paths.pidPath, { force: true })
+    this.stopping = false
   }
 
   private async start(signal?: AbortSignal): Promise<RunningServer> {
@@ -141,6 +170,8 @@ export class ManagedServer {
       })
       this.child = child
       this.stopping = false
+      if (child.pid !== undefined)
+        writeServerPid(this.deps.paths.pidPath, child.pid)
       child.unref()
       child.on('exit', (code, sig) => {
         if (this.child === child) {

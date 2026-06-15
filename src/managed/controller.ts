@@ -21,6 +21,7 @@ import {
   generateSecret,
   managedPaths,
 } from './config'
+import { claimLease, releaseLease } from './lifecycle'
 import { LOGIN_PROVIDERS, ManagementClient } from './management'
 import { ManagedServer } from './server'
 
@@ -254,8 +255,12 @@ export class ServerController implements ProxyConnection {
       clearTimeout(this.refreshDebounce)
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
-    // A detached daemon outlives the window: drop the handle, do not kill it.
-    this.server?.dispose()
+    // Release this window's lease. When it was the last one the shared sidecar
+    // is no longer used, so stop it; otherwise let it run for the other windows.
+    if (this.paths !== undefined && releaseLease(this.paths.leaseDir))
+      this.server?.shutdown()
+    else
+      this.server?.dispose()
   }
 
   private requestedVersion(): string {
@@ -278,6 +283,8 @@ export class ServerController implements ProxyConnection {
     this.paths = paths
     await mkdir(paths.root, { recursive: true })
     await mkdir(paths.authDir, { recursive: true })
+    // Register this window so the last one to close knows to stop the sidecar.
+    claimLease(paths.leaseDir)
 
     const apiKey = await this.ensureSecret(SECRET_KEY)
     this.managementKey = await this.ensureSecret(MGMT_KEY_SECRET)

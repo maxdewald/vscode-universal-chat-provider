@@ -18,6 +18,10 @@ export interface ManagedPaths {
   configPath: string
   /** Combined stdout/stderr log file for the detached server. */
   logPath: string
+  /** One lease file per open window; the last one out stops the sidecar. */
+  leaseDir: string
+  /** Records the running sidecar's process id so any window can stop it. */
+  pidPath: string
 }
 
 export function managedPaths(root: string): ManagedPaths {
@@ -27,6 +31,8 @@ export function managedPaths(root: string): ManagedPaths {
     authDir: join(root, 'auth'),
     configPath: join(root, 'config.yaml'),
     logPath: join(root, 'cliproxy.log'),
+    leaseDir: join(root, 'leases'),
+    pidPath: join(root, 'server.pid'),
   }
 }
 
