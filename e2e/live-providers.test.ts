@@ -1,4 +1,4 @@
-import type { ProviderModel } from '../src/model'
+import type { ProviderModel } from '../src/chat/model'
 import { resolve } from 'node:path'
 import untildify from 'untildify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -7,11 +7,13 @@ import {
   LanguageModelChatToolMode,
   LanguageModelTextPart,
 } from 'vscode'
-import { findConfigPath, normalizeBaseUrl } from '../src/credentials'
-import { readLocalProxyConfig } from '../src/local-config'
-import { mapProxyModels } from '../src/model'
-import { CLIProxyClient, ProxyHttpError } from '../src/proxy-client'
-import { buildRequest } from '../src/request'
+import { fetchCatalog } from '../src/chat/catalog'
+import { mapProxyModels } from '../src/chat/model'
+import { buildRequest } from '../src/chat/request'
+import { CLIProxyClient } from '../src/cliproxy/client'
+import { findConfigPath, normalizeBaseUrl } from '../src/cliproxy/credentials'
+import { ProxyHttpError } from '../src/cliproxy/errors'
+import { readLocalProxyConfig } from '../src/cliproxy/local-config'
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8317'
 const DEFAULT_OPENAI_MODEL = 'gpt-5.4-mini'
@@ -64,13 +66,16 @@ beforeAll(async () => {
 
   const discoveryController = trackedController()
   try {
-    const discovery = await client.discover(discoveryController.signal)
+    const [discovery, catalog] = await Promise.all([
+      client.discover(discoveryController.signal),
+      fetchCatalog(discoveryController.signal),
+    ])
     context = {
       client,
       models: mapProxyModels(
         discovery.available,
         discovery.metadata,
-        discovery.catalog,
+        catalog,
         { defaultMaxOutputTokens: MAX_OUTPUT_TOKENS },
       ),
     }

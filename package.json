@@ -192,6 +192,7 @@
     "ext:publish": "vsxpub --no-dependencies"
   },
   "dependencies": {
+    "eventsource-parser": "^3.1.0",
     "js-tiktoken": "^1.0.21",
     "moderndash": "^4.0.2",
     "untildify": "^6.0.0",

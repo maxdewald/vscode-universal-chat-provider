@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
-import type { ManagedPaths } from '../src/managed/config'
-import type { ServerDeps } from '../src/managed/server'
+import type { ManagedPaths } from '../src/cliproxy/managed/config'
+import type { ServerDeps } from '../src/cliproxy/managed/server'
 import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
@@ -9,10 +9,10 @@ import { join } from 'node:path'
 import { sleep, timeout } from 'moderndash'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { acquireBinary, DEFAULT_BINARY_VERSION } from '../src/managed/binary'
-import { buildManagedConfig, DEFAULT_HOST, generateSecret, managedPaths } from '../src/managed/config'
-import { claimLease, readServerPid, releaseLease } from '../src/managed/lifecycle'
-import { ManagedServer } from '../src/managed/server'
+import { acquireBinary, DEFAULT_BINARY_VERSION } from '../src/cliproxy/managed/binary'
+import { buildManagedConfig, DEFAULT_HOST, generateSecret, managedPaths } from '../src/cliproxy/managed/config'
+import { claimLease, readServerPid, releaseLease } from '../src/cliproxy/managed/leases'
+import { ManagedServer } from '../src/cliproxy/managed/server'
 
 const HOST = DEFAULT_HOST
 // Reuse a stable cache so the ~40 MB binary is downloaded at most once per machine.
