@@ -114,13 +114,14 @@ export function mapProxyModels(
       else
         displayName = advertisedName
     }
-    const tooltip = buildTooltip(displayName, displayProviderName, totalContext, maximumContext, outputTokens, reasoning.levels)
     const imageInput = detail?.input_modalities?.includes('image')
       ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
       ?? false
     const toolCalling = detail?.supports_parallel_tool_calls
       ?? catalogModel?.supported_parameters?.includes('tools')
       ?? true
+    const description = detail?.description ?? catalogModel?.description
+    const tooltip = buildTooltip(displayName, description, displayProviderName, outputTokens, imageInput, toolCalling)
 
     result.push({
       id: entry.id,
@@ -208,19 +209,50 @@ function isMediaOnly(id: string, model: CatalogModel | undefined): boolean {
   return /(?:^|[-_/])(?:image|video)(?:$|[-_/])/.test(id.toLowerCase())
 }
 
+// The hover renders `name` as the title, the input/output budget as "Max
+// context", and the reasoning selector as a "Thinking Effort" chip on its own.
+// The tooltip fills the remaining space with, at most, three stacked lines that
+// never repeat what the card already shows:
+//   <description, unless it just restates the name>
+//   <provider> via CLIProxyAPI
+//   <output> max output · Vision · Tools
 function buildTooltip(
   name: string,
+  description: string | undefined,
   provider: string,
-  context: number,
-  maximumContext: number,
   output: number,
-  reasoning: readonly string[],
+  imageInput: boolean,
+  toolCalling: boolean,
 ): string {
-  const contextText = maximumContext > context
-    ? `${formatTokens(context)} active / ${formatTokens(maximumContext)} maximum context`
-    : `${formatTokens(context)} context`
-  const reasoningText = reasoning.length > 0 ? ` Reasoning: ${reasoning.map(formatLevel).join(', ')}.` : ''
-  return `${name} via CLIProxyAPI (${provider}). ${contextText}; ${formatTokens(output)} maximum output.${reasoningText}`
+  const capabilities = [`${formatTokens(output)} max output`]
+  if (imageInput)
+    capabilities.push('Vision')
+  if (toolCalling)
+    capabilities.push('Tools')
+
+  const lines = [`${provider} via CLIProxyAPI`, capabilities.join(' · ')]
+  const summary = description?.trim()
+  if (summary !== undefined && summary.length > 0 && !isNameEcho(summary, name))
+    lines.unshift(endWithSentencePunctuation(summary))
+  return lines.join('\n\n')
+}
+
+function endWithSentencePunctuation(text: string): string {
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
+// A trailing reasoning qualifier such as " (Thinking)" or " (Low)" that some
+// providers append to a model's name. Stripped both when deriving the display
+// name and when comparing a description against it.
+const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
+
+// Many proxied providers fill `description` with nothing more than the model's
+// own name (e.g. "Claude Opus 4.6 (Thinking)"), which the card already shows as
+// the title. Treat those as no description so the tooltip never echoes the name.
+function isNameEcho(description: string, name: string): boolean {
+  const normalize = (text: string): string =>
+    text.trim().replace(/[.!?]+$/, '').replace(REASONING_NAME_SUFFIX, '').trim().toLowerCase()
+  return normalize(description) === normalize(name)
 }
 
 function formatTokens(value: number): string {
@@ -251,7 +283,7 @@ function formatProviderName(value: string): string {
 function normalizeReasoningModelName(name: string, levels: readonly string[]): string {
   if (levels.length < 2)
     return name
-  return name.replace(/\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i, '')
+  return name.replace(REASONING_NAME_SUFFIX, '')
 }
 
 function inferFamily(id: string): string {

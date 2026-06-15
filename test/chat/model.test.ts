@@ -230,8 +230,79 @@ describe('model mapping', () => {
         detail: '128K context · OpenAI',
       },
     ])
-    expect(models[0]?.tooltip).toContain('(Antigravity)')
-    expect(models[1]?.tooltip).toContain('(OpenAI)')
+    expect(models[0]?.tooltip).toContain('Antigravity via CLIProxyAPI')
+    expect(models[1]?.tooltip).toContain('OpenAI via CLIProxyAPI')
+  })
+
+  it('leads the tooltip with the model description and a compact spec line', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'claude-opus', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 64_000 }],
+      [{
+        slug: 'claude-opus',
+        display_name: 'Claude Opus 4.6',
+        description: 'Premium model combining maximum intelligence with practical performance',
+        input_modalities: ['text', 'image'],
+        supports_parallel_tool_calls: true,
+      }],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(model?.tooltip).toBe(
+      'Premium model combining maximum intelligence with practical performance.\n\n'
+      + 'Antigravity via CLIProxyAPI\n\n'
+      + '64K max output · Vision · Tools',
+    )
+    // The card already shows the name and context window, so the tooltip never repeats them.
+    expect(model?.tooltip).not.toContain('Claude Opus 4.6')
+    expect(model?.tooltip).not.toContain('200K')
+  })
+
+  it('omits the description line when it merely restates the model name', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'gemini-flash', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 }],
+      [{
+        slug: 'gemini-flash',
+        display_name: 'Gemini 3.1 Flash Lite',
+        description: 'Gemini 3.1 Flash Lite',
+        input_modalities: ['text', 'image'],
+        supports_parallel_tool_calls: true,
+      }],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(model?.tooltip).toBe('Antigravity via CLIProxyAPI\n\n65.5K max output · Vision · Tools')
+  })
+
+  it('omits descriptions that restate the name with a reasoning suffix', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'claude-opus-4-6-thinking', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 64_000 }],
+      [{
+        slug: 'claude-opus-4-6-thinking',
+        display_name: 'Claude Opus 4.6 (Thinking)',
+        description: 'Claude Opus 4.6 (Thinking)',
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }],
+        input_modalities: ['text', 'image'],
+        supports_parallel_tool_calls: true,
+      }],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(model?.name).toBe('Claude Opus 4.6')
+    expect(model?.tooltip).toBe('Antigravity via CLIProxyAPI\n\n64K max output · Vision · Tools')
+  })
+
+  it('falls back to the spec lines when no description is available', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'mystery', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
+      [],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(model?.tooltip).toBe('Proxy via CLIProxyAPI\n\n8.2K max output · Tools')
   })
 
   it('deduplicates IDs, applies safe numeric fallbacks, and filters catalog media models', () => {
