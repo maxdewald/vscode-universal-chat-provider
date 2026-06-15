@@ -87,7 +87,7 @@ export function deactivate(): void {
 function updateStatusBar(statusBar: StatusBarItem, status: ServerStatus): void {
   const presentation: Record<ServerStatus, { text: string, tooltip: string }> = {
     external: { text: '$(server) Universal Chat Provider', tooltip: 'Universal Chat Provider: using an external server' },
-    starting: { text: '$(sync~spin) Universal Chat Provider', tooltip: 'Universal Chat Provider: starting the managed server…' },
+    starting: { text: '$(loading~spin) Universal Chat Provider', tooltip: 'Universal Chat Provider: starting the managed server…' },
     running: { text: '$(server-process) Universal Chat Provider', tooltip: 'Universal Chat Provider: managed server running' },
     error: { text: '$(error) Universal Chat Provider', tooltip: 'Universal Chat Provider: managed server failed to start' },
   }
@@ -97,98 +97,86 @@ function updateStatusBar(statusBar: StatusBarItem, status: ServerStatus): void {
 }
 
 interface ActionItem extends QuickPickItem { command: string }
-interface ActionGroup { title: string, items: ActionItem[] }
+type Choice = QuickPickItem & { command?: string }
+
+function divider(): Choice {
+  return { label: '', kind: QuickPickItemKind.Separator }
+}
 
 async function manageProvider(): Promise<void> {
   const managed = controller?.mode() !== 'external'
   const snapshot = await controller?.statusSnapshot()
 
-  const groups: ActionGroup[] = [
-    {
-      title: 'Accounts',
-      items: [
-        {
-          label: '$(account) Add Account (Login)',
-          description: 'Sign in to Gemini, Codex, Claude, and more',
-          command: 'universalChatProvider.login',
-        },
-        {
-          label: '$(organization) Manage Accounts',
-          description: 'List or remove connected provider accounts',
-          command: 'universalChatProvider.manageAccounts',
-        },
-      ],
-    },
-    {
-      title: 'Models',
-      items: [
-        {
-          label: '$(refresh) Refresh Models',
-          description: 'Re-read models and capabilities from CLIProxyAPI',
-          command: 'universalChatProvider.refresh',
-        },
-        {
-          label: '$(sparkle) Select Commit Message Model',
-          description: 'Choose the CLIProxyAPI model used only for commit messages',
-          command: 'universalChatProvider.selectCommitMessageModel',
-        },
-      ],
-    },
+  // Logical groups, separated only by plain dividers — the descriptions carry
+  // the meaning, so no floating section labels are needed.
+  const groups: ActionItem[][] = [
+    [
+      {
+        label: '$(account) Add Account (Login)',
+        description: 'Gemini, Codex, Claude, and more',
+        command: 'universalChatProvider.login',
+      },
+      {
+        label: '$(organization) Manage Accounts',
+        description: 'List or remove connected accounts',
+        command: 'universalChatProvider.manageAccounts',
+      },
+    ],
+    [
+      {
+        label: '$(refresh) Refresh Models',
+        description: 'Reload models and capabilities',
+        command: 'universalChatProvider.refresh',
+      },
+      {
+        label: '$(sparkle) Select Commit Message Model',
+        description: 'Model used for commit messages',
+        command: 'universalChatProvider.selectCommitMessageModel',
+      },
+    ],
     managed
-      ? {
-          title: 'Server',
-          items: [
-            {
-              label: '$(debug-restart) Restart Server',
-              description: 'Restart the managed CLIProxyAPI server',
-              command: 'universalChatProvider.restartServer',
-            },
-            {
-              label: '$(cloud-download) Update Proxy Binary',
-              description: 'Download and run the configured CLIProxyAPI version',
-              command: 'universalChatProvider.updateBinary',
-            },
-            {
-              label: '$(trash) Reset Managed Server',
-              description: 'Recreate the generated config and keys',
-              command: 'universalChatProvider.resetServer',
-            },
-          ],
-        }
-      : {
-          title: 'Connection',
-          items: [
-            {
-              label: '$(settings-gear) Configure Connection',
-              description: 'Set the proxy URL and optional config path',
-              command: 'universalChatProvider.configure',
-            },
-            {
-              label: '$(key) Import API Key from Config',
-              description: 'Store a key from CLIProxyAPI config.yaml and refresh models',
-              command: 'universalChatProvider.importConfig',
-            },
-          ],
-        },
-    {
-      title: 'Credentials',
-      items: [
-        {
-          label: '$(trash) Clear Stored API Key',
-          description: 'Remove the key from VS Code SecretStorage',
-          command: 'universalChatProvider.clearCredentials',
-        },
-      ],
-    },
+      ? [
+          {
+            label: '$(debug-restart) Restart Server',
+            description: 'Restart the managed server',
+            command: 'universalChatProvider.restartServer',
+          },
+          {
+            label: '$(cloud-download) Update Proxy Binary',
+            description: 'Install the configured version',
+            command: 'universalChatProvider.updateBinary',
+          },
+          {
+            label: '$(discard) Reset Managed Server',
+            description: 'Recreate the config and keys',
+            command: 'universalChatProvider.resetServer',
+          },
+        ]
+      : [
+          {
+            label: '$(settings-gear) Configure Connection',
+            description: 'Set the proxy URL and config path',
+            command: 'universalChatProvider.configure',
+          },
+          {
+            label: '$(key) Import API Key from Config',
+            description: 'Load an API key from config.yaml',
+            command: 'universalChatProvider.importConfig',
+          },
+        ],
+    [
+      {
+        label: '$(trash) Clear Stored API Key',
+        description: 'Remove the key from SecretStorage',
+        command: 'universalChatProvider.clearCredentials',
+      },
+    ],
   ]
 
-  const choices: Array<QuickPickItem & { command?: string }> = [
-    ...(snapshot !== undefined ? [statusEntry(snapshot)] : []),
-    ...groups.flatMap(group => [
-      { label: group.title, kind: QuickPickItemKind.Separator },
-      ...group.items,
-    ]),
-  ]
+  const body = groups.flatMap((group, index) => (index === 0 ? group : [divider(), ...group]))
+  const choices: Choice[] = snapshot !== undefined
+    ? [statusEntry(snapshot), divider(), ...body]
+    : body
   const selected = await window.showQuickPick(choices, {
     title: 'Manage Universal Chat Provider',
     placeHolder: 'Choose an action',
@@ -204,7 +192,7 @@ async function manageProvider(): Promise<void> {
 function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command: string } {
   const presentation: Record<ServerStatus, { icon: string, label: string }> = {
     external: { icon: '$(server)', label: 'External CLI Proxy API server' },
-    starting: { icon: '$(sync~spin)', label: 'Managed CLI Proxy API server starting…' },
+    starting: { icon: '$(loading~spin)', label: 'Managed CLI Proxy API server starting…' },
     running: { icon: '$(server-process)', label: 'Managed CLI Proxy API server running' },
     error: { icon: '$(error)', label: 'Managed CLI Proxy API server failed to start' },
   }
