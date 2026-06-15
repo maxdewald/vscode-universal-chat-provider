@@ -25,7 +25,7 @@ import { streamCompletion } from './completion'
 import { CredentialFlows } from './credential-flows'
 import { ModelRegistry } from './model-registry'
 import { buildRequest, buildTextRequest } from './request'
-import { countTokens } from './tokenizer'
+import { TokenCounter } from './token-counter'
 
 /**
  * The VS Code language-model provider surface. It owns the collaborators —
@@ -36,6 +36,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly credentials: CredentialStore
   private readonly registry: ModelRegistry
   private readonly credentialFlows: CredentialFlows
+  private readonly tokenCounter: TokenCounter
 
   constructor(
     context: ExtensionContext,
@@ -49,6 +50,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       onCredentialsAccepted: () => this.credentialFlows.markCredentialsAccepted(),
     })
     this.credentialFlows = new CredentialFlows(this.credentials, this.registry, output)
+    this.tokenCounter = new TokenCounter({ connection, credentials: this.credentials, output })
   }
 
   get onDidChangeLanguageModelChatInformation(): Event<void> {
@@ -100,13 +102,11 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   async provideTokenCount(
-    _model: ProviderModel,
+    model: ProviderModel,
     value: string | LanguageModelChatRequestMessage,
     token: CancellationToken,
   ): Promise<number> {
-    if (token.isCancellationRequested)
-      return 0
-    return countTokens(value)
+    return this.tokenCounter.count(model, value, token)
   }
 
   async getModels(interactive: boolean, token?: CancellationToken): Promise<readonly ProviderModel[]> {

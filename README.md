@@ -119,8 +119,13 @@ provider returns them.
 
 VS Code requires custom language model providers to implement
 `provideTokenCount`; it does not tokenize arbitrary provider requests itself.
-This extension uses `js-tiktoken` with `o200k_base` for local estimates. Exact
-server-side usage is still reported by CLIProxyAPI after a response.
+This extension does not estimate locally: it counts every request through
+CLIProxyAPI's `count_tokens` endpoint, which routes by model and uses the
+upstream provider's own tokenizer (a server-side GPT tokenizer for OpenAI/Codex,
+the native count endpoint for Claude/Gemini/etc.). Counts are cached by content
+so stable history is counted at most once, and a count that cannot be obtained
+contributes nothing rather than a guess. Exact server-side usage is also
+reported by CLIProxyAPI after a response.
 
 ## Configurations
 

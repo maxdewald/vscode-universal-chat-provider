@@ -5,6 +5,10 @@ import { capitalize, unique } from 'moderndash'
 export interface ProxyModelListEntry {
   id: string
   owned_by?: string
+  /** Context window reported by the proxy's own `/v1/models` (OpenAI format). */
+  context_length?: number
+  /** Maximum output tokens reported by the proxy's own `/v1/models`. */
+  max_completion_tokens?: number
 }
 
 export interface ReasoningLevel {
@@ -35,6 +39,8 @@ export interface ProviderModel extends LanguageModelChatInformation {
 
 export interface ModelMappingOptions {
   defaultMaxOutputTokens: number
+  /** Invoked when a chat model is dropped because no context window is known. */
+  onSkipped?: (id: string, reason: string) => void
 }
 
 const LEVEL_DESCRIPTIONS: Record<string, string> = {
@@ -69,18 +75,27 @@ export function mapProxyModels(
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
+    // Context size comes from the proxy first (its `/v1/models` reports an exact
+    // `context_length` for every chat model), then enhanced metadata, then the
+    // shared catalog. We never invent a number: a model the proxy cannot size is
+    // dropped rather than shown with a guessed window that would compress early.
+    const totalContext = firstPositiveInteger(
+      entry.context_length,
+      detail?.context_window,
+      catalogModel?.context_length,
+      catalogModel?.inputTokenLimit,
+    )
+    if (totalContext === undefined) {
+      options.onSkipped?.(entry.id, 'no context window reported by the proxy')
+      continue
+    }
+
     const outputTokens = positiveInteger(
-      catalogModel?.max_completion_tokens
+      entry.max_completion_tokens
+      ?? catalogModel?.max_completion_tokens
       ?? catalogModel?.outputTokenLimit
       ?? options.defaultMaxOutputTokens,
       options.defaultMaxOutputTokens,
-    )
-    const totalContext = positiveInteger(
-      detail?.context_window
-      ?? catalogModel?.context_length
-      ?? catalogModel?.inputTokenLimit
-      ?? 128_000,
-      128_000,
     )
     const maximumContext = positiveInteger(detail?.max_context_window ?? totalContext, totalContext)
     const maxInputTokens = Math.max(1, totalContext - Math.min(outputTokens, totalContext - 1))
@@ -247,6 +262,15 @@ function inferFamily(id: string): string {
 
 function positiveInteger(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+}
+
+/** First candidate that is a positive, finite integer, or undefined if none qualify. */
+function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {
+  for (const value of values) {
+    if (value !== undefined && Number.isFinite(value) && value > 0)
+      return Math.floor(value)
+  }
+  return undefined
 }
 
 function normalizedUnique(values: readonly string[]): string[] {

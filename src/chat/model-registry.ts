@@ -89,6 +89,7 @@ export class ModelRegistry {
       const settings = workspace.getConfiguration('universalChatProvider')
       const models = mapProxyModels(discovery.available, discovery.metadata, catalog, {
         defaultMaxOutputTokens: settings.get<number>('defaultMaxOutputTokens', 16_384),
+        onSkipped: (id, reason) => this.output.appendLine(`Skipped model ${id}: ${reason}.`),
       })
       const fingerprint = JSON.stringify(models)
       if (fingerprint !== this.cachedFingerprint) {

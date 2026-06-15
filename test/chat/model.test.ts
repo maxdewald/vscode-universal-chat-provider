@@ -53,9 +53,9 @@ describe('model mapping', () => {
   it('keeps every provider model while filtering media-only endpoints', () => {
     const models = mapProxyModels(
       [
-        { id: 'claude-sonnet', owned_by: 'anthropic' },
-        { id: 'gemini-pro', owned_by: 'google' },
-        { id: 'image-generation', owned_by: 'openai' },
+        { id: 'claude-sonnet', owned_by: 'anthropic', context_length: 200_000 },
+        { id: 'gemini-pro', owned_by: 'google', context_length: 1_000_000 },
+        { id: 'image-generation', owned_by: 'openai', context_length: 4096 },
       ],
       [],
       new Map(),
@@ -72,9 +72,9 @@ describe('model mapping', () => {
     ]
     const models = mapProxyModels(
       [
-        { id: 'gemini-3-pro-high', owned_by: 'antigravity' },
-        { id: 'gemini-3-pro-low', owned_by: 'antigravity' },
-        { id: 'claude-opus-thinking', owned_by: 'antigravity' },
+        { id: 'gemini-3-pro-high', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'gemini-3-pro-low', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'claude-opus-thinking', owned_by: 'antigravity', context_length: 200_000 },
       ],
       [
         {
@@ -120,7 +120,7 @@ describe('model mapping', () => {
 
   it('keeps fixed reasoning names when no selector can be offered', () => {
     const [model] = mapProxyModels(
-      [{ id: 'fixed-high', owned_by: 'proxy' }],
+      [{ id: 'fixed-high', owned_by: 'proxy', context_length: 128_000 }],
       [{
         slug: 'fixed-high',
         display_name: 'Fixed Model (High)',
@@ -137,8 +137,8 @@ describe('model mapping', () => {
   it('keeps distinct aliases when their reasoning choices differ', () => {
     const models = mapProxyModels(
       [
-        { id: 'model-high', owned_by: 'proxy' },
-        { id: 'model-low', owned_by: 'proxy' },
+        { id: 'model-high', owned_by: 'proxy', context_length: 128_000 },
+        { id: 'model-low', owned_by: 'proxy', context_length: 128_000 },
       ],
       [
         {
@@ -212,8 +212,8 @@ describe('model mapping', () => {
   it('capitalizes provider names in model details and tooltips', () => {
     const models = mapProxyModels(
       [
-        { id: 'gpt', owned_by: 'openai' },
-        { id: 'gemini', owned_by: 'antigravity' },
+        { id: 'gpt', owned_by: 'openai', context_length: 128_000 },
+        { id: 'gemini', owned_by: 'antigravity', context_length: 128_000 },
       ],
       [],
       new Map(),
@@ -238,8 +238,8 @@ describe('model mapping', () => {
     const models = mapProxyModels(
       [
         { id: '' },
-        { id: 'tiny' },
-        { id: 'tiny' },
+        { id: 'tiny', context_length: 128_000 },
+        { id: 'tiny', context_length: 128_000 },
         { id: 'picture' },
         { id: 'audio-only' },
       ],
@@ -260,6 +260,28 @@ describe('model mapping', () => {
       totalContextTokens: 128_000,
       maximumContextTokens: 128_000,
     })
+  })
+
+  it('prefers the proxy context window and drops models with none, reporting the skip', () => {
+    const skipped: string[] = []
+    const models = mapProxyModels(
+      [
+        { id: 'sized', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+        { id: 'unsized', owned_by: 'openai' },
+      ],
+      [{ slug: 'sized', context_window: 999 }],
+      new Map(),
+      { defaultMaxOutputTokens: 8192, onSkipped: id => skipped.push(id) },
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      id: 'sized',
+      totalContextTokens: 256_000,
+      maxOutputTokens: 32_000,
+      maxInputTokens: 224_000,
+    })
+    expect(skipped).toEqual(['unsized'])
   })
 
   it('ignores malformed catalog sections', () => {

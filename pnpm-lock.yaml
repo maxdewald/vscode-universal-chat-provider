@@ -11,9 +11,6 @@ importers:
       eventsource-parser:
         specifier: ^3.1.0
         version: 3.1.0
-      js-tiktoken:
-        specifier: ^1.0.21
-        version: 1.0.21
       moderndash:
         specifier: ^4.0.2
         version: 4.0.2
@@ -2001,9 +1998,6 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
-
-  js-tiktoken@1.0.21:
-    resolution: {integrity: sha512-biOj/6M5qdgx5TKjDnFT1ymSpM5tbd3ylwDtrQvFQSu0Z7bBYko2dF+W/aUkXUPuk6IVpRxk/3Q2sHOzGlS36g==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -4357,7 +4351,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  base64-js@1.5.1: {}
+  base64-js@1.5.1:
+    optional: true
 
   baseline-browser-mapping@2.10.36: {}
 
@@ -5287,10 +5282,6 @@ snapshots:
       textextensions: 6.11.0
 
   jiti@2.7.0: {}
-
-  js-tiktoken@1.0.21:
-    dependencies:
-      base64-js: 1.5.1
 
   js-tokens@10.0.0: {}
 
