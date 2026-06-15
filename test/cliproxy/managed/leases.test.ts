@@ -56,7 +56,6 @@ describe('window leases', () => {
     expect(readServerPid(pidPath)).toBeUndefined()
   })
 
-  /** A do-nothing child that stays alive until killed, giving us a real pid. */
   function liveProcess(): ChildProcess {
     const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
     spawned.push(child)

@@ -10,7 +10,6 @@ import {
   normalizeCommitMessage,
 } from './prompt'
 
-/** The slice of the chat provider the commit feature needs. */
 export interface CommitMessageProvider {
   getModels: (interactive: boolean, token?: CancellationToken) => Promise<readonly ProviderModel[]>
   completeText: (
@@ -25,7 +24,6 @@ interface ModelQuickPickItem extends QuickPickItem {
   readonly model: ProviderModel
 }
 
-/** Generates commit messages from repository changes via the chat provider. */
 export class CommitMessageService {
   constructor(private readonly provider: CommitMessageProvider) {}
 

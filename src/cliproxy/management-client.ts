@@ -1,6 +1,5 @@
 import { isPlainObject } from 'moderndash'
 
-/** OAuth providers CLIProxyAPI can log in, in the order shown in the picker. */
 export interface LoginProvider {
   id: string
   label: string
@@ -18,7 +17,6 @@ export const LOGIN_PROVIDERS: readonly LoginProvider[] = [
   { id: 'xai', label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url' },
 ]
 
-/** A reachable CLIProxyAPI management API: its base URL and bearer key. */
 export interface ManagementEndpoint {
   baseUrl: string
   key: string
@@ -40,7 +38,6 @@ export class ManagementError extends Error {
   }
 }
 
-/** Thin typed client over the CLIProxyAPI `/v0/management` API. */
 export class ManagementClient {
   constructor(
     private readonly baseUrl: string,
@@ -73,7 +70,6 @@ export class ManagementClient {
     await this.send('DELETE', `/auth-files?name=${encodeURIComponent(name)}`, undefined, signal)
   }
 
-  /** Manual no-browser fallback: hand the provider redirect back to the server. */
   async postOAuthCallback(body: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
     await this.send('POST', '/oauth-callback', body, signal)
   }

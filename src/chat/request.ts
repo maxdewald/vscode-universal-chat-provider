@@ -107,7 +107,6 @@ export function buildCountPayload(
   }
 }
 
-/** Stable identity for caching a count result by its exact content. */
 export function fingerprintCountValue(value: string | LanguageModelChatRequestMessage): string {
   if (typeof value === 'string')
     return `string:${value}`

@@ -2,7 +2,6 @@ import type { StatusBarItem } from 'vscode'
 import type { ServerStatus } from '../cliproxy/controller'
 import { StatusBarAlignment, window } from 'vscode'
 
-/** Create the manage-provider status bar item (opens the manage menu on click). */
 export function createStatusBar(): StatusBarItem {
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right, 100)
   statusBar.command = 'universalChatProvider.manage'

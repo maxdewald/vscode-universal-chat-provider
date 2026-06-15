@@ -19,23 +19,19 @@ import { acquireBinary, DEFAULT_BINARY_VERSION } from './managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
+import { LogTailer } from './managed/log-tailer'
 import { ManagementClient } from './management-client'
 import { buildStatusSnapshot } from './status'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 
-/**
- * Owns the managed-server experience and exposes the {@link ProxyConnection} the
- * provider talks to. In `external` mode it falls back to user settings, so the
- * provider needs no knowledge of which mode is active. Provisioning, account
- * flows, and status assembly are delegated to focused collaborators.
- */
 export class ServerController implements ProxyConnection {
   private readonly disposables: Disposable[] = []
   private readonly accounts: AccountsService
   private server: ManagedServer | undefined
   private paths: ManagedPaths | undefined
   private managementKey: string | undefined
+  private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
   private refreshDebounce: ReturnType<typeof setTimeout> | undefined
   private refreshListener: (() => void) | undefined
@@ -45,6 +41,7 @@ export class ServerController implements ProxyConnection {
   constructor(
     private readonly context: ExtensionContext,
     private readonly output: OutputChannel,
+    private readonly serverOutput: OutputChannel,
   ) {
     this.accounts = new AccountsService({
       resolveManagement: async start => this.resolveManagement(start),
@@ -155,7 +152,6 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  /** Stop the server and discard generated config + secrets (keeps accounts). */
   async resetServer(): Promise<void> {
     const confirm = await window.showWarningMessage(
       'Reset the managed CLIProxyAPI server? Generated config and keys are recreated; connected accounts are kept.',
@@ -214,6 +210,12 @@ export class ServerController implements ProxyConnection {
     this.server = state.server
     this.managementKey = state.managementKey
     this.disposables.push(...watchAuthDir(state.paths.authDir, () => this.scheduleRefresh()))
+    // Follow the shared server log into its own channel. The path is stable for
+    // the window's lifetime, so one tailer survives re-bootstraps (e.g. reset).
+    if (this.logTailer === undefined) {
+      this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()
+      this.disposables.push(this.logTailer)
+    }
   }
 
   /** A healthy server is ours only if it accepts our management key. */
@@ -269,7 +271,6 @@ export class ServerController implements ProxyConnection {
     return { baseUrl: this.baseUrl(), key }
   }
 
-  /** The live managed endpoint when one is running; no side effects. */
   private currentManagement(): ManagementEndpoint | undefined {
     const baseUrl = this.server?.baseUrl()
     if (baseUrl === undefined || this.managementKey === undefined)
@@ -297,7 +298,6 @@ export class ServerController implements ProxyConnection {
     this.statusListener?.(status)
   }
 
-  /** Management endpoint for a status probe, only when one is already known. */
   private async managementForStatus(): Promise<ManagementEndpoint | undefined> {
     if (this.mode() === 'external') {
       const key = await this.externalManagementKey()
@@ -312,12 +312,15 @@ export class ServerController implements ProxyConnection {
       `CLIProxyAPI could not start: ${errorMessage(error)}`,
       'Retry',
       'Show Logs',
+      'Show Server Output',
       'Use External Server',
     ).then(async (choice) => {
       if (choice === 'Retry')
         await this.ensureReady(true)
       else if (choice === 'Show Logs')
         this.output.show(true)
+      else if (choice === 'Show Server Output')
+        this.serverOutput.show(true)
       else if (choice === 'Use External Server')
         await workspace.getConfiguration('universalChatProvider').update('server.mode', 'external', ConfigurationTarget.Global)
     })

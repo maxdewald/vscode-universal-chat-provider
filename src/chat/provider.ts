@@ -27,11 +27,6 @@ import { ModelRegistry } from './model-registry'
 import { buildRequest, buildTextRequest } from './request'
 import { TokenCounter } from './token-counter'
 
-/**
- * The VS Code language-model provider surface. It owns the collaborators —
- * {@link ModelRegistry} for discovery, {@link CredentialFlows} for onboarding,
- * and {@link streamCompletion} for requests — and wires them together.
- */
 export class UniversalChatProvider implements LanguageModelChatProvider<ProviderModel> {
   private readonly credentials: CredentialStore
   private readonly registry: ModelRegistry

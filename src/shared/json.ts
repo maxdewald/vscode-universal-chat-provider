@@ -1,11 +1,9 @@
 import { isPlainObject } from 'moderndash'
 
-/** The value when it is a string, otherwise undefined. */
 export function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-/** The value when it is a plain object, otherwise undefined. */
 export function asRecord(value: unknown): Record<string, unknown> | undefined {
   return isPlainObject(value) ? value : undefined
 }

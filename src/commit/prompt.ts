@@ -1,4 +1,3 @@
-/** Output-token budget for a full message (with body) vs a subject-only line. */
 export const COMMIT_MESSAGE_OUTPUT_TOKENS = 512
 export const COMMIT_SUBJECT_OUTPUT_TOKENS = 64
 

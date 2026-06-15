@@ -13,7 +13,6 @@ export interface LocalProxyConfig {
   authDir: string
   /** Plaintext `remote-management.secret-key`, when set and not yet hashed. */
   managementKey?: string
-  /** Configured server port, used to reach an external instance's management API. */
   port?: number
 }
 

@@ -10,11 +10,11 @@ export interface CommandDeps {
   controller: ServerController
   commitMessages: CommitMessageService
   output: OutputChannel
+  serverOutput: OutputChannel
 }
 
-/** Register every `universalChatProvider.*` command and return its disposables. */
 export function registerCommands(deps: CommandDeps): Disposable[] {
-  const { provider, controller, commitMessages, output } = deps
+  const { provider, controller, commitMessages, output, serverOutput } = deps
   return [
     commands.registerCommand('universalChatProvider.manage', async () => manageProvider(controller)),
     commands.registerCommand('universalChatProvider.login', async () => {
@@ -58,5 +58,6 @@ export function registerCommands(deps: CommandDeps): Disposable[] {
         await provider.clearCredentials()
     }),
     commands.registerCommand('universalChatProvider.showLogs', () => output.show(true)),
+    commands.registerCommand('universalChatProvider.showServerLogs', () => serverOutput.show(true)),
   ]
 }

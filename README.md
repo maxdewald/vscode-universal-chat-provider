@@ -1,133 +1,120 @@
-# Universal Chat Provider
+<div align="center">
 
-Expose the chat-capable models from a local
-[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) server in GitHub
-Copilot Chat, and use those models to generate Git commit messages without a
-Copilot subscription.
+<img src="res/logo.png" width="132" alt="Universal Chat Provider logo" />
 
-The extension discovers models from CLIProxyAPI, enriches them with context,
-output, tool, image, and reasoning metadata, and refreshes the list on startup
-and when the local CLIProxyAPI configuration changes. Models with multiple
-reasoning levels use VS Code's native
-**Thinking Effort** selector; they are not duplicated into separate model
-entries.
+<h1>Universal Chat Provider</h1>
 
-## Requirements
+<p>
+  <b>Bring your Claude, ChatGPT&nbsp;/&nbsp;Codex, and Gemini subscriptions into GitHub&nbsp;Copilot&nbsp;Chat</b><br/>
+  <sub>…and use them to write your Git commit messages, too.</sub>
+</p>
 
-- VS Code 1.124 or newer
-- GitHub Copilot Chat
+<p>
+  <img src="https://img.shields.io/badge/VS%20Code-%5E1.124-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code ^1.124" />
+  <img src="https://img.shields.io/badge/Marketplace-coming%20soon-654FF0?logo=visualstudiocode&logoColor=white" alt="Marketplace · coming soon" />
+  <img src="https://img.shields.io/badge/license-MIT-3da639" alt="MIT License" />
+</p>
 
-GitHub Copilot Chat is required to expose the models in Chat, but it is not
-required for commit-message generation. The commit feature uses VS Code's
-built-in Git extension and talks directly to CLIProxyAPI.
+<p>
+  <img src="https://img.shields.io/badge/Claude-D97757?logo=anthropic&logoColor=white" alt="Claude" />
+  <img src="https://img.shields.io/badge/ChatGPT%20·%20Codex-10A37F?logo=openai&logoColor=white" alt="ChatGPT / Codex" />
+  <img src="https://img.shields.io/badge/Gemini-8E75B2?logo=googlegemini&logoColor=white" alt="Gemini" />
+  <img src="https://img.shields.io/badge/Grok-202020?logo=x&logoColor=white" alt="Grok" />
+</p>
 
-This extension uses the proposed `chatProvider`,
-`contribSourceControlInputBoxMenu`, and `languageModelThinkingPart` APIs.
-Proposed API extensions must be installed from a VSIX and cannot be published
-as ordinary Marketplace extensions.
+<p>
+  <a href="#features"><b>Features</b></a> &nbsp;·&nbsp;
+  <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
+  <a href="#supported-logins"><b>Logins</b></a> &nbsp;·&nbsp;
+  <a href="#configuration"><b>Configuration</b></a>
+</p>
 
-## Server modes
+</div>
 
-The provider talks to a CLIProxyAPI server. The `universalChatProvider.server.mode`
-setting controls where that server comes from:
+---
 
-- **`managed`** (default): the extension downloads, verifies, runs, and
-  supervises a CLIProxyAPI binary for you. Nothing to install. The binary is
-  cached under the extension's global storage, secrets are generated
-  automatically, and one shared server is reused across all VS Code windows.
-- **`external`**: the extension connects to a CLIProxyAPI server you start
-  yourself, using `universalChatProvider.baseUrl` and your own API key. This is the way
-  to point at a remote or shared instance.
+## Features
 
-### Managed mode (zero setup)
+- **Native model picker** — your subscription models appear under *Universal Chat Provider* in Copilot Chat, with context, output, tool, image, and reasoning metadata.
+- **Native Thinking Effort** — models with multiple reasoning levels use VS Code's built-in selector instead of duplicated entries.
+- **Commit messages** — generate a message from staged changes via the ✨ action in the Source Control input. No Copilot subscription required.
+- **Zero setup (managed mode)** — the extension downloads, verifies, and supervises the proxy for you; one shared server across all windows.
+- **Accurate token counts** — every request is counted through the upstream provider's own tokenizer, never a local guess.
 
-1. Build and package the extension with `pnpm install && pnpm ext:package`, then
-   install the generated VSIX in VS Code Insiders.
-2. On first start the extension downloads the platform binary, generates its
-   config and keys, and starts the server in the background. Watch the status
-   bar item for progress.
-3. When no provider accounts are connected yet, accept the **Add Account**
-   prompt — or run **Universal Chat Provider: Add Account (Login)** anytime — and pick a
-   provider (Gemini, Codex, Claude, Antigravity, Kimi, xAI). The system browser
-   opens the provider's OAuth page and the running server captures the
-   redirect; the account is saved and models refresh automatically.
-4. Open Copilot Chat and choose a model under the **Universal Chat Provider** provider.
+## Supported logins
 
-Use **Universal Chat Provider: Manage Accounts** to list or remove connected accounts,
-**Restart Managed Server** / **Update Proxy Binary** to maintain it, and
-**Reset Managed Server** to recreate the generated config and keys.
+| Provider             | Account                |
+| -------------------- | ---------------------- |
+| 🟣 Anthropic Claude  | Claude Code / Pro / Max |
+| 🟢 OpenAI Codex      | ChatGPT Plus / Pro     |
+| 🔵 Google Gemini     | Gemini CLI             |
+| ⚫ Antigravity       | Antigravity            |
+| 🟡 Kimi              | Moonshot Kimi          |
+| ⚪ xAI Grok          | Grok Build             |
 
-The downloaded binary defaults to a pinned version (`universalChatProvider.server.version`);
-set it to `latest` to track new releases, and use **Update Proxy Binary** to
-apply an update. The managed server is launched detached so it keeps running in
-the background, and is adopted (not duplicated) by other windows.
+## Quick start
 
-### External mode (bring your own server)
+> Requires **VS Code 1.124+** and the **GitHub Copilot Chat** extension.
+
+1. **Install** — get *Universal Chat Provider* from the **VS Code Marketplace** _(coming soon)_. Prefer to build it yourself? See [Development](#development).
+2. **Add an account** — accept the **Add Account** prompt (or run *Universal Chat Provider: Add Account (Login)*), pick a provider, and complete OAuth in your browser. Models refresh automatically.
+3. **Chat** — open Copilot Chat and select a model under **Universal Chat Provider**.
+
+Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — list/remove accounts, restart, update, or reset the managed server.
+
+<details>
+<summary><b>External mode</b> — bring your own CLIProxyAPI server</summary>
+
+<br>
+
+Prefer to run CLIProxyAPI yourself (e.g. a remote or shared instance)?
 
 1. Set `universalChatProvider.server.mode` to `external`.
-2. Start CLIProxyAPI yourself and complete the provider login flow there.
-3. Use the bottom **Import API Key** notification action when a local config is
-   found, or **Configure Connection** to set the URL and key manually.
+2. Start CLIProxyAPI and complete the provider login there.
+3. Use the **Import API Key** notification action (when a local config is found) or *Configure Connection* to set the URL and key manually.
 
-The API key is stored in VS Code `SecretStorage`. In external mode the
-extension never starts or stops CLIProxyAPI. If your own server sets a plaintext
-`remote-management.secret-key`, the **Add Account (Login)** and **Manage
-Accounts** commands work against it too.
+The API key is stored in VS Code `SecretStorage`. In external mode the extension never starts or stops the server. If your server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
 
-In managed mode the extension watches its `auth-dir` for credential changes and
-refreshes models after a short debounce, so accounts added in-editor or via the
-CLI appear without a manual refresh. In external mode, logins completed
-in-editor refresh automatically and **Refresh Models** picks up changes made
-directly on the server.
+</details>
 
-## Commit Messages
+> [!WARNING]
+> **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI **subscription** accounts (Claude, ChatGPT / Codex, Gemini, …) over OAuth. Accessing these subscriptions outside their official apps may violate the providers' **Terms of Service** and could result in rate limiting or account suspension. You alone are responsible for how you use it.
 
-The sparkle action in the Git Source Control input generates a commit message
-from staged changes. When nothing is staged, it falls back to tracked and
-untracked working-tree changes. The generated message is placed in the input
-box for review and is never committed automatically.
+## Commit messages
 
-Commit-message model selection is independent from Chat. The selected model is
-remembered in `universalChatProvider.commitMessage.model`; if no model is selected, the
-extension automatically uses the only available model or opens a live picker.
-Use **Universal Chat Provider: Select Commit Message Model** to change it.
+Click the ✨ action in the Source Control input to draft a [Conventional Commits](https://www.conventionalcommits.org) subject from your staged changes (falling back to working-tree changes when nothing is staged). The message lands in the input box for review — it is **never committed automatically**.
 
-By default, the generator requests a single-line Conventional Commit subject
-with no body. Set `universalChatProvider.commitMessage.instructions` to replace
-that style with repository-specific instructions, for example to opt into a
-short body. Diff context is bounded per file and per request, and unresolved
-merge conflicts must be resolved before generation.
+Commit-model selection is independent from Chat (*Select Commit Message Model*). Set `universalChatProvider.commitMessage.instructions` to customize the style, e.g. to opt into a body.
 
-## Model Metadata
+## How it works
 
-The provider reads CLIProxyAPI's standard and enhanced model-list endpoints.
-It reports:
+GitHub Copilot Chat normally only talks to Copilot's own models. This extension bridges that gap: it runs a local [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) server, logs you into your AI subscriptions via OAuth, and registers their models as a **native chat provider** in VS Code. Pick them straight from the Copilot model dropdown.
 
-- active and maximum context sizes
-- maximum output tokens
-- image-input and tool-calling support
-- all reported reasoning efforts through the native selector
-- streaming text, thinking summaries, tool calls, and usage
+```
+   Your subscriptions          Local proxy             VS Code
+  ┌────────────────────┐     ┌──────────────┐     ┌──────────────────┐
+  │ Claude             │     │              │     │  Copilot Chat     │
+  │ ChatGPT / Codex    │──┐  │              │  ┌─▶│   model picker    │
+  │ Gemini             │  ├─▶│  CLIProxyAPI │──┤  ├──────────────────┤
+  │ Grok · Kimi · …    │──┘  │   (OAuth)    │  └─▶│  Commit messages  │
+  └────────────────────┘     └──────────────┘     └──────────────────┘
+```
 
-Chat requests include a stable `prompt_cache_key` derived from the initial chat
-seed. CLIProxyAPI uses it for Codex prompt-cache reuse and reasoning replay
-cache lookup. The same value is sent as `Session_id` so optional
-`session-affinity` auth selection stays sticky without relying on changing
-message-history hashes. Cache effectiveness can be checked in the provider
-output usage lines; CLIProxyAPI reports cached token counts when the upstream
-provider returns them.
+<details>
+<summary><b>Caching &amp; token counting</b></summary>
 
-VS Code requires custom language model providers to implement
-`provideTokenCount`; it does not tokenize arbitrary provider requests itself.
-This extension does not estimate locally: it counts every request through
-CLIProxyAPI's `count_tokens` endpoint, which routes by model and uses the
-upstream provider's own tokenizer (a server-side GPT tokenizer for OpenAI/Codex,
-the native count endpoint for Claude/Gemini/etc.). Counts are cached by content
-so stable history is counted at most once, and a count that cannot be obtained
-contributes nothing rather than a guess. Exact server-side usage is also
-reported by CLIProxyAPI after a response.
+<br>
 
-## Configurations
+The provider reads CLIProxyAPI's standard and enhanced model-list endpoints and streams text, thinking summaries, tool calls, and usage. Requests carry a stable `prompt_cache_key` (also sent as `Session_id`) so Codex prompt-cache reuse, reasoning replay, and optional `session-affinity` selection stay sticky.
+
+VS Code requires custom providers to implement `provideTokenCount`. Rather than guessing locally, every request is counted through CLIProxyAPI's `count_tokens` endpoint, which routes by model and uses the upstream provider's own tokenizer. Counts are cached by content, and a count that can't be obtained contributes nothing rather than a guess.
+
+</details>
+
+## Configuration
+
+<details>
+<summary>All settings</summary>
 
 <!-- configs -->
 
@@ -144,7 +131,10 @@ reported by CLIProxyAPI after a response.
 
 <!-- configs -->
 
-## Commands
+</details>
+
+<details>
+<summary>All commands</summary>
 
 <!-- commands -->
 
@@ -163,49 +153,23 @@ reported by CLIProxyAPI after a response.
 | `universalChatProvider.selectCommitMessageModel` | Universal Chat Provider: Select Commit Message Model |
 | `universalChatProvider.clearCredentials`         | Universal Chat Provider: Clear Stored API Key        |
 | `universalChatProvider.showLogs`                 | Universal Chat Provider: Show Logs                   |
+| `universalChatProvider.showServerLogs`           | Universal Chat Provider: Show Server Output          |
 
 <!-- commands -->
+
+</details>
 
 ## Development
 
 ```bash
 pnpm install
 pnpm vscode:dts
-pnpm check
+pnpm check          # lint + typecheck + tests + build
+pnpm ext:package    # produce an installable .vsix
 ```
 
-Press `F5` from VS Code Insiders to launch the Extension Development Host with
-the proposed APIs enabled.
-
-### Live provider smoke test
-
-The opt-in E2E suite verifies real streamed messages through the local
-CLIProxyAPI server:
-
-```bash
-pnpm test:e2e
-```
-
-On successful setup this command makes exactly two live model requests, one to
-`gpt-5.4-mini` and one to `gemini-3.1-flash-lite`. It is intentionally excluded
-from `pnpm test`, `pnpm check`, coverage, and CI because the requests can consume
-subscription quota or incur cost.
-
-The test reads the API key from the same automatically discovered CLIProxyAPI
-`config.yaml` used by the extension. These environment variables override its
-defaults:
-
-| Variable                                   | Default                         |
-| ------------------------------------------ | ------------------------------- |
-| `UNIVERSAL_CHAT_PROVIDER_E2E_BASE_URL`     | `http://127.0.0.1:8317`         |
-| `UNIVERSAL_CHAT_PROVIDER_E2E_CONFIG_PATH`  | Automatically discovered config |
-| `UNIVERSAL_CHAT_PROVIDER_E2E_OPENAI_MODEL` | `gpt-5.4-mini`                  |
-| `UNIVERSAL_CHAT_PROVIDER_E2E_GEMINI_MODEL` | `gemini-3.1-flash-lite`         |
-
-The suite covers request construction, model discovery, streaming transport,
-and SSE parsing. Extension Host registration and Copilot Chat UI behavior
-remain covered by unit and manual tests.
+Press `F5` from VS Code Insiders to launch the Extension Development Host with the proposed APIs enabled. The opt-in live smoke test (`pnpm test:e2e`) makes real model requests and is excluded from `pnpm check` and CI because it can consume subscription quota.
 
 ## License
 
-[MIT](./LICENSE.md).
+[MIT](./LICENSE.md) · Not affiliated with GitHub, OpenAI, Anthropic, or Google.

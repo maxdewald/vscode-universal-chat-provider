@@ -12,22 +12,18 @@ export interface AccountsDeps {
   resolveManagement: (start: boolean) => Promise<ManagementEndpoint | undefined>
   /** The live managed endpoint when one is already running (no side effects). */
   currentManagement: () => ManagementEndpoint | undefined
-  /** Notify that the connected-account set may have changed. */
   onAccountsChanged: () => void
 }
 
-/** The provider OAuth login and account-management UI flows. */
 export class AccountsService {
   private loginPrompted = false
 
   constructor(private readonly deps: AccountsDeps) {}
 
-  /** Allow the "no accounts connected" prompt to appear again (after a reset). */
   reset(): void {
     this.loginPrompted = false
   }
 
-  /** Open the provider OAuth login flow against whichever server is active. */
   async login(): Promise<void> {
     const management = await this.deps.resolveManagement(true)
     if (management === undefined)
@@ -81,7 +77,6 @@ export class AccountsService {
     }
   }
 
-  /** List connected accounts and optionally remove one. */
   async manageAccounts(): Promise<void> {
     const management = await this.deps.resolveManagement(false)
     if (management === undefined)
@@ -119,7 +114,6 @@ export class AccountsService {
     }
   }
 
-  /** After startup, prompt once to connect an account when none exist yet. */
   async maybePromptLogin(): Promise<void> {
     if (this.loginPrompted)
       return

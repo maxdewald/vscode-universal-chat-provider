@@ -33,7 +33,7 @@ describe('server controller lifecycle', () => {
   it('claims a lease on start and stops the sidecar when the last window closes', async () => {
     const shutdown = vi.spyOn(ManagedServer.prototype, 'shutdown').mockReturnValue()
     const dispose = vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
-    const controller = new ServerController(context(root), vscodeMock.output as never)
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady(false)
     expect(await readdir(managedPaths(root).leaseDir)).toEqual([String(process.pid)])
@@ -46,7 +46,7 @@ describe('server controller lifecycle', () => {
   it('leaves the sidecar running when another window still holds a lease', async () => {
     const shutdown = vi.spyOn(ManagedServer.prototype, 'shutdown').mockReturnValue()
     const dispose = vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
-    const controller = new ServerController(context(root), vscodeMock.output as never)
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
 
     // A second, still-open window holds its own lease.
@@ -81,7 +81,7 @@ describe('server controller status snapshot', () => {
   })
 
   it('reports the managed server as running once it has started', async () => {
-    const controller = new ServerController(context(root), vscodeMock.output as never)
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
 
     const snapshot = await controller.statusSnapshot()
@@ -95,7 +95,7 @@ describe('server controller status snapshot', () => {
     // An unreachable port makes the best-effort account probe fail fast.
     vscodeMock.settings.set('universalChatProvider.baseUrl', 'http://127.0.0.1:9')
     vscodeMock.secrets.set('universalChatProvider.managementKey', 'mgmt-secret')
-    const controller = new ServerController(context(root), vscodeMock.output as never)
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     const snapshot = await controller.statusSnapshot()
 

@@ -9,7 +9,6 @@ function divider(): Choice {
   return { label: '', kind: QuickPickItemKind.Separator }
 }
 
-/** Open the "Manage Universal Chat Provider" quick pick and run the choice. */
 export async function manageProvider(controller: ServerController | undefined): Promise<void> {
   const managed = controller?.mode() !== 'external'
   const snapshot = await controller?.statusSnapshot()
@@ -73,6 +72,11 @@ export async function manageProvider(controller: ServerController | undefined): 
         ],
     [
       {
+        label: '$(output) Show Extension Logs',
+        description: 'Diagnostics from the extension itself',
+        command: 'universalChatProvider.showLogs',
+      },
+      {
         label: '$(trash) Clear Stored API Key',
         description: 'Remove the key from SecretStorage',
         command: 'universalChatProvider.clearCredentials',
@@ -92,10 +96,6 @@ export async function manageProvider(controller: ServerController | undefined): 
     await commands.executeCommand(selected.command)
 }
 
-/**
- * The rich status row shown at the top of the manage picker. Selecting it opens
- * the logs — the natural drill-in when the server is starting or unhealthy.
- */
 function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command: string } {
   const presentation: Record<ServerStatus, { icon: string, label: string }> = {
     external: { icon: '$(server)', label: 'External CLI Proxy API server' },
@@ -107,10 +107,13 @@ function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command:
   const accounts = snapshot.accounts === undefined
     ? undefined
     : `${snapshot.accounts} ${snapshot.accounts === 1 ? 'account' : 'accounts'} connected`
+  // The managed sidecar's output is tailed into its own channel; an external
+  // server is not, so there fall back to the extension's own diagnostics.
+  const external = snapshot.status === 'external'
   const detail = [
     snapshot.version !== undefined ? `Version ${snapshot.version}` : undefined,
     accounts,
-    'Select to view logs',
+    external ? 'Select to view logs' : 'Select to view server output',
   ].filter((part): part is string => part !== undefined).join('  ·  ')
   return {
     // Codicons render in the label and description, but not the detail — keep
@@ -118,6 +121,6 @@ function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command:
     label: `${icon} ${label}`,
     description: snapshot.baseUrl.replace(/^https?:\/\//, ''),
     detail,
-    command: 'universalChatProvider.showLogs',
+    command: external ? 'universalChatProvider.showLogs' : 'universalChatProvider.showServerLogs',
   }
 }

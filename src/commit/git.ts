@@ -38,11 +38,6 @@ interface GitExtension {
   getAPI: (version: 1) => GitAPI
 }
 
-/**
- * Find the repository to describe: the one named by `rootUri`, else the
- * UI-selected repository, else the only open one. Surfaces a message and
- * returns undefined when none can be resolved.
- */
 export async function resolveRepository(rootUri?: Uri): Promise<GitRepository | undefined> {
   const extension = extensions.getExtension<GitExtension>(GIT_EXTENSION_ID)
   if (extension === undefined) {
@@ -81,10 +76,6 @@ export async function resolveRepository(rootUri?: Uri): Promise<GitRepository | 
   return undefined
 }
 
-/**
- * Assemble a per-file diff context for the given changes, bounded per file and
- * in total. Untracked files are rendered as synthetic new-file diffs.
- */
 export async function collectChangeContext(
   repository: GitRepository,
   changes: readonly GitChange[],
@@ -133,7 +124,6 @@ export async function collectChangeContext(
   return chunks.join('\n\n')
 }
 
-/** Deduplicate changes by URI, preserving first-seen order. */
 export function uniqueChanges(changes: readonly GitChange[]): GitChange[] {
   const seen = new Set<string>()
   return changes.filter((change) => {

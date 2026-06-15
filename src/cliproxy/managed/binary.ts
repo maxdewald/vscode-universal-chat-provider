@@ -10,19 +10,14 @@ import { exists } from '../../shared/fs'
 const execFileAsync = promisify(execFile)
 
 const REPO = 'router-for-me/CLIProxyAPI'
-/** Default pinned version; reproducible installs unless the user opts into `latest`. */
 export const DEFAULT_BINARY_VERSION = '7.2.5'
 
 export interface AssetInfo {
-  /** Release asset filename, e.g. `CLIProxyAPI_7.2.5_darwin_aarch64.tar.gz`. */
   assetName: string
-  /** Extracted executable filename. */
   binaryName: string
-  /** Whether the asset is a zip (Windows) versus a gzip tarball. */
   isZip: boolean
 }
 
-/** Map the running platform/arch to the matching release asset. Pure. */
 export function resolveAsset(platform: NodeJS.Platform, arch: string, version: string): AssetInfo {
   const os = platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'windows' : 'linux'
   const cpu = arch === 'arm64' ? 'aarch64' : 'amd64'
@@ -64,7 +59,6 @@ async function fetchOk(url: string, signal?: AbortSignal): Promise<Response> {
   return response
 }
 
-/** Resolve a pinned version, or the latest release tag when `latest` is requested. */
 export async function resolveVersion(requested: string, signal?: AbortSignal): Promise<string> {
   if (requested.toLowerCase() !== 'latest')
     return normalizeVersion(requested)
@@ -88,11 +82,6 @@ export interface AcquireResult {
   version: string
 }
 
-/**
- * Ensure the CLIProxyAPI binary for the running platform is present under
- * `binDir/<version>/`, downloading + checksum-verifying + extracting it on first
- * use. Returns the absolute path to the executable.
- */
 export async function acquireBinary(options: AcquireOptions): Promise<AcquireResult> {
   const version = await resolveVersion(options.requestedVersion, options.signal)
   const asset = resolveAsset(osPlatform(), osArch(), version)
@@ -138,7 +127,6 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   return { binaryPath, version }
 }
 
-/** Remove cached binaries other than the one in use to keep globalStorage small. */
 async function pruneOldVersions(binDir: string, keep: string, output: OutputChannel): Promise<void> {
   let entries: string[]
   try {

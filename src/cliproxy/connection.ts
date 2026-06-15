@@ -11,7 +11,6 @@ export interface ProxyConnection {
   baseUrl: () => string
 }
 
-/** The external (bring-your-own-server) connection backed purely by settings. */
 export class SettingsConnection implements ProxyConnection {
   async ensureReady(): Promise<void> {}
 

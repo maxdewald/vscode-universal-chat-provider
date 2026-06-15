@@ -9,16 +9,10 @@ import { ProxyHttpError } from '../cliproxy/errors'
 export interface CompletionDeps {
   connection: ProxyConnection
   credentials: CredentialStore
-  /** Invoked when the proxy rejects the stored API key (HTTP 401/403). */
   onCredentialsRejected: () => void
 }
 
-/**
- * Run one streaming completion against the proxy: ensure the connection is
- * ready, attach the stored credentials, pump the SSE callbacks, and translate
- * transport/HTTP failures into {@link LanguageModelError}s. A cancelled request
- * resolves quietly (without throwing) so callers can treat it as a no-op.
- */
+/** A cancelled request resolves quietly (without throwing) so callers can treat it as a no-op. */
 export async function streamCompletion(
   deps: CompletionDeps,
   body: Record<string, unknown>,

@@ -39,7 +39,6 @@ export interface ProviderModel extends LanguageModelChatInformation {
 
 export interface ModelMappingOptions {
   defaultMaxOutputTokens: number
-  /** Invoked when a chat model is dropped because no context window is known. */
   onSkipped?: (id: string, reason: string) => void
 }
 
@@ -264,7 +263,6 @@ function positiveInteger(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
 }
 
-/** First candidate that is a positive, finite integer, or undefined if none qualify. */
 function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {
   for (const value of values) {
     if (value !== undefined && Number.isFinite(value) && value > 0)

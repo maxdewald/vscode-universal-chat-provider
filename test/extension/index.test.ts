@@ -27,8 +27,8 @@ describe('extension activation', () => {
 
     expect(activate(context)).toBeUndefined()
     expect(vscodeMock.registeredProviders[0]).toMatchObject({ vendor: 'universal-chat-provider' })
-    expect(vscodeMock.commandHandlers.size).toBe(13)
-    expect(context.subscriptions).toHaveLength(18)
+    expect(vscodeMock.commandHandlers.size).toBe(14)
+    expect(context.subscriptions).toHaveLength(20)
     expect(initialize).toHaveBeenCalledTimes(1)
 
     await commands.executeCommand('universalChatProvider.configure')

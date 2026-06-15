@@ -9,13 +9,9 @@ import { errorMessage } from '../shared/errors'
 import { fetchCatalog } from './catalog'
 import { mapProxyModels } from './model'
 
-/** UI/onboarding callbacks invoked by discovery; wired by the provider. */
 export interface ModelRegistryHooks {
-  /** Interactively obtain an API key when none is stored. */
   acquireApiKey: () => Promise<string | undefined>
-  /** The proxy rejected the stored key (HTTP 401/403). */
   onCredentialsRejected: () => void
-  /** A request succeeded, so the stored key is known-good again. */
   onCredentialsAccepted: () => void
 }
 
@@ -43,12 +39,10 @@ export class ModelRegistry {
     this.changeEmitter.dispose()
   }
 
-  /** True while a discovery is in flight (used to avoid redundant refreshes). */
   isRefreshing(): boolean {
     return this.refreshPromise !== undefined
   }
 
-  /** Drop the cached models and notify listeners (e.g. after clearing keys). */
   reset(): void {
     this.cachedModels = []
     this.cachedFingerprint = ''
@@ -96,9 +90,9 @@ export class ModelRegistry {
         this.cachedFingerprint = fingerprint
         this.cachedModels = models
         this.changeEmitter.fire()
+        this.output.appendLine(`Discovered ${models.length} CLIProxyAPI chat models at ${this.connection.baseUrl()}.`)
       }
       this.hooks.onCredentialsAccepted()
-      this.output.appendLine(`Discovered ${models.length} CLIProxyAPI chat models at ${this.connection.baseUrl()}.`)
       return this.cachedModels
     }
     catch (error) {

@@ -6,11 +6,6 @@ import { window } from 'vscode'
 import { configureConnection } from '../cliproxy/credentials'
 import { errorMessage } from '../shared/errors'
 
-/**
- * The onboarding, credential-recovery, and import notification flows. These are
- * the interactive paths that obtain or repair the CLIProxyAPI credentials the
- * {@link ModelRegistry} needs, then trigger a refresh once a key is in place.
- */
 export class CredentialFlows {
   private onboardingShown = false
   private credentialRecoveryShown = false
@@ -21,12 +16,10 @@ export class CredentialFlows {
     private readonly output: OutputChannel,
   ) {}
 
-  /** Reset recovery state so a fresh prompt can be shown after a known-good key. */
   markCredentialsAccepted(): void {
     this.credentialRecoveryShown = false
   }
 
-  /** Interactive path used by discovery when no key is stored. */
   async acquireApiKey(): Promise<string | undefined> {
     await this.showOnboarding()
     return this.credentials.get()

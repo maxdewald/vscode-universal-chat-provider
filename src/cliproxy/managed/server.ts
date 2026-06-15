@@ -21,7 +21,6 @@ export interface ServerDeps {
   host: string
   /** Pinned binary version or `latest`. */
   requestedVersion: string
-  /** Persist/recall the chosen port across windows and sessions. */
   getPort: () => number | undefined
   setPort: (port: number) => void | Thenable<void>
   /**
@@ -226,7 +225,6 @@ async function waitForHealthz(host: string, port: number, signal?: AbortSignal):
   throw new Error(`CLIProxyAPI did not become healthy on port ${port} within ${STARTUP_TIMEOUT_MS / 1000}s.`)
 }
 
-/** True when nothing is already listening on host:port. */
 async function isFree(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createServer()

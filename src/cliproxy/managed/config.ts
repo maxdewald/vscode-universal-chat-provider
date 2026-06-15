@@ -8,15 +8,10 @@ export const DEFAULT_PORT = 8317
 export const DEFAULT_HOST = '127.0.0.1'
 
 export interface ManagedPaths {
-  /** Root of the extension-owned managed state (under globalStorage). */
   root: string
-  /** Directory holding versioned binaries (`bin/<version>/cli-proxy-api`). */
   binDir: string
-  /** CLIProxyAPI `auth-dir` holding OAuth credential files. */
   authDir: string
-  /** Generated `config.yaml` consumed by the server. */
   configPath: string
-  /** Combined stdout/stderr log file for the detached server. */
   logPath: string
   /** One lease file per open window; the last one out stops the sidecar. */
   leaseDir: string
@@ -36,7 +31,6 @@ export function managedPaths(root: string): ManagedPaths {
   }
 }
 
-/** A cryptographically random hex secret used for the proxy or management key. */
 export function generateSecret(bytes = 32): string {
   return randomBytes(bytes).toString('hex')
 }
@@ -44,9 +38,7 @@ export function generateSecret(bytes = 32): string {
 export interface ManagedConfigOptions {
   host: string
   port: number
-  /** Proxy API key clients send as `Authorization: Bearer`. */
   apiKey: string
-  /** Management key that unlocks the `/v0/management` login API. */
   managementKey: string
   authDir: string
 }

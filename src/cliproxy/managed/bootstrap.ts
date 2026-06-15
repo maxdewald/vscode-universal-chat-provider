@@ -14,12 +14,9 @@ import {
 import { claimLease } from './leases'
 import { ManagedServer } from './server'
 
-/** SecretStorage key for the generated management (remote-management) key. */
 export const MGMT_KEY_SECRET = 'universalChatProvider.managementKey'
-/** globalState key for the port the managed server settled on. */
 export const PORT_STATE_KEY = 'universalChatProvider.managedPort'
 
-/** The provisioned managed state handed back to the controller. */
 export interface ManagedState {
   paths: ManagedPaths
   server: ManagedServer
@@ -35,11 +32,6 @@ export interface ProvisionOptions {
   verifyOwnership: (baseUrl: string) => Promise<boolean>
 }
 
-/**
- * Provision the managed server's on-disk state and construct (but do not start)
- * its {@link ManagedServer}: create the storage dirs, claim this window's lease,
- * ensure the proxy + management secrets exist, and write the config on first run.
- */
 export async function provisionManagedState(options: ProvisionOptions): Promise<ManagedState> {
   const { context, output } = options
   const paths = managedPaths(context.globalStorageUri.fsPath)
@@ -75,7 +67,6 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   return { paths, server, managementKey }
 }
 
-/** Watch the `auth-dir` for credential changes, invoking `onChange` on any event. */
 export function watchAuthDir(authDir: string, onChange: () => void): Disposable[] {
   const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(authDir), '**'))
   return [

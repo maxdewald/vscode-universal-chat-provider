@@ -25,7 +25,7 @@
     "Other"
   ],
   "main": "./dist/index.cjs",
-  "icon": "res/icon.png",
+  "icon": "res/logo.png",
   "files": [
     "LICENSE.md",
     "dist/*",
@@ -103,6 +103,10 @@
       {
         "command": "universalChatProvider.showLogs",
         "title": "Universal Chat Provider: Show Logs"
+      },
+      {
+        "command": "universalChatProvider.showServerLogs",
+        "title": "Universal Chat Provider: Show Server Output"
       }
     ],
     "menus": {

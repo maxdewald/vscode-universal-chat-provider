@@ -1,4 +1,3 @@
-/** An HTTP-level failure from a CLIProxyAPI request, carrying the status code. */
 export class ProxyHttpError extends Error {
   constructor(
     message: string,

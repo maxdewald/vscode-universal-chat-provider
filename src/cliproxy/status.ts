@@ -6,14 +6,12 @@ const STATUS_PROBE_TIMEOUT_MS = 1500
 export type ServerMode = 'managed' | 'external'
 export type ServerStatus = 'external' | 'starting' | 'running' | 'error'
 
-/** A point-in-time view of the proxy for the manage picker's status entry. */
 export interface ServerStatusSnapshot {
   mode: ServerMode
   status: ServerStatus
   baseUrl: string
   /** Managed binary version, when this window spawned it (absent when adopted). */
   version?: string
-  /** Connected provider accounts, when the server could be reached. */
   accounts?: number
 }
 
@@ -22,7 +20,6 @@ export interface StatusInputs {
   lastStatus: ServerStatus
   baseUrl: string
   version: string | undefined
-  /** Endpoint for the best-effort account probe, when one is already known. */
   management: ManagementEndpoint | undefined
 }
 
@@ -42,10 +39,6 @@ export async function buildStatusSnapshot(inputs: StatusInputs): Promise<ServerS
   return accounts === undefined ? snapshot : { ...snapshot, accounts }
 }
 
-/**
- * Best-effort count of connected accounts for the status row. Returns undefined
- * whenever the server is unreachable or no endpoint is known.
- */
 async function countAccounts(management: ManagementEndpoint | undefined): Promise<number | undefined> {
   if (management === undefined)
     return undefined
