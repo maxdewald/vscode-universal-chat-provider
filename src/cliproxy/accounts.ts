@@ -1,6 +1,6 @@
 import type { ManagementEndpoint } from './management-client'
+import { sleep } from 'moderndash'
 import { env, ProgressLocation, Uri, window } from 'vscode'
-import { delay } from '../shared/async'
 import { errorMessage } from '../shared/errors'
 import { LOGIN_PROVIDERS, ManagementClient } from './management-client'
 
@@ -59,7 +59,7 @@ export class AccountsService {
       async (_progress, token) => {
         const deadline = Date.now() + LOGIN_TIMEOUT_MS
         while (Date.now() < deadline && !token.isCancellationRequested) {
-          await delay(LOGIN_POLL_MS)
+          await sleep(LOGIN_POLL_MS)
           const files = await client.listAuthFiles().catch(() => [])
           if (files.length > before)
             return true

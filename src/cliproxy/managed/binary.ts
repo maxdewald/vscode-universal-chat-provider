@@ -1,14 +1,13 @@
 import type { OutputChannel } from 'vscode'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { arch as osArch, platform as osPlatform } from 'node:os'
-import { join } from 'node:path'
-import { promisify } from 'node:util'
+import { dirname, join } from 'node:path'
+import { unzipSync } from 'fflate'
+import { retry } from 'moderndash'
+import { parseTarGzip } from 'nanotar'
 import semver from 'semver'
 import { exists } from '../../shared/fs'
-
-const execFileAsync = promisify(execFile)
 
 export const REPO = 'router-for-me/CLIProxyAPI'
 export const DEFAULT_BINARY_VERSION = '7.2.5'
@@ -60,10 +59,25 @@ export async function fetchOk(url: string, signal?: AbortSignal): Promise<Respon
   return response
 }
 
+/** Max attempts for a GitHub release fetch before giving up. */
+const DOWNLOAD_RETRIES = 3
+
+/**
+ * {@link fetchOk} with a few retries so a transient GitHub/CDN hiccup doesn't
+ * fail an install. When the caller's signal aborts, the backoff collapses to
+ * zero so the pending retries fall through immediately and surface the abort.
+ */
+export async function fetchWithRetry(url: string, signal?: AbortSignal): Promise<Response> {
+  return retry(async () => fetchOk(url, signal), {
+    maxRetries: DOWNLOAD_RETRIES,
+    backoff: attempt => (signal?.aborted ? 0 : attempt * 500),
+  })
+}
+
 export async function resolveVersion(requested: string, signal?: AbortSignal): Promise<string> {
   if (requested.toLowerCase() !== 'latest')
     return normalizeVersion(requested)
-  const response = await fetchOk(`https://api.github.com/repos/${REPO}/releases/latest`, signal)
+  const response = await fetchWithRetry(`https://api.github.com/repos/${REPO}/releases/latest`, signal)
   const payload = await response.json() as { tag_name?: string }
   if (typeof payload.tag_name !== 'string' || payload.tag_name.length === 0)
     throw new Error('Could not determine the latest CLIProxyAPI release.')
@@ -97,8 +111,8 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   options.output.appendLine(`Downloading CLIProxyAPI ${version} (${asset.assetName})...`)
   const base = `https://github.com/${REPO}/releases/download/v${version}`
   const [archiveResponse, checksumResponse] = await Promise.all([
-    fetchOk(`${base}/${asset.assetName}`, options.signal),
-    fetchOk(`${base}/checksums.txt`, options.signal),
+    fetchWithRetry(`${base}/${asset.assetName}`, options.signal),
+    fetchWithRetry(`${base}/checksums.txt`, options.signal),
   ])
   const archive = new Uint8Array(await archiveResponse.arrayBuffer())
   const expected = parseChecksums(await checksumResponse.text()).get(asset.assetName)
@@ -110,13 +124,7 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
 
   await rm(versionDir, { recursive: true, force: true })
   await mkdir(versionDir, { recursive: true })
-  const archivePath = join(versionDir, asset.assetName)
-  await writeFile(archivePath, archive)
-
-  // bsdtar (macOS/Windows) and GNU tar both extract our tar.gz; bsdtar also
-  // reads the Windows .zip — so a single `tar -xf` covers every platform.
-  await execFileAsync('tar', ['-xf', archivePath, '-C', versionDir])
-  await rm(archivePath, { force: true })
+  await extractArchive(archive, asset.isZip, versionDir)
 
   if (!(await exists(binaryPath)))
     throw new Error(`Extracted archive did not contain ${asset.binaryName}.`)
@@ -126,6 +134,29 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   options.output.appendLine(`Installed CLIProxyAPI ${version} at ${binaryPath}.`)
   await pruneOldVersions(options.binDir, version, options.output)
   return { binaryPath, version }
+}
+
+/**
+ * Extract a release archive (held in memory) into `dest`, preserving its layout.
+ * tar.gz (macOS/Linux) and zip (Windows) are both handled in pure JS, so no
+ * external `tar` binary needs to be on PATH. The archive is already sha256-verified
+ * against the release checksum, but entry names are still rejected if they would
+ * escape `dest`.
+ */
+export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: string): Promise<void> {
+  const entries = isZip
+    ? Object.entries(unzipSync(archive)).map(([name, data]) => ({ name, data }))
+    : (await parseTarGzip(archive)).map(item => ({ name: item.name, data: item.data }))
+
+  for (const { name, data } of entries) {
+    if (data === undefined || name.endsWith('/'))
+      continue // directory entry; parent dirs are created per file below
+    if (name.split('/').includes('..'))
+      throw new Error(`Refusing to extract unsafe path: ${name}`)
+    const target = join(dest, name)
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, data)
+  }
 }
 
 /**

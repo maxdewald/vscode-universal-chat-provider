@@ -1,5 +1,5 @@
 import semver from 'semver'
-import { fetchOk, normalizeVersion, REPO } from './binary'
+import { fetchWithRetry, normalizeVersion, REPO } from './binary'
 
 /**
  * Newest release that is a safe upgrade from `installed`: strictly newer, but
@@ -27,7 +27,7 @@ interface ReleaseEntry {
  * releases, newest page first as GitHub returns them.
  */
 export async function listReleaseVersions(signal?: AbortSignal): Promise<string[]> {
-  const response = await fetchOk(`https://api.github.com/repos/${REPO}/releases?per_page=100`, signal)
+  const response = await fetchWithRetry(`https://api.github.com/repos/${REPO}/releases?per_page=100`, signal)
   const payload = await response.json() as ReleaseEntry[]
   return payload
     .filter(release => release.draft !== true && release.prerelease !== true && typeof release.tag_name === 'string')

@@ -11,6 +11,9 @@ export default defineConfig({
   deps: {
     neverBundle: ['vscode'],
     alwaysBundle: [
+      'fflate',
+      'get-port',
+      'nanotar',
       'tokenx',
       'untildify',
       'yaml',

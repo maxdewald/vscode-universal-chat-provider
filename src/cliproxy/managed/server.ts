@@ -4,9 +4,9 @@ import type { ManagedPaths } from './config'
 import { spawn } from 'node:child_process'
 import { closeSync, openSync, rmSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import process from 'node:process'
-import { delay } from '../../shared/async'
+import getPort from 'get-port'
+import { sleep } from 'moderndash'
 import { acquireBinary, readInstalledVersion } from './binary'
 import { DEFAULT_PORT, setConfigPort } from './config'
 import { readServerPid, writeServerPid } from './leases'
@@ -148,7 +148,7 @@ export class ManagedServer {
     })
     this.version = version
 
-    const port = (await isFree(this.deps.host, preferred)) ? preferred : await findFreePort(this.deps.host)
+    const port = await getPort({ port: preferred, host: this.deps.host })
     await this.spawnServer(binaryPath, port)
     await waitForHealthz(this.deps.host, port, signal)
     this.adopted = false
@@ -197,20 +197,15 @@ export class ManagedServer {
 }
 
 async function isHealthy(host: string, port: number, signal?: AbortSignal): Promise<boolean> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
-  const onAbort = (): void => controller.abort()
-  signal?.addEventListener('abort', onAbort)
+  const deadline = AbortSignal.timeout(HEALTH_TIMEOUT_MS)
   try {
-    const response = await fetch(`http://${host}:${port}/healthz`, { signal: controller.signal })
+    const response = await fetch(`http://${host}:${port}/healthz`, {
+      signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+    })
     return response.ok
   }
   catch {
     return false
-  }
-  finally {
-    clearTimeout(timer)
-    signal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -221,28 +216,7 @@ async function waitForHealthz(host: string, port: number, signal?: AbortSignal):
       throw new Error('Cancelled while waiting for CLIProxyAPI to start.')
     if (await isHealthy(host, port, signal))
       return
-    await delay(STARTUP_POLL_MS)
+    await sleep(STARTUP_POLL_MS)
   }
   throw new Error(`CLIProxyAPI did not become healthy on port ${port} within ${STARTUP_TIMEOUT_MS / 1000}s.`)
-}
-
-async function isFree(host: string, port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = createServer()
-    probe.once('error', () => resolve(false))
-    probe.once('listening', () => probe.close(() => resolve(true)))
-    probe.listen(port, host)
-  })
-}
-
-async function findFreePort(host: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer()
-    probe.once('error', reject)
-    probe.listen(0, host, () => {
-      const address = probe.address()
-      const port = typeof address === 'object' && address !== null ? address.port : 0
-      probe.close(() => (port > 0 ? resolve(port) : reject(new Error('Could not allocate a free port.'))))
-    })
-  })
 }

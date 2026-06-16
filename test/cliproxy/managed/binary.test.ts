@@ -1,8 +1,10 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { zipSync } from 'fflate'
+import { createTarGzip } from 'nanotar'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset, sha256 } from '../../../src/cliproxy/managed/binary'
+import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset, sha256 } from '../../../src/cliproxy/managed/binary'
 
 describe('binary asset resolution', () => {
   it('maps platform and arch to the matching release asset', () => {
@@ -43,6 +45,41 @@ describe('binary asset resolution', () => {
     expect(normalizeVersion('  7.2.5 ')).toBe('7.2.5')
     expect(sha256(new TextEncoder().encode('abc')))
       .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+  })
+})
+
+describe('extractArchive', () => {
+  let dest: string
+
+  beforeEach(async () => {
+    dest = await mkdtemp(join(tmpdir(), 'ucp-extract-'))
+  })
+
+  afterEach(async () => {
+    await rm(dest, { recursive: true, force: true })
+  })
+
+  const bin = new TextEncoder().encode('#!/bin/sh\necho hi\n')
+
+  it('extracts a tar.gz, preserving nested paths', async () => {
+    const archive = await createTarGzip([
+      { name: 'cli-proxy-api', data: bin },
+      { name: 'docs/README.md', data: new TextEncoder().encode('readme') },
+    ])
+    await extractArchive(archive, false, dest)
+    expect(new Uint8Array(await readFile(join(dest, 'cli-proxy-api')))).toEqual(bin)
+    expect(await readFile(join(dest, 'docs', 'README.md'), 'utf8')).toBe('readme')
+  })
+
+  it('extracts a zip', async () => {
+    const archive = zipSync({ 'cli-proxy-api.exe': bin })
+    await extractArchive(archive, true, dest)
+    expect(new Uint8Array(await readFile(join(dest, 'cli-proxy-api.exe')))).toEqual(bin)
+  })
+
+  it('rejects path traversal', async () => {
+    const archive = zipSync({ '../escape': bin })
+    await expect(extractArchive(archive, true, dest)).rejects.toThrow(/unsafe path/)
   })
 })
 

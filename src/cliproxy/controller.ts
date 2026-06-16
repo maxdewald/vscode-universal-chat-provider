@@ -5,6 +5,7 @@ import type { ManagedServer } from './managed/server'
 import type { ManagementEndpoint } from './management-client'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 import { rm } from 'node:fs/promises'
+import { debounce } from 'moderndash'
 import {
   ConfigurationTarget,
   ProgressLocation,
@@ -37,7 +38,8 @@ export class ServerController implements ProxyConnection {
   private managementKey: string | undefined
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
-  private refreshDebounce: ReturnType<typeof setTimeout> | undefined
+  /** Coalesce bursts of auth-dir change events into a single refresh. */
+  private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private lastStatus: ServerStatus = 'starting'
@@ -230,8 +232,7 @@ export class ServerController implements ProxyConnection {
   }
 
   dispose(): void {
-    if (this.refreshDebounce !== undefined)
-      clearTimeout(this.refreshDebounce)
+    this.scheduleRefresh.cancel()
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
     // Release this window's lease. When it was the last one the shared sidecar
@@ -287,12 +288,6 @@ export class ServerController implements ProxyConnection {
     catch {
       return false
     }
-  }
-
-  private scheduleRefresh(): void {
-    if (this.refreshDebounce !== undefined)
-      clearTimeout(this.refreshDebounce)
-    this.refreshDebounce = setTimeout(() => this.notifyAccountsChanged(), 750)
   }
 
   private notifyAccountsChanged(): void {
