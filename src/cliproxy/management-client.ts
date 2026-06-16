@@ -1,7 +1,6 @@
 import { isPlainObject } from 'moderndash'
 
 export interface LoginProvider {
-  id: string
   label: string
   detail: string
   /** Management endpoint (relative to `/v0/management/`) that returns an auth URL. */
@@ -9,22 +8,17 @@ export interface LoginProvider {
 }
 
 export const LOGIN_PROVIDERS: readonly LoginProvider[] = [
-  { id: 'gemini', label: 'Google Gemini', detail: 'Gemini CLI account', endpoint: 'gemini-cli-auth-url' },
-  { id: 'codex', label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
-  { id: 'claude', label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url' },
-  { id: 'antigravity', label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url' },
-  { id: 'kimi', label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url' },
-  { id: 'xai', label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url' },
+  { label: 'Google Gemini', detail: 'Gemini CLI account', endpoint: 'gemini-cli-auth-url' },
+  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
+  { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url' },
+  { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url' },
+  { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url' },
+  { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url' },
 ]
 
 export interface ManagementEndpoint {
   baseUrl: string
   key: string
-}
-
-export interface AuthUrlResponse {
-  url: string
-  state: string
 }
 
 export interface AuthFile {
@@ -44,16 +38,16 @@ export class ManagementClient {
     private readonly key: string,
   ) {}
 
-  async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<AuthUrlResponse> {
+  async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<string> {
     // `is_webui=true` makes the server run the OAuth flow itself: it starts a
     // callback forwarder on the provider's fixed port and relays the redirect
     // into its own `/<provider>/callback` route. Without it the flow expects a
     // CLI-managed local listener we never start, so the browser redirect lands
     // on a dead port (ERR_CONNECTION_REFUSED).
-    const payload = await this.getJson<{ url?: unknown, state?: unknown }>(`/${endpoint}?is_webui=true`, signal)
-    if (typeof payload.url !== 'string' || typeof payload.state !== 'string')
+    const payload = await this.getJson<{ url?: unknown }>(`/${endpoint}?is_webui=true`, signal)
+    if (typeof payload.url !== 'string')
       throw new ManagementError('CLIProxyAPI returned an invalid auth URL response.', 502)
-    return { url: payload.url, state: payload.state }
+    return payload.url
   }
 
   async listAuthFiles(signal?: AbortSignal): Promise<AuthFile[]> {
@@ -68,10 +62,6 @@ export class ManagementClient {
 
   async deleteAuthFile(name: string, signal?: AbortSignal): Promise<void> {
     await this.send('DELETE', `/auth-files?name=${encodeURIComponent(name)}`, undefined, signal)
-  }
-
-  async postOAuthCallback(body: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
-    await this.send('POST', '/oauth-callback', body, signal)
   }
 
   private async getJson<T>(path: string, signal?: AbortSignal): Promise<T> {

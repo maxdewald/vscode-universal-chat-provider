@@ -3,7 +3,6 @@ import type { LocalProxyConfig } from './local-config'
 import { access } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
-import untildify from 'untildify'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 import { errorMessage } from '../shared/errors'
 import { readLocalProxyConfig } from './local-config'
@@ -89,7 +88,8 @@ export function configCandidates(): string[] {
   const settings = workspace.getConfiguration('universalChatProvider')
   const configured = settings.get<string>('configPath', '').trim()
   if (configured.length > 0) {
-    const expanded = untildify(configured)
+    // Expand a leading `~` (also `~/` and `~\` on Windows) to the home directory.
+    const expanded = configured.replace(/^~(?=$|[/\\])/, homedir())
     return [isAbsolute(expanded) ? expanded : resolve(expanded)]
   }
   return settings.get<boolean>('autoDetectConfig', true)

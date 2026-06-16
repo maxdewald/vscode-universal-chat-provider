@@ -5,23 +5,6 @@ beforeEach(() => {
 })
 
 describe('cLIProxyClient', () => {
-  it('checks health without credentials and handles transport failures', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockRejectedValueOnce(new Error('offline'))
-    vi.stubGlobal('fetch', fetchMock)
-    const { CLIProxyClient } = await import('../../src/cliproxy/client')
-    const signal = new AbortController().signal
-    const client = new CLIProxyClient('http://proxy', 'secret')
-
-    await expect(client.health(signal)).resolves.toBe(true)
-    await expect(client.health()).resolves.toBe(false)
-    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://proxy/healthz', {
-      method: 'HEAD',
-      signal,
-    })
-  })
-
   it('discovers models and tolerates optional metadata failure', async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url === 'http://proxy/v1/models')

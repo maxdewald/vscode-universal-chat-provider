@@ -31,8 +31,8 @@ export function managedPaths(root: string): ManagedPaths {
   }
 }
 
-export function generateSecret(bytes = 32): string {
-  return randomBytes(bytes).toString('hex')
+export function generateSecret(): string {
+  return randomBytes(32).toString('hex')
 }
 
 export interface ManagedConfigOptions {

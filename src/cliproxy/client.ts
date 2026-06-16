@@ -31,19 +31,6 @@ export class CLIProxyClient {
     private readonly apiKey: string,
   ) {}
 
-  async health(signal?: AbortSignal): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/healthz`, {
-        method: 'HEAD',
-        ...(signal ? { signal } : {}),
-      })
-      return response.ok
-    }
-    catch {
-      return false
-    }
-  }
-
   async discover(signal?: AbortSignal): Promise<DiscoveryResult> {
     const [available, metadata] = await Promise.all([
       this.getJson<{ data?: ProxyModelListEntry[] }>('/v1/models', signal)

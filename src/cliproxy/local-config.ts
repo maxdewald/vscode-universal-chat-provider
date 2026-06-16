@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isPlainObject } from 'moderndash'
-import untildify from 'untildify'
 import { parse } from 'yaml'
 
 const PLACEHOLDER_KEY = /^your-api-key(?:-\d+)?$/i
@@ -68,6 +67,7 @@ function firstApiKey(value: unknown): string | undefined {
 }
 
 function resolveConfigPath(value: string, baseDir: string): string {
-  const expanded = untildify(value)
+  // Expand a leading `~` (also `~/` and `~\` on Windows) to the home directory.
+  const expanded = value.replace(/^~(?=$|[/\\])/, homedir())
   return isAbsolute(expanded) ? expanded : resolve(baseDir, expanded)
 }

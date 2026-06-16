@@ -15,9 +15,9 @@ export default defineConfig({
       'get-port',
       'nanotar',
       'tokenx',
-      'untildify',
       'yaml',
     ],
+    // Silences tsdown's "unintended bundling" hint; bundling is deliberate here.
     onlyBundle: false,
   },
   hooks(hooks) {

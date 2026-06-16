@@ -41,7 +41,7 @@ export class AccountsService {
     let before: number
     try {
       before = (await client.listAuthFiles()).length
-      url = (await client.requestAuthUrl(picked.provider.endpoint)).url
+      url = await client.requestAuthUrl(picked.provider.endpoint)
     }
     catch (error) {
       void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}`)

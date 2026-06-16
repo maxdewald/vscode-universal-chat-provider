@@ -1,6 +1,6 @@
 import type { ProviderModel } from '../src/chat/model'
+import { homedir } from 'node:os'
 import { resolve } from 'node:path'
-import untildify from 'untildify'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   LanguageModelChatMessageRole,
@@ -35,7 +35,7 @@ beforeAll(async () => {
   )
   const configuredPath = environmentValue('UNIVERSAL_CHAT_PROVIDER_E2E_CONFIG_PATH')
   const configPath = configuredPath !== undefined
-    ? resolve(untildify(configuredPath))
+    ? resolve(configuredPath.replace(/^~(?=$|[/\\])/, homedir()))
     : await findConfigPath()
 
   if (configPath === undefined) {
@@ -54,7 +54,9 @@ beforeAll(async () => {
   const client = new CLIProxyClient(baseUrl, config.apiKey)
   const healthController = trackedController()
   try {
-    if (!await client.health(healthController.signal)) {
+    const health = await fetch(`${baseUrl}/healthz`, { method: 'HEAD', signal: healthController.signal })
+      .catch(() => undefined)
+    if (health?.ok !== true) {
       throw new Error(
         `CLIProxyAPI is unavailable at ${baseUrl}. Start the server or set UNIVERSAL_CHAT_PROVIDER_E2E_BASE_URL.`,
       )

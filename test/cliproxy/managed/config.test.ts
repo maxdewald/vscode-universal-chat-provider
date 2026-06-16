@@ -40,12 +40,11 @@ describe('managed config', () => {
     })
   })
 
-  it('generates random hex secrets of the requested size', () => {
+  it('generates unique random 32-byte hex secrets', () => {
     const a = generateSecret()
     const b = generateSecret()
     expect(a).toMatch(/^[0-9a-f]{64}$/)
     expect(a).not.toBe(b)
-    expect(generateSecret(8)).toMatch(/^[0-9a-f]{16}$/)
   })
 })
 
