@@ -36,7 +36,6 @@
   },
   "enabledApiProposals": [
     "chatProvider",
-    "contribSourceControlInputBoxMenu",
     "languageModelThinkingPart"
   ],
   "activationEvents": [
