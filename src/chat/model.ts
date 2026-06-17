@@ -103,7 +103,10 @@ export function mapProxyModels(
     let displayName = normalizeReasoningModelName(advertisedName, reasoning.levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     const displayProviderName = formatProviderName(providerName)
-    if (displayName !== advertisedName) {
+    // Collapse same-base-name ids that only differ by reasoning budget (e.g. Gemini
+    // 3.5 Flash High/Medium/Low) into one entry driven by the effort selector. A
+    // different level set keeps its qualifier and stays distinct.
+    if (reasoning.levels.length >= 2) {
       const reasoningModelKey = `${providerName}\0${displayName}`.toLowerCase()
       const levelSignature = [...reasoning.levels].sort().join('\0')
       const existingSignature = seenReasoningModels.get(reasoningModelKey)

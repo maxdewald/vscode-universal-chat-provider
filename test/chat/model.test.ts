@@ -118,6 +118,29 @@ describe('model mapping', () => {
     ])
   })
 
+  it('dedups a suffixed alias against an already-unsuffixed sibling', () => {
+    const levels = [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }]
+    const models = mapProxyModels(
+      [
+        { id: 'gemini-3-flash-agent', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'gemini-3.5-flash-low', owned_by: 'antigravity', context_length: 1_000_000 },
+      ],
+      [
+        { slug: 'gemini-3-flash-agent', display_name: 'Gemini 3.5 Flash', supported_reasoning_levels: levels },
+        { slug: 'gemini-3.5-flash-low', display_name: 'Gemini 3.5 Flash (Low)', supported_reasoning_levels: levels },
+      ],
+      new Map(),
+      { defaultMaxOutputTokens: 8192 },
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      proxyModelId: 'gemini-3-flash-agent',
+      name: 'Gemini 3.5 Flash',
+      reasoningLevels: ['low', 'medium', 'high'],
+    })
+  })
+
   it('keeps fixed reasoning names when no selector can be offered', () => {
     const [model] = mapProxyModels(
       [{ id: 'fixed-high', owned_by: 'proxy', context_length: 128_000 }],
