@@ -178,7 +178,6 @@
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
     "vscode:prepublish": "pnpm build",
-    "release": "bumpp",
     "ext:package": "vsce package --no-dependencies",
     "ext:publish": "vsxpub --no-dependencies"
   },
@@ -200,7 +199,6 @@
     "@vitest/coverage-v8": "^4.1.8",
     "@vscode/dts": "^0.4.1",
     "@vscode/vsce": "^3.9.2",
-    "bumpp": "^11.1.0",
     "eslint": "^10.5.0",
     "ovsx": "^1.0.1",
     "tsdown": "^0.22.2",

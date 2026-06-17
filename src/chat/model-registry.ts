@@ -94,10 +94,12 @@ export class ModelRegistry {
       })
       const fingerprint = JSON.stringify(models)
       if (fingerprint !== this.cachedFingerprint) {
+        const countChanged = models.length !== this.cachedModels.length
         this.cachedFingerprint = fingerprint
         this.cachedModels = models
         this.changeEmitter.fire()
-        this.output.appendLine(`Discovered ${models.length} CLIProxyAPI chat models at ${this.connection.baseUrl()}.`)
+        if (countChanged)
+          this.output.appendLine(`Discovered ${models.length} CLIProxyAPI chat models at ${this.connection.baseUrl()}.`)
       }
       this.lastRefreshAt = Date.now()
       this.hooks.onCredentialsAccepted()
