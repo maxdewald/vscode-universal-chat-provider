@@ -179,7 +179,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
     "vscode:prepublish": "pnpm build",
     "ext:package": "vsce package --no-dependencies",
-    "ext:publish": "vsxpub --no-dependencies"
+    "ext:publish": "vsce publish --no-dependencies --allow-all-proposed-apis"
   },
   "dependencies": {
     "eventsource-parser": "^3.1.0",
@@ -200,12 +200,10 @@
     "@vscode/dts": "^0.4.1",
     "@vscode/vsce": "^3.9.2",
     "eslint": "^10.5.0",
-    "ovsx": "^1.0.1",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.8",
-    "vscode-ext-gen": "^1.6.0",
-    "vsxpub": "^0.1.4"
+    "vscode-ext-gen": "^1.6.0"
   }
 }
