@@ -49,7 +49,6 @@ export class ManagedServer {
   private adopted = false
   private port: number | undefined
   private version: string | undefined
-  private stopping = false
   private startPromise: Promise<RunningServer> | undefined
 
   constructor(private readonly deps: ServerDeps) {}
@@ -80,7 +79,6 @@ export class ManagedServer {
   }
 
   async stop(): Promise<void> {
-    this.stopping = true
     const child = this.child
     this.child = undefined
     this.adopted = false
@@ -89,7 +87,6 @@ export class ManagedServer {
       child.kill()
       this.deps.output.appendLine('Stopped the managed CLIProxyAPI server.')
     }
-    this.stopping = false
   }
 
   dispose(): void {
@@ -105,7 +102,6 @@ export class ManagedServer {
    * server (and so holds no child handle) by falling back to the recorded pid.
    */
   shutdown(): void {
-    this.stopping = true
     const child = this.child
     this.child = undefined
     this.adopted = false
@@ -123,7 +119,6 @@ export class ManagedServer {
       }
     }
     rmSync(this.deps.paths.pidPath, { force: true })
-    this.stopping = false
   }
 
   private async start(signal?: AbortSignal): Promise<RunningServer> {
@@ -174,17 +169,17 @@ export class ManagedServer {
         stdio: ['ignore', logFd, logFd],
       })
       this.child = child
-      this.stopping = false
       if (child.pid !== undefined)
         writeServerPid(this.deps.paths.pidPath, child.pid)
       child.unref()
       child.on('exit', (code, sig) => {
+        // stop()/shutdown() detach this.child before killing, so reaching here
+        // with it still ours means a real crash, not a deliberate stop.
         if (this.child === child) {
           this.child = undefined
           this.port = undefined
-        }
-        if (!this.stopping)
           this.deps.output.appendLine(`CLIProxyAPI exited unexpectedly (code=${code ?? 'null'}, signal=${sig ?? 'null'}); it will restart on next use.`)
+        }
       })
       child.on('error', (error) => {
         this.deps.output.appendLine(`CLIProxyAPI process error on port ${port}: ${error.message}`)
