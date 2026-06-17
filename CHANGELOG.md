@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/maxdewald/universal-chat-provider/compare/universal-chat-provider-v0.7.0...universal-chat-provider-v0.7.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* publish to marketplace with proposed apis allowed ([f17edee](https://github.com/maxdewald/universal-chat-provider/commit/f17edee0ab622b8b8f373e68012250f5788f2776))
+
 ## [0.7.0](https://github.com/maxdewald/universal-chat-provider/compare/universal-chat-provider-v0.6.0...universal-chat-provider-v0.7.0) (2026-06-17)
 
 
