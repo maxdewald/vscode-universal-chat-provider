@@ -9,7 +9,7 @@
     "node": "24.16.0",
     "pnpm": "11.6.0"
   },
-  "description": "Expose CLIProxyAPI models in GitHub Copilot Chat.",
+  "description": "Your AI subscriptions — Claude, ChatGPT/Codex, Gemini & more — in GitHub Copilot Chat. No API key, just OAuth.",
   "author": "Maximilian Dewald <maximilian@dewald.one>",
   "license": "MIT",
   "homepage": "https://github.com/maxdewald/vscode-universal-chat-provider#readme",
