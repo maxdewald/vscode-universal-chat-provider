@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.3](https://github.com/maxdewald/universal-chat-provider/compare/v0.7.2...v0.7.3) (2026-06-18)
+
+
+### Bug Fixes
+
+* normalize tilde-expanded config paths on Windows ([b0ed2b9](https://github.com/maxdewald/universal-chat-provider/commit/b0ed2b951c233522958caee9efcac6a01d9a7cd1))
+
+
+### Documentation
+
+* update README for Marketplace launch ([cd91053](https://github.com/maxdewald/universal-chat-provider/commit/cd910533a92d23efccd230bfd80d5d837dc05b41))
+
 ## [0.7.2](https://github.com/maxdewald/universal-chat-provider/compare/v0.7.1...v0.7.2) (2026-06-17)
 
 
