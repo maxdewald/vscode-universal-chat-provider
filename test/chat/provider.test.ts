@@ -9,14 +9,13 @@ import {
   LanguageModelDataPart,
   LanguageModelError,
   LanguageModelTextPart,
-  LanguageModelThinkingPart,
   LanguageModelToolCallPart,
 } from 'vscode'
 import { estimateTokens } from '../../src/chat/estimate'
 import { UniversalChatProvider } from '../../src/chat/provider'
 
 import { ProxyHttpError } from '../../src/cliproxy/errors'
-import { resetVSCodeMock, vscodeMock, window } from '../support/vscode'
+import { LanguageModelThinkingPart, resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
   discover: vi.fn(),
@@ -78,16 +77,13 @@ describe('language model provider', () => {
     const report = vi.fn()
 
     await provider.provideLanguageModelChatResponse(
-      model(),
+      { ...model(), reasoningEffort: 'high' },
       [{
         role: LanguageModelChatMessageRole.User,
         content: [new LanguageModelTextPart('hello')],
         name: undefined,
       }],
-      {
-        ...options(),
-        modelConfiguration: { reasoningEffort: 'high' },
-      },
+      options(),
       { report },
       new CancellationTokenSource().token,
     )
@@ -356,8 +352,6 @@ function model(): ProviderModel {
     maximumContextTokens: 120,
     reasoningLevels: ['low', 'high'],
     supportsParallelToolCalls: true,
-    isUserSelectable: true,
-    isBYOK: true,
     capabilities: {
       imageInput: false,
       toolCalling: true,
@@ -367,7 +361,6 @@ function model(): ProviderModel {
 
 function options() {
   return {
-    requestInitiator: 'test',
     toolMode: LanguageModelChatToolMode.Auto,
   }
 }

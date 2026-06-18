@@ -1,4 +1,4 @@
-import type { LanguageModelChatInformation, LanguageModelConfigurationSchema } from 'vscode'
+import type { LanguageModelChatInformation } from 'vscode'
 import type { CatalogModel } from './catalog'
 import { capitalize, unique } from 'moderndash'
 
@@ -11,11 +11,6 @@ export interface ProxyModelListEntry {
   max_completion_tokens?: number
 }
 
-export interface ReasoningLevel {
-  effort: string
-  description?: string
-}
-
 export interface ProxyModelMetadata {
   slug: string
   display_name?: string
@@ -26,8 +21,7 @@ export interface ProxyModelMetadata {
   supported_in_api?: boolean
   input_modalities?: string[]
   supports_parallel_tool_calls?: boolean
-  supported_reasoning_levels?: ReasoningLevel[]
-  default_reasoning_level?: string
+  supported_reasoning_levels?: { effort: string }[]
 }
 
 export interface ProviderModel extends LanguageModelChatInformation {
@@ -35,6 +29,7 @@ export interface ProviderModel extends LanguageModelChatInformation {
   totalContextTokens: number
   maximumContextTokens: number
   reasoningLevels: readonly string[]
+  reasoningEffort?: string
   supportsParallelToolCalls: boolean
 }
 
@@ -43,16 +38,10 @@ export interface ModelMappingOptions {
   onSkipped?: (id: string, reason: string) => void
 }
 
-const LEVEL_DESCRIPTIONS: Record<string, string> = {
-  none: 'No reasoning applied',
-  minimal: 'Minimal reasoning for fastest responses',
-  low: 'Faster responses with less reasoning',
-  medium: 'Balanced reasoning and speed',
-  high: 'Greater reasoning depth but slower',
-  xhigh: 'Highest reasoning depth but slowest',
-  max: 'Absolute maximum reasoning capability',
-  auto: 'Let the provider choose the reasoning depth',
-}
+// A trailing reasoning qualifier such as " (Thinking)" or " (Low)" that some
+// providers append to a model's name. Stripped both when deriving the display
+// name and when comparing a description against it.
+const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
 
 export function mapProxyModels(
   available: readonly ProxyModelListEntry[],
@@ -98,17 +87,16 @@ export function mapProxyModels(
       options.defaultMaxOutputTokens,
     )
     const maximumContext = positiveInteger(detail?.max_context_window ?? totalContext, totalContext)
-    const reasoning = resolveReasoning(detail, catalogModel)
+    const levels = resolveReasoning(detail, catalogModel)
     const advertisedName = detail?.display_name ?? catalogModel?.display_name ?? entry.id
-    let displayName = normalizeReasoningModelName(advertisedName, reasoning.levels)
+    let displayName = normalizeReasoningModelName(advertisedName, levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     const displayProviderName = formatProviderName(providerName)
-    // Collapse same-base-name ids that only differ by reasoning budget (e.g. Gemini
-    // 3.5 Flash High/Medium/Low) into one entry driven by the effort selector. A
-    // different level set keeps its qualifier and stays distinct.
-    if (reasoning.levels.length >= 2) {
+    // Dedupe same-base-name ids that share a reasoning-level set (e.g. Gemini 3.5
+    // Flash aliases). A different level set keeps its qualifier and stays distinct.
+    if (levels.length >= 2) {
       const reasoningModelKey = `${providerName}\0${displayName}`.toLowerCase()
-      const levelSignature = [...reasoning.levels].sort().join('\0')
+      const levelSignature = [...levels].sort().join('\0')
       const existingSignature = seenReasoningModels.get(reasoningModelKey)
       if (existingSignature === levelSignature)
         continue
@@ -128,14 +116,11 @@ export function mapProxyModels(
     const toolCalling = parallelToolCalls !== undefined
       || (catalogModel?.supported_parameters?.includes('tools') ?? true)
     const family = catalogModel?.type ?? inferFamily(entry.id)
-    const editTools = toolCalling ? preferredEditTools(family, entry.id) : undefined
     const description = detail?.description ?? catalogModel?.description
     const tooltip = buildTooltip(displayName, description, displayProviderName, outputTokens, imageInput, toolCalling)
 
-    result.push({
-      id: entry.id,
+    const baseModel = {
       proxyModelId: entry.id,
-      name: displayName,
       family,
       version: catalogModel?.version ?? entry.id,
       // The full context window. `maxInputTokens` is the only field VS Code
@@ -147,28 +132,56 @@ export function mapProxyModels(
       maxOutputTokens: outputTokens,
       totalContextTokens: totalContext,
       maximumContextTokens: maximumContext,
-      reasoningLevels: reasoning.levels,
       supportsParallelToolCalls,
       detail: `${formatTokens(totalContext)} context · ${displayProviderName}`,
       tooltip,
-      isBYOK: true,
-      isUserSelectable: true,
-      ...(reasoning.schema ? { configurationSchema: reasoning.schema } : {}),
       capabilities: {
         imageInput,
         toolCalling,
-        ...(editTools ? { editTools } : {}),
       },
-    })
+    }
+
+    // Stable VS Code has no per-model config UI, so the reasoning effort is
+    // chosen through the model picker: one selectable entry per level.
+    if (levels.length >= 2) {
+      for (const level of levels) {
+        result.push({
+          ...baseModel,
+          id: `${entry.id}:${level}`,
+          name: `${displayName} (${formatLevel(level)})`,
+          reasoningLevels: [level],
+          reasoningEffort: level,
+        })
+      }
+    }
+    else {
+      result.push({ ...baseModel, id: entry.id, name: displayName, reasoningLevels: levels })
+    }
   }
 
-  return result.sort((a, b) => a.name.localeCompare(b.name))
+  return result.sort((a, b) => {
+    const baseA = a.name.replace(REASONING_NAME_SUFFIX, '')
+    const baseB = b.name.replace(REASONING_NAME_SUFFIX, '')
+    return baseA === baseB
+      ? effortRank(a.reasoningEffort) - effortRank(b.reasoningEffort)
+      : baseA.localeCompare(baseB)
+  })
+}
+
+const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, auto: 7 }
+
+function effortRank(level: string | undefined): number {
+  return level === undefined ? -1 : EFFORT_RANK[level] ?? 99
+}
+
+function formatLevel(value: string): string {
+  return value === 'xhigh' ? 'Extra High' : capitalize(value)
 }
 
 function resolveReasoning(
   metadata: ProxyModelMetadata | undefined,
   catalog: CatalogModel | undefined,
-): { levels: string[], schema?: LanguageModelConfigurationSchema } {
+): string[] {
   const describedLevels = metadata?.supported_reasoning_levels
     ?.map(item => item.effort.trim().toLowerCase())
     .filter(Boolean)
@@ -184,35 +197,7 @@ function resolveReasoning(
     levels = normalizedUnique(levels)
   }
 
-  if (levels.length < 2)
-    return { levels }
-
-  const descriptions = new Map(
-    metadata?.supported_reasoning_levels?.map(item => [item.effort.toLowerCase(), item.description]) ?? [],
-  )
-  const preferredDefault = metadata?.default_reasoning_level?.toLowerCase()
-  const defaultLevel = preferredDefault !== undefined && levels.includes(preferredDefault)
-    ? preferredDefault
-    : levels.includes('medium')
-      ? 'medium'
-      : levels[0]
-
-  return {
-    levels,
-    schema: {
-      properties: {
-        reasoningEffort: {
-          type: 'string',
-          title: 'Thinking Effort',
-          enum: levels,
-          enumItemLabels: levels.map(formatLevel),
-          enumDescriptions: levels.map(level => descriptions.get(level) ?? LEVEL_DESCRIPTIONS[level] ?? level),
-          default: defaultLevel,
-          group: 'navigation',
-        },
-      },
-    },
-  }
+  return levels
 }
 
 function isMediaOnly(id: string, model: CatalogModel | undefined): boolean {
@@ -256,11 +241,6 @@ function endWithSentencePunctuation(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`
 }
 
-// A trailing reasoning qualifier such as " (Thinking)" or " (Low)" that some
-// providers append to a model's name. Stripped both when deriving the display
-// name and when comparing a description against it.
-const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
-
 // Many proxied providers fill `description` with nothing more than the model's
 // own name (e.g. "Claude Opus 4.6 (Thinking)"), which the card already shows as
 // the title. Treat those as no description so the tooltip never echoes the name.
@@ -276,12 +256,6 @@ function formatTokens(value: number): string {
   if (value >= 1_000)
     return `${Number((value / 1_000).toFixed(1))}K`
   return String(value)
-}
-
-function formatLevel(value: string): string {
-  return value === 'xhigh'
-    ? 'Extra High'
-    : capitalize(value)
 }
 
 // The proxy reports the company in `owned_by` (e.g. "anthropic", "google"); show
@@ -304,19 +278,6 @@ function normalizeReasoningModelName(name: string, levels: readonly string[]): s
   if (levels.length < 2)
     return name
   return name.replace(REASONING_NAME_SUFFIX, '')
-}
-
-// Match Copilot's own per-family edit-tool defaults: apply-patch suits OpenAI
-// models, find/replace suits Claude. For other families (e.g. Gemini) we leave
-// it unset so Copilot's edit-tool learning picks what the model handles best
-// rather than forcing a format it edits poorly with.
-function preferredEditTools(family: string, id: string): string[] | undefined {
-  const key = `${family} ${id}`.toLowerCase()
-  if (/gpt|openai|codex/.test(key))
-    return ['apply-patch']
-  if (/claude|anthropic|sonnet|opus|haiku/.test(key))
-    return ['find-replace', 'multi-find-replace']
-  return undefined
 }
 
 function inferFamily(id: string): string {

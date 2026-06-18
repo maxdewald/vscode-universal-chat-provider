@@ -20,8 +20,12 @@
   "bugs": {
     "url": "https://github.com/maxdewald/vscode-universal-chat-provider/issues"
   },
+  "keywords": [
+    "language-models"
+  ],
   "categories": [
-    "Other"
+    "AI",
+    "Chat"
   ],
   "main": "./dist/index.cjs",
   "icon": "res/logo.png",
@@ -32,12 +36,8 @@
   ],
   "engines": {
     "node": ">=22.18.0",
-    "vscode": "^1.124.0"
+    "vscode": "^1.125.0"
   },
-  "enabledApiProposals": [
-    "chatProvider",
-    "languageModelThinkingPart"
-  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -167,7 +167,6 @@
     "dev": "tsdown --watch --sourcemap",
     "prepare": "pnpm generate",
     "generate": "vscode-ext-gen --output src/generated/meta.ts",
-    "vscode:dts": "dts dev",
     "lint": "eslint .",
     "test": "vitest run --project test:unit",
     "test:e2e": "vitest run --project test:e2e",
@@ -178,7 +177,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
     "vscode:prepublish": "pnpm build",
     "ext:package": "vsce package --no-dependencies",
-    "ext:publish": "vsce publish --no-dependencies --allow-all-proposed-apis"
+    "ext:publish": "vsce publish --no-dependencies"
   },
   "dependencies": {
     "eventsource-parser": "^3.1.0",
@@ -194,9 +193,8 @@
     "@antfu/eslint-config": "^9.0.0",
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "^1.125.0",
     "@vitest/coverage-v8": "^4.1.8",
-    "@vscode/dts": "^0.4.1",
     "@vscode/vsce": "^3.9.2",
     "eslint": "^10.5.0",
     "tsdown": "^0.22.2",

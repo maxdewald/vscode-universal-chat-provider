@@ -103,7 +103,6 @@ describe('response request conversion', () => {
         name: undefined,
       }],
       {
-        requestInitiator: 'test',
         toolMode: LanguageModelChatToolMode.Required,
         tools: [{
           name: 'lookup',
@@ -135,7 +134,7 @@ describe('response request conversion', () => {
         role: LanguageModelChatMessageRole.User,
         content: [new LanguageModelTextPart('hello')],
         name: undefined,
-      }], 'test'),
+      }]),
       reasoning: { effort: 'high', summary: 'auto' },
       tools: [{
         type: 'function',
@@ -173,19 +172,17 @@ describe('response request conversion', () => {
       },
     ]
 
-    const key = buildPromptCacheKey(model, firstTurn, 'test')
+    const key = buildPromptCacheKey(model, firstTurn)
 
     expect(key).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
-    expect(buildPromptCacheKey(model, secondTurn, 'test')).toBe(key)
+    expect(buildPromptCacheKey(model, secondTurn)).toBe(key)
     expect(buildRequest(model, firstTurn, {
-      requestInitiator: 'test',
       toolMode: LanguageModelChatToolMode.Auto,
     }).prompt_cache_key).toBe(key)
   })
 
   it('omits unsupported reasoning and supplies a default tool schema', () => {
     const request = buildRequest(model, [], {
-      requestInitiator: 'test',
       toolMode: LanguageModelChatToolMode.Auto,
       tools: [{ name: 'empty', description: 'No input' }],
     }, 'medium')
@@ -211,7 +208,6 @@ describe('response request conversion', () => {
     } as unknown as ProviderModel
 
     const request = buildRequest(geminiModel, [], {
-      requestInitiator: 'test',
       toolMode: LanguageModelChatToolMode.Auto,
       tools: [{
         name: 'lookup',

@@ -21,7 +21,7 @@ export function buildRequest(
   options: ProvideLanguageModelChatResponseOptions,
   reasoningEffort?: string,
 ): Record<string, unknown> {
-  const promptCacheKey = buildPromptCacheKey(model, messages, options.requestInitiator)
+  const promptCacheKey = buildPromptCacheKey(model, messages)
   const request: Record<string, unknown> = {
     model: model.proxyModelId,
     input: messages.flatMap(convertMessage),
@@ -63,7 +63,6 @@ function targetsGemini(model: ProviderModel): boolean {
 export function buildPromptCacheKey(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
-  requestInitiator?: string,
 ): string | undefined {
   const seed = sessionSeed(messages)
   if (seed === undefined)
@@ -72,8 +71,6 @@ export function buildPromptCacheKey(
   const hash = createHash('sha256')
     .update('universal-chat-provider:prompt-cache:v1\0')
     .update(model.proxyModelId)
-    .update('\0')
-    .update(requestInitiator ?? '')
     .update('\0')
     .update(seed)
     .digest('hex')

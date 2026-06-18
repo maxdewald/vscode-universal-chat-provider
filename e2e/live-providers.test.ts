@@ -139,7 +139,6 @@ async function expectSentinel(provider: string, modelId: string, sentinel: strin
       name: undefined,
     }],
     {
-      requestInitiator: 'universal-chat-provider-e2e',
       toolMode: LanguageModelChatToolMode.Auto,
     },
     'low',

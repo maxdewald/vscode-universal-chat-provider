@@ -4,7 +4,7 @@ import type {
   ExtensionContext,
   LanguageModelChatProvider,
   LanguageModelChatRequestMessage,
-  LanguageModelResponsePart2,
+  LanguageModelResponsePart,
   OutputChannel,
   PrepareLanguageModelChatModelOptions,
   Progress,
@@ -13,9 +13,9 @@ import type {
 import type { ProxyConnection } from '../cliproxy/connection'
 import type { CompletionDeps } from './completion'
 import type { ProviderModel } from './model'
+import * as vscode from 'vscode'
 import {
   LanguageModelTextPart,
-  LanguageModelThinkingPart,
   LanguageModelToolCallPart,
 } from 'vscode'
 import { SettingsConnection } from '../cliproxy/connection'
@@ -81,24 +81,27 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     model: ProviderModel,
     messages: readonly LanguageModelChatRequestMessage[],
     options: ProvideLanguageModelChatResponseOptions,
-    progress: Progress<LanguageModelResponsePart2>,
+    progress: Progress<LanguageModelResponsePart>,
     token: CancellationToken,
   ): Promise<void> {
-    const reasoningEffort = asString(options.modelConfiguration?.reasoningEffort)
-    const request = buildRequest(model, messages, options, reasoningEffort)
+    const request = buildRequest(model, messages, options, model.reasoningEffort)
     await streamCompletion(
       this.completionDeps(),
       request,
       {
         onText: delta => progress.report(new LanguageModelTextPart(delta)),
-        onThinking: delta => progress.report(new LanguageModelThinkingPart(delta)),
+        // LanguageModelThinkingPart is a proposed API: present on Insiders, absent on stable.
+        onThinking: (delta) => {
+          const ThinkingPart = (vscode as { LanguageModelThinkingPart?: new (value: string) => LanguageModelResponsePart }).LanguageModelThinkingPart
+          if (ThinkingPart !== undefined)
+            progress.report(new ThinkingPart(delta))
+        },
         onToolCall: (callId, name, input) =>
           progress.report(new LanguageModelToolCallPart(callId, name, input)),
         onUsage: (usage) => {
           this.cacheMetrics.record(usage, {
             model: model.proxyModelId,
             promptCacheKey: asString(request.prompt_cache_key),
-            requestInitiator: options.requestInitiator,
             inputItems: request.input as readonly unknown[],
           })
           const part = createContextUsagePart(usage)

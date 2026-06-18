@@ -19,7 +19,6 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "e2e/**/*.ts",
-    "vscode.proposed.*.d.ts",
     "*.ts"
   ]
 }
