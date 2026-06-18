@@ -12,13 +12,13 @@
   "description": "Expose CLIProxyAPI models in GitHub Copilot Chat.",
   "author": "Maximilian Dewald <maximilian@dewald.one>",
   "license": "MIT",
-  "homepage": "https://github.com/maxdewald/universal-chat-provider#readme",
+  "homepage": "https://github.com/maxdewald/vscode-universal-chat-provider#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/maxdewald/universal-chat-provider.git"
+    "url": "https://github.com/maxdewald/vscode-universal-chat-provider.git"
   },
   "bugs": {
-    "url": "https://github.com/maxdewald/universal-chat-provider/issues"
+    "url": "https://github.com/maxdewald/vscode-universal-chat-provider/issues"
   },
   "categories": [
     "Other"

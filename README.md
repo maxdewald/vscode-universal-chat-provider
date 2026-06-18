@@ -5,16 +5,16 @@
 <h1>Universal Chat Provider</h1>
 
 <p>
-  <b>Bring your Claude, ChatGPT&nbsp;/&nbsp;Codex, and Gemini subscriptions into GitHub&nbsp;Copilot&nbsp;Chat</b><br/>
+  <b>The VS&nbsp;Code extension that brings your Claude, ChatGPT&nbsp;/&nbsp;Codex, and Gemini subscriptions into GitHub&nbsp;Copilot&nbsp;Chat</b><br/>
   <sub>No API key — just OAuth&#8209;login the subscriptions you already pay for.</sub><br/>
   <sub>…and use them to write your Git commit messages, too.</sub>
 </p>
 
 <p>
-  <a href="https://marketplace.visualstudio.com/items?itemName=maxdewald.universal-chat-provider"><img src="https://img.shields.io/visual-studio-marketplace/v/maxdewald.universal-chat-provider?label=Marketplace&logo=visualstudiocode&logoColor=white&color=654FF0" alt="VS Code Marketplace" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=maxdewald.universal-chat-provider"><img src="https://img.shields.io/visual-studio-marketplace/i/maxdewald.universal-chat-provider?label=installs&color=007ACC" alt="Installs" /></a>
-  <img src="https://img.shields.io/badge/VS%20Code-%5E1.124-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code ^1.124" />
-  <img src="https://img.shields.io/badge/license-MIT-3da639" alt="MIT License" />
+  <a href="https://marketplace.visualstudio.com/items?itemName=maxdewald.universal-chat-provider"><img src="https://vsmarketplacebadges.dev/version-short/maxdewald.universal-chat-provider.png?label=Marketplace&color=654FF0" alt="VS Code Marketplace version" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=maxdewald.universal-chat-provider"><img src="https://vsmarketplacebadges.dev/installs-short/maxdewald.universal-chat-provider.png?label=installs&color=007ACC" alt="Marketplace installs" /></a>
+  <img src="https://img.shields.io/badge/VS%20Code-1.124%2B-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code 1.124+" />
+  <img src="https://img.shields.io/badge/license-MIT-3da639?logo=opensourceinitiative&logoColor=white" alt="MIT License" />
 </p>
 
 <p>
