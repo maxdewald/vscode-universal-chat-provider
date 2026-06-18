@@ -61,7 +61,7 @@ Sign in with any subscription you already have — no API key:
 > Requires **VS Code 1.124+** and the **GitHub Copilot Chat** extension.
 
 1. **Install** — get *Universal Chat Provider* from the **[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=maxdewald.universal-chat-provider)**. Prefer to build it yourself? See [Development](#development).
-2. **Add an account** — accept the **Add Account** prompt (or run *Universal Chat Provider: Add Account (Login)*), pick a provider, and complete OAuth in your browser. Models refresh automatically.
+2. **Add an account** — accept the **Add Account** prompt (or run `Universal Chat Provider: Add Account`), pick a provider, and complete OAuth in your browser. Models refresh automatically.
 3. **Chat** — open Copilot Chat and select a model under **Universal Chat Provider**.
 
 Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — list/remove accounts, restart, update, or reset the managed server.
@@ -92,10 +92,10 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 ```
    Your subscriptions          Local proxy             VS Code
   ┌────────────────────┐     ┌──────────────┐     ┌──────────────────┐
-  │ Claude             │     │              │     │  Copilot Chat     │
-  │ ChatGPT / Codex    │──┐  │              │  ┌─▶│   model picker    │
+  │ Claude             │     │              │     │  Copilot Chat    │
+  │ ChatGPT / Codex    │──┐  │              │  ┌─▶│   model picker   │
   │ Gemini             │  ├─▶│  CLIProxyAPI │──┤  ├──────────────────┤
-  │ Grok · Kimi · …    │──┘  │   (OAuth)    │  └─▶│  Utility model    │
+  │ Grok · Kimi · …    │──┘  │   (OAuth)    │  └─▶│  Utility model   │
   └────────────────────┘     └──────────────┘     └──────────────────┘
 ```
 
