@@ -34,6 +34,8 @@ export interface UsageContext {
   /** The `Session_id` we asked the proxy to key Claude's cache on. */
   promptCacheKey?: string | undefined
   requestInitiator?: string | undefined
+  /** The reasoning effort sent to the proxy (`request.reasoning.effort`), if any. */
+  reasoningEffort?: string | undefined
   /** The request `input` items, so consecutive turns can be diffed for prefix stability. */
   inputItems?: readonly unknown[] | undefined
 }
@@ -183,9 +185,11 @@ export function formatUsageLine(
   summary: UsageSummary,
   label?: string,
   raw?: unknown,
+  reasoningEffort?: string,
 ): string {
   const tag = label !== undefined && label.length > 0 ? ` (${label})` : ''
-  const base = `[usage] ${model}${tag}: input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
+  const effort = reasoningEffort !== undefined && reasoningEffort.length > 0 ? ` effort=${reasoningEffort}` : ''
+  const base = `[usage] ${model}${tag}:${effort} input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
     return `${base} (${summary.shape})`
@@ -223,7 +227,7 @@ export class CacheMetricsTracker {
 
   record(usage: unknown, context: UsageContext): void {
     const summary = normalizeUsage(usage)
-    this.output.appendLine(formatUsageLine(context.model, summary, context.label, usage))
+    this.output.appendLine(formatUsageLine(context.model, summary, context.label, usage, context.reasoningEffort))
     if (!this.enabled()) {
       this.statusBar.hide()
       return
@@ -277,6 +281,7 @@ export class CacheMetricsTracker {
       label: context.label,
       requestInitiator: context.requestInitiator,
       promptCacheKey: context.promptCacheKey,
+      reasoningEffort: context.reasoningEffort ?? null,
       shape: summary.shape,
       inputTokens: summary.inputTokens,
       cacheReadTokens: summary.cacheReadTokens,

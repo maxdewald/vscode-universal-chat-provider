@@ -112,6 +112,13 @@ export class LanguageModelTextPart {
   constructor(readonly value: string) {}
 }
 
+export class LanguageModelThinkingPart {
+  constructor(
+    readonly value: string,
+    readonly id?: string,
+  ) {}
+}
+
 export class LanguageModelDataPart {
   static image(data: Uint8Array, mimeType: string): LanguageModelDataPart {
     return new LanguageModelDataPart(data, mimeType)

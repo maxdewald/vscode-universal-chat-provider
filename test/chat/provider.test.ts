@@ -15,7 +15,7 @@ import { estimateTokens } from '../../src/chat/estimate'
 import { UniversalChatProvider } from '../../src/chat/provider'
 
 import { ProxyHttpError } from '../../src/cliproxy/errors'
-import { resetVSCodeMock, vscodeMock, window } from '../support/vscode'
+import { LanguageModelThinkingPart, resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
   discover: vi.fn(),
@@ -89,12 +89,14 @@ describe('language model provider', () => {
       expect.any(Object),
       expect.any(AbortSignal),
     )
-    expect(report.mock.calls[0]?.[0]).toEqual(new LanguageModelTextPart('> **Thinking**\n> thinking'))
-    expect(report.mock.calls[1]?.[0]).toEqual(new LanguageModelTextPart('\n\n'))
-    expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelTextPart('text'))
-    expect(report.mock.calls[3]?.[0]).toEqual(new LanguageModelToolCallPart('call', 'lookup', { q: 'x' }))
+    const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
+    expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
+    expect(thinkingPart.value).toBe('thinking')
+    expect(thinkingPart.id).toEqual(expect.any(String))
+    expect(report.mock.calls[1]?.[0]).toEqual(new LanguageModelTextPart('text'))
+    expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelToolCallPart('call', 'lookup', { q: 'x' }))
     // The usage data part drives VS Code's context-window indicator.
-    const usagePart = report.mock.calls[4]?.[0] as LanguageModelDataPart
+    const usagePart = report.mock.calls[3]?.[0] as LanguageModelDataPart
     expect(usagePart).toBeInstanceOf(LanguageModelDataPart)
     expect(usagePart.mimeType).toBe('usage')
     expect(JSON.parse(new TextDecoder().decode(usagePart.data))).toEqual({
@@ -104,11 +106,11 @@ describe('language model provider', () => {
       prompt_tokens_details: { cached_tokens: 0 },
     })
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: effort=high input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
-  it('shows multiline reasoning as text', async () => {
+  it('streams reasoning deltas as thinking parts sharing one id', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
       callbacks.onThinking?.('first\nsecond')
@@ -129,44 +131,42 @@ describe('language model provider', () => {
       new CancellationTokenSource().token,
     )
 
-    const parts: unknown[] = []
-    for (const call of report.mock.calls)
-      parts.push(call[0])
-    expect(parts).toEqual([
-      new LanguageModelTextPart('> **Thinking**\n> first\n> second'),
-      new LanguageModelTextPart(' tail'),
-      new LanguageModelTextPart('\n\n'),
-      new LanguageModelTextPart('answer'),
-    ])
+    const first = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
+    const second = report.mock.calls[1]?.[0] as LanguageModelThinkingPart
+    expect(first).toBeInstanceOf(LanguageModelThinkingPart)
+    expect(first.value).toBe('first\nsecond')
+    expect(second).toBeInstanceOf(LanguageModelThinkingPart)
+    expect(second.value).toBe(' tail')
+    expect(first.id).toBe(second.id)
+    expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelTextPart('answer'))
   })
 
-  it('hides reasoning when configured off', async () => {
-    vscodeMock.settings.set('universalChatProvider.showReasoning', false)
+  it('sends the effort picked from the model-config dropdown and logs it', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
-      callbacks.onThinking?.('hidden')
-      callbacks.onText('answer')
+      callbacks.onUsage?.({ output_tokens: 1 })
     })
-    const report = vi.fn()
 
     await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningEffort: 'high' },
+      { ...model(), reasoningLevels: ['low', 'high', 'xhigh'], reasoningEffort: 'low' },
       [{
         role: LanguageModelChatMessageRole.User,
         content: [new LanguageModelTextPart('hello')],
         name: undefined,
       }],
-      options(),
-      { report },
+      { ...options(), modelConfiguration: { reasoningEffort: 'xhigh' } } as ReturnType<typeof options>,
+      { report: vi.fn() },
       new CancellationTokenSource().token,
     )
 
-    const parts: unknown[] = []
-    for (const call of report.mock.calls)
-      parts.push(call[0])
-    expect(parts).toEqual([
-      new LanguageModelTextPart('answer'),
-    ])
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'auto' } }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=1 hit=n/a raw={"output_tokens":1}',
+    )
   })
 
   it('maps HTTP errors and suppresses errors after cancellation', async () => {

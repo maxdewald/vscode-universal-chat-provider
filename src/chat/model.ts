@@ -29,6 +29,23 @@ export interface ProviderModel extends LanguageModelChatInformation {
   reasoningLevels: readonly string[]
   reasoningEffort?: string
   supportsParallelToolCalls: boolean
+  // configurationSchema is part of VS Code's proposed chatProvider API but ships
+  // ungated in stable, so we set it here and let the model picker render a
+  // reasoning-effort dropdown from it.
+  configurationSchema?: ModelConfigurationSchema
+}
+
+interface ModelConfigurationSchema {
+  properties: {
+    reasoningEffort: {
+      type: 'string'
+      enum: readonly string[]
+      enumItemLabels: readonly string[]
+      default: string
+      description: string
+      group: 'navigation'
+    }
+  }
 }
 
 export interface ModelMappingOptions {
@@ -136,18 +153,31 @@ export function mapProxyModels(
       },
     }
 
-    // Stable VS Code has no per-model config UI, so the reasoning effort is
-    // chosen through the model picker: one selectable entry per level.
+    // A model with multiple reasoning levels gets a single picker entry; the
+    // level is chosen through a "Thinking Effort" dropdown that VS Code renders
+    // from configurationSchema and echoes back as options.modelConfiguration.
     if (levels.length >= 2) {
-      for (const level of levels) {
-        result.push({
-          ...baseModel,
-          id: `${entry.id}:${level}`,
-          name: `${displayName} (${formatLevel(level)})`,
-          reasoningLevels: [level],
-          reasoningEffort: level,
-        })
-      }
+      const ordered = [...levels].sort((a, b) => effortRank(a) - effortRank(b))
+      const defaultLevel = ordered[ordered.length - 1]!
+      result.push({
+        ...baseModel,
+        id: entry.id,
+        name: displayName,
+        reasoningLevels: ordered,
+        reasoningEffort: defaultLevel,
+        configurationSchema: {
+          properties: {
+            reasoningEffort: {
+              type: 'string',
+              enum: ordered,
+              enumItemLabels: ordered.map(formatLevel),
+              default: defaultLevel,
+              description: 'Thinking Effort',
+              group: 'navigation',
+            },
+          },
+        },
+      })
     }
     else {
       result.push({ ...baseModel, id: entry.id, name: displayName, reasoningLevels: levels })

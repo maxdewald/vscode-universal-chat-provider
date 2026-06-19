@@ -105,6 +105,12 @@ describe('formatUsageLine', () => {
       '[usage] model-a (commit message): input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
     )
   })
+
+  it('includes the reasoning effort sent to the proxy', () => {
+    expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, undefined, 'xhigh')).toBe(
+      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+    )
+  })
 })
 
 describe('cacheMetricsTracker', () => {

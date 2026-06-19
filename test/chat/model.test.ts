@@ -3,7 +3,7 @@ import { flattenCatalog } from '../../src/chat/catalog'
 import { mapProxyModels } from '../../src/chat/model'
 
 describe('model mapping', () => {
-  it('creates one selectable entry per reasoning level', () => {
+  it('creates one entry with a reasoning-effort selector', () => {
     const models = mapProxyModels(
       [{ id: 'gpt-5.4', owned_by: 'openai' }],
       [{
@@ -26,19 +26,29 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 16_384 },
     )
 
-    expect(models).toHaveLength(3)
-    expect(models.map(model => model.id)).toEqual(['gpt-5.4:low', 'gpt-5.4:medium', 'gpt-5.4:high'])
-    expect(models.map(model => model.name)).toEqual(['GPT-5.4 (Low)', 'GPT-5.4 (Medium)', 'GPT-5.4 (High)'])
-    expect(models.map(model => model.reasoningEffort)).toEqual(['low', 'medium', 'high'])
-    for (const model of models) {
-      expect(model).toMatchObject({
-        proxyModelId: 'gpt-5.4',
-        maxInputTokens: 400_000,
-        maxOutputTokens: 128_000,
-        capabilities: { imageInput: true, toolCalling: true },
-      })
-      expect(model.reasoningLevels).toEqual([model.reasoningEffort])
-    }
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      id: 'gpt-5.4',
+      name: 'GPT-5.4',
+      proxyModelId: 'gpt-5.4',
+      maxInputTokens: 400_000,
+      maxOutputTokens: 128_000,
+      capabilities: { imageInput: true, toolCalling: true },
+      reasoningLevels: ['low', 'medium', 'high'],
+      reasoningEffort: 'high',
+    })
+    expect(models[0]?.configurationSchema).toEqual({
+      properties: {
+        reasoningEffort: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          enumItemLabels: ['Low', 'Medium', 'High'],
+          default: 'high',
+          description: 'Thinking Effort',
+          group: 'navigation',
+        },
+      },
+    })
   })
 
   it('keeps every provider model while filtering media-only endpoints', () => {
@@ -56,7 +66,7 @@ describe('model mapping', () => {
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'gemini-pro'])
   })
 
-  it('dedups reasoning aliases then expands the survivor into one entry per level', () => {
+  it('dedups reasoning aliases into a single survivor with a selector', () => {
     const levels = [
       { effort: 'low' },
       { effort: 'high' },
@@ -92,16 +102,16 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    // claude-opus → 3 levels; the two gemini aliases dedupe to one model → 2 levels.
+    // claude-opus keeps one entry; the two gemini aliases dedupe to one survivor.
     expect(models.map(model => model.name)).toEqual([
-      'Claude Opus (Low)',
-      'Claude Opus (Medium)',
-      'Claude Opus (High)',
-      'Gemini 3 Pro (Low)',
-      'Gemini 3 Pro (High)',
+      'Claude Opus',
+      'Gemini 3 Pro',
     ])
-    expect(models.filter(model => model.name.startsWith('Gemini')).map(model => model.proxyModelId))
-      .toEqual(['gemini-3-pro-high', 'gemini-3-pro-high'])
+    expect(models.map(model => model.reasoningLevels)).toEqual([
+      ['low', 'medium', 'high'],
+      ['low', 'high'],
+    ])
+    expect(models.find(model => model.name === 'Gemini 3 Pro')?.proxyModelId).toBe('gemini-3-pro-high')
   })
 
   it('dedups a suffixed alias against an already-unsuffixed sibling', () => {
@@ -119,15 +129,11 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    expect(models.map(model => model.name)).toEqual([
-      'Gemini 3.5 Flash (Low)',
-      'Gemini 3.5 Flash (Medium)',
-      'Gemini 3.5 Flash (High)',
-    ])
+    expect(models.map(model => model.name)).toEqual(['Gemini 3.5 Flash'])
     expect(models[0]).toMatchObject({
       proxyModelId: 'gemini-3-flash-agent',
-      reasoningEffort: 'low',
-      reasoningLevels: ['low'],
+      reasoningEffort: 'high',
+      reasoningLevels: ['low', 'medium', 'high'],
     })
   })
 
@@ -169,8 +175,8 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    // Distinct aliases stay distinct: each survives and expands to its own levels.
-    expect(models).toHaveLength(5)
+    // Distinct aliases stay distinct: each survives as its own selector entry.
+    expect(models).toHaveLength(2)
     expect(new Set(models.map(model => model.proxyModelId))).toEqual(new Set(['model-high', 'model-low']))
   })
 
@@ -206,15 +212,15 @@ describe('model mapping', () => {
     )
 
     const model = models[0]
-    expect(models.map(entry => entry.reasoningEffort)).toEqual(['none', 'low', 'medium', 'high', 'auto'])
+    expect(models).toHaveLength(1)
     expect(model).toMatchObject({
-      name: 'Catalog Model (None)',
+      name: 'Catalog Model',
       family: 'vendor',
       version: 'v1',
       maxInputTokens: 1_000_000,
       maxOutputTokens: 50_000,
-      reasoningLevels: ['none'],
-      reasoningEffort: 'none',
+      reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
+      reasoningEffort: 'auto',
       detail: '1M context · Vendor',
       capabilities: {
         imageInput: true,
@@ -305,7 +311,7 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    expect(model?.name).toBe('Claude Opus 4.6 (Low)')
+    expect(model?.name).toBe('Claude Opus 4.6')
     expect(model?.tooltip).toBe('Antigravity via CLIProxyAPI\n\n64K max output · Vision · Tools')
   })
 

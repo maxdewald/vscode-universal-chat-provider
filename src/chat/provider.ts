@@ -20,7 +20,7 @@ import {
 } from 'vscode'
 import { SettingsConnection } from '../cliproxy/connection'
 import { CredentialStore } from '../cliproxy/credentials'
-import { asString } from '../shared/json'
+import { asRecord, asString } from '../shared/json'
 import { CacheMetricsTracker } from './cache-metrics'
 import { streamCompletion } from './completion'
 import { createContextUsagePart } from './context-usage'
@@ -28,6 +28,14 @@ import { CredentialFlows } from './credential-flows'
 import { estimateTokens } from './estimate'
 import { ModelRegistry } from './model-registry'
 import { buildRequest } from './request'
+
+// LanguageModelThinkingPart renders reasoning as a collapsible block that shrinks
+// once the answer streams in. Its type is still proposed, but the runtime class is
+// ungated on stable, so we reach for it directly and type the result as a regular
+// response part.
+const LanguageModelThinkingPart = (vscode as unknown as {
+  LanguageModelThinkingPart: new (value: string, id?: string) => LanguageModelResponsePart
+}).LanguageModelThinkingPart
 
 export class UniversalChatProvider implements LanguageModelChatProvider<ProviderModel> {
   private readonly credentials: CredentialStore
@@ -84,24 +92,20 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     progress: Progress<LanguageModelResponsePart>,
     token: CancellationToken,
   ): Promise<void> {
-    const request = buildRequest(model, messages, options, model.reasoningEffort)
-    const reasoning = new ReasoningTextFallback(
-      vscode.workspace.getConfiguration('universalChatProvider').get<boolean>('showReasoning', true),
-    )
+    // modelConfiguration carries the reasoning effort the user picked from the
+    // model's configurationSchema dropdown; fall back to the model's default.
+    const modelConfiguration = (options as { modelConfiguration?: { reasoningEffort?: string } }).modelConfiguration
+    const chosenEffort = modelConfiguration?.reasoningEffort ?? model.reasoningEffort
+    const request = buildRequest(model, messages, options, chosenEffort)
     await streamCompletion(
       this.completionDeps(),
       request,
       {
         onText: (delta) => {
-          const separator = reasoning.close()
-          if (separator !== undefined)
-            progress.report(new LanguageModelTextPart(separator))
           progress.report(new LanguageModelTextPart(delta))
         },
         onThinking: (delta) => {
-          const text = reasoning.format(delta)
-          if (text !== undefined)
-            progress.report(new LanguageModelTextPart(text))
+          progress.report(new LanguageModelThinkingPart(delta, 'thinking'))
         },
         onToolCall: (callId, name, input) =>
           progress.report(new LanguageModelToolCallPart(callId, name, input)),
@@ -109,6 +113,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           this.cacheMetrics.record(usage, {
             model: model.proxyModelId,
             promptCacheKey: asString(request.prompt_cache_key),
+            reasoningEffort: asString(asRecord(request.reasoning)?.effort),
             inputItems: request.input as readonly unknown[],
           })
           const part = createContextUsagePart(usage)
@@ -156,26 +161,5 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       credentials: this.credentials,
       onCredentialsRejected: () => void this.credentialFlows.showCredentialRecovery(),
     }
-  }
-}
-
-class ReasoningTextFallback {
-  private open = false
-
-  constructor(private readonly enabled: boolean) {}
-
-  format(delta: string): string | undefined {
-    if (!this.enabled || delta.length === 0)
-      return undefined
-    const prefix = this.open ? '' : '> **Thinking**\n> '
-    this.open = true
-    return `${prefix}${delta.replace(/\n/g, '\n> ')}`
-  }
-
-  close(): string | undefined {
-    if (!this.open)
-      return undefined
-    this.open = false
-    return '\n\n'
   }
 }

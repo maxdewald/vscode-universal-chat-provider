@@ -8,8 +8,7 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         "${workspaceFolder}/.vscode/extension-dev.code-workspace",
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "--enable-proposed-api=maxdewald.universal-chat-provider"
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"
