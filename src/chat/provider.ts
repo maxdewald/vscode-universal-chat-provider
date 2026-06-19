@@ -99,13 +99,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           progress.report(new LanguageModelTextPart(delta))
         },
         onThinking: (delta) => {
-          if (!reasoning.enabled)
-            return
-          const ThinkingPart = (vscode as { LanguageModelThinkingPart?: new (value: string) => LanguageModelResponsePart }).LanguageModelThinkingPart
-          if (ThinkingPart !== undefined) {
-            progress.report(new ThinkingPart(delta))
-            return
-          }
           const text = reasoning.format(delta)
           if (text !== undefined)
             progress.report(new LanguageModelTextPart(text))
@@ -167,16 +160,14 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 }
 
 class ReasoningTextFallback {
-  private started = false
   private open = false
 
-  constructor(readonly enabled: boolean) {}
+  constructor(private readonly enabled: boolean) {}
 
   format(delta: string): string | undefined {
-    if (delta.length === 0)
+    if (!this.enabled || delta.length === 0)
       return undefined
-    const prefix = this.started ? '' : '> **Thinking**\n> '
-    this.started = true
+    const prefix = this.open ? '' : '> **Thinking**\n> '
     this.open = true
     return `${prefix}${delta.replace(/\n/g, '\n> ')}`
   }
