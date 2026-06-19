@@ -55,7 +55,7 @@ describe('model mapping', () => {
     const models = mapProxyModels(
       [
         { id: 'claude-sonnet', owned_by: 'anthropic', context_length: 200_000 },
-        { id: 'gemini-pro', owned_by: 'google', context_length: 1_000_000 },
+        { id: 'grok-code', owned_by: 'xai', context_length: 256_000 },
         { id: 'image-generation', owned_by: 'openai', context_length: 4096 },
       ],
       [],
@@ -63,7 +63,7 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'gemini-pro'])
+    expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'grok-code'])
   })
 
   it('dedups reasoning aliases into a single survivor with a selector', () => {
@@ -73,19 +73,19 @@ describe('model mapping', () => {
     ]
     const models = mapProxyModels(
       [
-        { id: 'gemini-3-pro-high', owned_by: 'antigravity', context_length: 1_000_000 },
-        { id: 'gemini-3-pro-low', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'atlas-3-pro-high', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'atlas-3-pro-low', owned_by: 'antigravity', context_length: 1_000_000 },
         { id: 'claude-opus-thinking', owned_by: 'antigravity', context_length: 200_000 },
       ],
       [
         {
-          slug: 'gemini-3-pro-high',
-          display_name: 'Gemini 3 Pro (High)',
+          slug: 'atlas-3-pro-high',
+          display_name: 'Atlas 3 Pro (High)',
           supported_reasoning_levels: levels,
         },
         {
-          slug: 'gemini-3-pro-low',
-          display_name: 'Gemini 3 Pro (Low)',
+          slug: 'atlas-3-pro-low',
+          display_name: 'Atlas 3 Pro (Low)',
           supported_reasoning_levels: levels,
         },
         {
@@ -102,36 +102,36 @@ describe('model mapping', () => {
       { defaultMaxOutputTokens: 8192 },
     )
 
-    // claude-opus keeps one entry; the two gemini aliases dedupe to one survivor.
+    // claude-opus keeps one entry; the two Atlas aliases dedupe to one survivor.
     expect(models.map(model => model.name)).toEqual([
+      'Atlas 3 Pro',
       'Claude Opus',
-      'Gemini 3 Pro',
     ])
     expect(models.map(model => model.reasoningLevels)).toEqual([
-      ['low', 'medium', 'high'],
       ['low', 'high'],
+      ['low', 'medium', 'high'],
     ])
-    expect(models.find(model => model.name === 'Gemini 3 Pro')?.proxyModelId).toBe('gemini-3-pro-high')
+    expect(models.find(model => model.name === 'Atlas 3 Pro')?.proxyModelId).toBe('atlas-3-pro-high')
   })
 
   it('dedups a suffixed alias against an already-unsuffixed sibling', () => {
     const levels = [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }]
     const models = mapProxyModels(
       [
-        { id: 'gemini-3-flash-agent', owned_by: 'antigravity', context_length: 1_000_000 },
-        { id: 'gemini-3.5-flash-low', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'atlas-3-flash-agent', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'atlas-3.5-flash-low', owned_by: 'antigravity', context_length: 1_000_000 },
       ],
       [
-        { slug: 'gemini-3-flash-agent', display_name: 'Gemini 3.5 Flash', supported_reasoning_levels: levels },
-        { slug: 'gemini-3.5-flash-low', display_name: 'Gemini 3.5 Flash (Low)', supported_reasoning_levels: levels },
+        { slug: 'atlas-3-flash-agent', display_name: 'Atlas 3.5 Flash', supported_reasoning_levels: levels },
+        { slug: 'atlas-3.5-flash-low', display_name: 'Atlas 3.5 Flash (Low)', supported_reasoning_levels: levels },
       ],
       new Map(),
       { defaultMaxOutputTokens: 8192 },
     )
 
-    expect(models.map(model => model.name)).toEqual(['Gemini 3.5 Flash'])
+    expect(models.map(model => model.name)).toEqual(['Atlas 3.5 Flash'])
     expect(models[0]).toMatchObject({
-      proxyModelId: 'gemini-3-flash-agent',
+      proxyModelId: 'atlas-3-flash-agent',
       reasoningEffort: 'high',
       reasoningLevels: ['low', 'medium', 'high'],
     })
@@ -233,9 +233,9 @@ describe('model mapping', () => {
     const models = mapProxyModels(
       [
         { id: 'gpt', owned_by: 'openai', context_length: 128_000 },
-        { id: 'gemini', owned_by: 'antigravity', context_length: 128_000 },
+        { id: 'atlas', owned_by: 'antigravity', context_length: 128_000 },
         { id: 'sonnet', owned_by: 'anthropic', context_length: 128_000 },
-        { id: 'flash', owned_by: 'google', context_length: 128_000 },
+        { id: 'grok', owned_by: 'xai', context_length: 128_000 },
         { id: 'mystery', owned_by: 'acme-labs', context_length: 128_000 },
       ],
       [],
@@ -246,9 +246,9 @@ describe('model mapping', () => {
     const detail = Object.fromEntries(models.map(model => [model.id, model.detail]))
     expect(detail).toMatchObject({
       gpt: '128K context · Codex',
-      gemini: '128K context · Antigravity',
+      atlas: '128K context · Antigravity',
       sonnet: '128K context · Claude Code',
-      flash: '128K context · Gemini',
+      grok: '128K context · Grok',
       // Unknown providers fall back to title-casing.
       mystery: '128K context · Acme-labs',
     })
@@ -281,11 +281,11 @@ describe('model mapping', () => {
 
   it('omits the description line when it merely restates the model name', () => {
     const [model] = mapProxyModels(
-      [{ id: 'gemini-flash', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 }],
+      [{ id: 'atlas-flash', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 }],
       [{
-        slug: 'gemini-flash',
-        display_name: 'Gemini 3.1 Flash Lite',
-        description: 'Gemini 3.1 Flash Lite',
+        slug: 'atlas-flash',
+        display_name: 'Atlas 3.1 Flash Lite',
+        description: 'Atlas 3.1 Flash Lite',
         input_modalities: ['text', 'image'],
         supports_parallel_tool_calls: true,
       }],

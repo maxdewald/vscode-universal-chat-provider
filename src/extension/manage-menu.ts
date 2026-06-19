@@ -19,7 +19,7 @@ export async function manageProvider(controller: ServerController | undefined): 
     [
       {
         label: '$(account) Add Account (Login)',
-        description: 'Gemini, Codex, Claude, and more',
+        description: 'Codex, Claude, Antigravity, and more',
         command: 'universalChatProvider.login',
       },
       {

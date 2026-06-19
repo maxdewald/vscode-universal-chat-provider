@@ -8,7 +8,6 @@ export interface LoginProvider {
 }
 
 export const LOGIN_PROVIDERS: readonly LoginProvider[] = [
-  { label: 'Google Gemini', detail: 'Gemini CLI account', endpoint: 'gemini-cli-auth-url' },
   { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
   { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url' },
   { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url' },

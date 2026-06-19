@@ -55,7 +55,6 @@ describe('management client', () => {
 
   it('exposes the supported login providers in picker order', () => {
     expect(LOGIN_PROVIDERS.map(provider => provider.endpoint)).toEqual([
-      'gemini-cli-auth-url',
       'codex-auth-url',
       'anthropic-auth-url',
       'antigravity-auth-url',

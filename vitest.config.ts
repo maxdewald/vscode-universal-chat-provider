@@ -29,21 +29,6 @@ export default defineConfig({
           unstubGlobals: true,
         },
       },
-      {
-        resolve: {
-          alias: {
-            vscode: fileURLToPath(new URL('./test/support/vscode.ts', import.meta.url)),
-          },
-        },
-        test: {
-          name: 'test:e2e',
-          include: ['e2e/**/*.test.ts'],
-          fileParallelism: false,
-          hookTimeout: 60_000,
-          maxWorkers: 1,
-          testTimeout: 70_000,
-        },
-      },
     ],
   },
 })

@@ -106,8 +106,8 @@ export function mapProxyModels(
     let displayName = normalizeReasoningModelName(advertisedName, levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     const displayProviderName = formatProviderName(providerName)
-    // Dedupe same-base-name ids that share a reasoning-level set (e.g. Gemini 3.5
-    // Flash aliases). A different level set keeps its qualifier and stays distinct.
+    // Dedupe same-base-name ids that share a reasoning-level set. A different
+    // level set keeps its qualifier and stays distinct.
     if (levels.length >= 2) {
       const reasoningModelKey = `${providerName}\0${displayName}`.toLowerCase()
       const levelSignature = [...levels].sort().join('\0')
@@ -283,14 +283,13 @@ function formatTokens(value: number): string {
   return String(value)
 }
 
-// The proxy reports the company in `owned_by` (e.g. "anthropic", "google"); show
-// the CLI app instead. Only values that need renaming are listed — the rest
-// (e.g. "kimi" → "Kimi") title-case correctly on their own.
+// The proxy reports the company in `owned_by`; show the CLI app instead. Only
+// values that need renaming are listed — the rest (e.g. "kimi" → "Kimi")
+// title-case correctly on their own.
 function formatProviderName(value: string): string {
   const apps: Record<string, string> = {
     anthropic: 'Claude Code',
     openai: 'Codex',
-    google: 'Gemini',
     antigravity: 'Antigravity',
     xai: 'Grok',
   }
