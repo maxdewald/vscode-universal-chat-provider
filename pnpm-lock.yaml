@@ -43,7 +43,7 @@ importers:
         specifier: ^7.7.1
         version: 7.7.1
       '@types/vscode':
-        specifier: ^1.125.0
+        specifier: ^1.124.0
         version: 1.125.0
       '@vitest/coverage-v8':
         specifier: ^4.1.8
