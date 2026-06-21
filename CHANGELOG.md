@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.8.3...v0.9.0) (2026-06-21)
+
+
+### Features
+
+* drop output-token fallback setting, skip models with no limit ([959ccd3](https://github.com/maxdewald/vscode-universal-chat-provider/commit/959ccd3c87db2b75c4bf80d9512eb21e650717e0))
+* log and resolve model display name collisions ([423d2cd](https://github.com/maxdewald/vscode-universal-chat-provider/commit/423d2cdc1f02ce042ecd200e8c1d850e7095341b))
+* support reasoning effort for utility models ([51571cc](https://github.com/maxdewald/vscode-universal-chat-provider/commit/51571cc9d90a6551036127cc42afe336aff48dd8))
+
 ## [0.8.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.8.2...v0.8.3) (2026-06-19)
 
 
