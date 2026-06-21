@@ -49,7 +49,6 @@ interface ModelConfigurationSchema {
 }
 
 export interface ModelMappingOptions {
-  defaultMaxOutputTokens: number
   onSkipped?: (id: string, reason: string) => void
 }
 
@@ -94,13 +93,16 @@ export function mapProxyModels(
       continue
     }
 
-    const outputTokens = positiveInteger(
-      entry.max_completion_tokens
-      ?? catalogModel?.max_completion_tokens
-      ?? catalogModel?.outputTokenLimit
-      ?? options.defaultMaxOutputTokens,
-      options.defaultMaxOutputTokens,
+    // Output limit mirrors the context rule above: proxy first, then catalog.
+    const outputTokens = firstPositiveInteger(
+      entry.max_completion_tokens,
+      catalogModel?.max_completion_tokens,
+      catalogModel?.outputTokenLimit,
     )
+    if (outputTokens === undefined) {
+      options.onSkipped?.(entry.id, 'no output token limit reported by the proxy')
+      continue
+    }
     const levels = resolveReasoning(detail, catalogModel)
     const advertisedName = detail?.display_name ?? catalogModel?.display_name ?? entry.id
     let displayName = normalizeReasoningModelName(advertisedName, levels)
@@ -307,10 +309,6 @@ function normalizeReasoningModelName(name: string, levels: readonly string[]): s
 function inferFamily(id: string): string {
   const family = id.split(/[/:]/, 1)[0]
   return family !== undefined && family.length > 0 ? family : id
-}
-
-function positiveInteger(value: number, fallback: number): number {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
 }
 
 function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {

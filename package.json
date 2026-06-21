@@ -177,17 +177,10 @@
         "title": "Advanced",
         "order": 3,
         "properties": {
-          "universalChatProvider.defaultMaxOutputTokens": {
-            "type": "number",
-            "default": 16384,
-            "minimum": 1024,
-            "order": 1,
-            "description": "Fallback output-token limit when CLIProxyAPI has no model-specific value."
-          },
           "universalChatProvider.debug": {
             "type": "boolean",
             "default": false,
-            "order": 2,
+            "order": 1,
             "description": "Show prompt-cache hit rate and write per-request diagnostics to extension storage."
           }
         }

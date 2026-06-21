@@ -23,7 +23,7 @@ describe('model mapping', () => {
         max_completion_tokens: 128_000,
         supported_parameters: ['tools'],
       }]]),
-      { defaultMaxOutputTokens: 16_384 },
+      {},
     )
 
     expect(models).toHaveLength(1)
@@ -54,13 +54,13 @@ describe('model mapping', () => {
   it('keeps every provider model while filtering media-only endpoints', () => {
     const models = mapProxyModels(
       [
-        { id: 'claude-sonnet', owned_by: 'anthropic', context_length: 200_000 },
-        { id: 'grok-code', owned_by: 'xai', context_length: 256_000 },
-        { id: 'image-generation', owned_by: 'openai', context_length: 4096 },
+        { id: 'claude-sonnet', owned_by: 'anthropic', context_length: 200_000, max_completion_tokens: 8192 },
+        { id: 'grok-code', owned_by: 'xai', context_length: 256_000, max_completion_tokens: 8192 },
+        { id: 'image-generation', owned_by: 'openai', context_length: 4096, max_completion_tokens: 8192 },
       ],
       [],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'grok-code'])
@@ -73,9 +73,9 @@ describe('model mapping', () => {
     ]
     const models = mapProxyModels(
       [
-        { id: 'atlas-3-pro-high', owned_by: 'antigravity', context_length: 1_000_000 },
-        { id: 'atlas-3-pro-low', owned_by: 'antigravity', context_length: 1_000_000 },
-        { id: 'claude-opus-thinking', owned_by: 'antigravity', context_length: 200_000 },
+        { id: 'atlas-3-pro-high', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 },
+        { id: 'atlas-3-pro-low', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 },
+        { id: 'claude-opus-thinking', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 64_000 },
       ],
       [
         {
@@ -99,7 +99,7 @@ describe('model mapping', () => {
         },
       ],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     // claude-opus keeps one entry; the two Atlas aliases dedupe to one survivor.
@@ -118,15 +118,15 @@ describe('model mapping', () => {
     const levels = [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }]
     const models = mapProxyModels(
       [
-        { id: 'atlas-3-flash-agent', owned_by: 'antigravity', context_length: 1_000_000 },
-        { id: 'atlas-3.5-flash-low', owned_by: 'antigravity', context_length: 1_000_000 },
+        { id: 'atlas-3-flash-agent', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 },
+        { id: 'atlas-3.5-flash-low', owned_by: 'antigravity', context_length: 1_000_000, max_completion_tokens: 65_536 },
       ],
       [
         { slug: 'atlas-3-flash-agent', display_name: 'Atlas 3.5 Flash', supported_reasoning_levels: levels },
         { slug: 'atlas-3.5-flash-low', display_name: 'Atlas 3.5 Flash (Low)', supported_reasoning_levels: levels },
       ],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(models.map(model => model.name)).toEqual(['Atlas 3.5 Flash'])
@@ -139,14 +139,14 @@ describe('model mapping', () => {
 
   it('keeps fixed reasoning names when no selector can be offered', () => {
     const [model] = mapProxyModels(
-      [{ id: 'fixed-high', owned_by: 'proxy', context_length: 128_000 }],
+      [{ id: 'fixed-high', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
       [{
         slug: 'fixed-high',
         display_name: 'Fixed Model (High)',
         supported_reasoning_levels: [{ effort: 'high' }],
       }],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(model?.name).toBe('Fixed Model (High)')
@@ -156,8 +156,8 @@ describe('model mapping', () => {
   it('keeps distinct aliases when their reasoning choices differ', () => {
     const models = mapProxyModels(
       [
-        { id: 'model-high', owned_by: 'proxy', context_length: 128_000 },
-        { id: 'model-low', owned_by: 'proxy', context_length: 128_000 },
+        { id: 'model-high', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'model-low', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
       ],
       [
         {
@@ -172,7 +172,7 @@ describe('model mapping', () => {
         },
       ],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     // Distinct aliases stay distinct: each survives as its own selector entry.
@@ -208,7 +208,7 @@ describe('model mapping', () => {
           max: 10,
         },
       }]]),
-      { defaultMaxOutputTokens: 10 },
+      {},
     )
 
     const model = models[0]
@@ -232,15 +232,15 @@ describe('model mapping', () => {
   it('shows the CLI app in model details and tooltips', () => {
     const models = mapProxyModels(
       [
-        { id: 'gpt', owned_by: 'openai', context_length: 128_000 },
-        { id: 'atlas', owned_by: 'antigravity', context_length: 128_000 },
-        { id: 'sonnet', owned_by: 'anthropic', context_length: 128_000 },
-        { id: 'grok', owned_by: 'xai', context_length: 128_000 },
-        { id: 'mystery', owned_by: 'acme-labs', context_length: 128_000 },
+        { id: 'gpt', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'atlas', owned_by: 'antigravity', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'sonnet', owned_by: 'anthropic', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'grok', owned_by: 'xai', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'mystery', owned_by: 'acme-labs', context_length: 128_000, max_completion_tokens: 8192 },
       ],
       [],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     const detail = Object.fromEntries(models.map(model => [model.id, model.detail]))
@@ -266,7 +266,7 @@ describe('model mapping', () => {
         supports_parallel_tool_calls: true,
       }],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(model?.tooltip).toBe(
@@ -290,7 +290,7 @@ describe('model mapping', () => {
         supports_parallel_tool_calls: true,
       }],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(model?.tooltip).toBe('Antigravity via CLIProxyAPI\n\n65.5K max output · Vision · Tools')
@@ -308,7 +308,7 @@ describe('model mapping', () => {
         supports_parallel_tool_calls: true,
       }],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(model?.name).toBe('Claude Opus 4.6')
@@ -320,7 +320,7 @@ describe('model mapping', () => {
       [{ id: 'mystery', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
       [],
       new Map(),
-      { defaultMaxOutputTokens: 8192 },
+      {},
     )
 
     expect(model?.tooltip).toBe('Proxy via CLIProxyAPI\n\n8.2K max output · Tools')
@@ -337,11 +337,11 @@ describe('model mapping', () => {
       ],
       [{ slug: 'tiny', context_window: -1, max_context_window: Number.NaN }],
       new Map([
-        ['tiny', { id: 'tiny', max_completion_tokens: -5 }],
+        ['tiny', { id: 'tiny', max_completion_tokens: -5, outputTokenLimit: 8 }],
         ['picture', { id: 'picture', type: 'openai-image' }],
         ['audio-only', { id: 'audio-only', supportedOutputModalities: ['audio'] }],
       ]),
-      { defaultMaxOutputTokens: 8 },
+      {},
     )
 
     expect(models).toHaveLength(1)
@@ -361,7 +361,7 @@ describe('model mapping', () => {
       ],
       [{ slug: 'sized', context_window: 999 }],
       new Map(),
-      { defaultMaxOutputTokens: 8192, onSkipped: id => skipped.push(id) },
+      { onSkipped: id => skipped.push(id) },
     )
 
     expect(models).toHaveLength(1)
@@ -371,6 +371,22 @@ describe('model mapping', () => {
       maxInputTokens: 256_000,
     })
     expect(skipped).toEqual(['unsized'])
+  })
+
+  it('drops models with no output token limit, reporting the skip', () => {
+    const skipped: { id: string, reason: string }[] = []
+    const models = mapProxyModels(
+      [
+        { id: 'sized', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+        { id: 'no-output', owned_by: 'openai', context_length: 256_000 },
+      ],
+      [],
+      new Map(),
+      { onSkipped: (id, reason) => skipped.push({ id, reason }) },
+    )
+
+    expect(models.map(model => model.id)).toEqual(['sized'])
+    expect(skipped).toEqual([{ id: 'no-output', reason: 'no output token limit reported by the proxy' }])
   })
 
   it('advertises the full context window as input regardless of the reported output cap', () => {
@@ -383,7 +399,7 @@ describe('model mapping', () => {
       ],
       [],
       new Map(),
-      { defaultMaxOutputTokens: 16_384 },
+      {},
     )
 
     // `maxInputTokens` is a separate dimension from output; carving a reserve out

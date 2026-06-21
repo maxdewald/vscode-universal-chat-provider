@@ -442,7 +442,7 @@ function options() {
 
 function discovery() {
   return {
-    available: [{ id: 'model-a', owned_by: 'test', context_length: 128_000 }],
+    available: [{ id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 }],
     metadata: [],
   }
 }

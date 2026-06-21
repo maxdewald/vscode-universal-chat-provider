@@ -2,7 +2,7 @@ import type { CancellationToken, Event, OutputChannel } from 'vscode'
 import type { ProxyConnection } from '../cliproxy/connection'
 import type { CredentialStore } from '../cliproxy/credentials'
 import type { ProviderModel } from './model'
-import { EventEmitter, window, workspace } from 'vscode'
+import { EventEmitter, window } from 'vscode'
 import { CLIProxyClient } from '../cliproxy/client'
 import { ProxyHttpError } from '../cliproxy/errors'
 import { errorMessage } from '../shared/errors'
@@ -87,9 +87,7 @@ export class ModelRegistry {
         client.discover(controller.signal),
         fetchCatalog(controller.signal),
       ])
-      const settings = workspace.getConfiguration('universalChatProvider')
       const models = mapProxyModels(discovery.available, discovery.metadata, catalog, {
-        defaultMaxOutputTokens: settings.get<number>('defaultMaxOutputTokens', 16_384),
         onSkipped: (id, reason) => this.output.appendLine(`Skipped model ${id}: ${reason}.`),
       })
       const fingerprint = JSON.stringify(models)

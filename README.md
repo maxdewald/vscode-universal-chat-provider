@@ -106,19 +106,18 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 
 <!-- configs -->
 
-| Key                                            | Description                                                                                                            | Type      | Default                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
-| ▿ <b>Connection</b>                            |
-| `universalChatProvider.server.mode`            | How CLIProxyAPI is provided.                                                                                           | `string`  | `"managed"`               |
-| `universalChatProvider.baseUrl`                | CLIProxyAPI server URL. Used only in external mode.                                                                    | `string`  | `"http://127.0.0.1:8317"` |
-| `universalChatProvider.configPath`             | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                     | `string`  | `""`                      |
-| `universalChatProvider.autoDetectConfig`       | Search common CLIProxyAPI config locations when no config path is set.                                                 | `boolean` | `true`                    |
-| ▿ <b>Managed Server</b>                        |
-| `universalChatProvider.server.version`         | CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or latest to track new releases. | `string`  | `"7.2.5"`                 |
-| `universalChatProvider.server.suggestUpdates`  | Offer same-major updates for pinned managed server versions.                                                           | `boolean` | `true`                    |
-| ▿ <b>Advanced</b>                              |
-| `universalChatProvider.defaultMaxOutputTokens` | Fallback output-token limit when CLIProxyAPI has no model-specific value.                                              | `number`  | `16384`                   |
-| `universalChatProvider.debug`                  | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                                     | `boolean` | `false`                   |
+| Key                                           | Description                                                                                                            | Type      | Default                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
+| ▿ <b>Connection</b>                           |
+| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                           | `string`  | `"managed"`               |
+| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                    | `string`  | `"http://127.0.0.1:8317"` |
+| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                     | `string`  | `""`                      |
+| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                 | `boolean` | `true`                    |
+| ▿ <b>Managed Server</b>                       |
+| `universalChatProvider.server.version`        | CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or latest to track new releases. | `string`  | `"7.2.5"`                 |
+| `universalChatProvider.server.suggestUpdates` | Offer same-major updates for pinned managed server versions.                                                           | `boolean` | `true`                    |
+| ▿ <b>Advanced</b>                             |
+| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                                     | `boolean` | `false`                   |
 
 <!-- configs -->
 
