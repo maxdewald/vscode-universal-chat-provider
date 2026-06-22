@@ -34,7 +34,7 @@ describe('model mapping', () => {
       maxOutputTokens: 128_000,
       capabilities: { imageInput: true, toolCalling: true },
       reasoningLevels: ['low', 'medium', 'high'],
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
     })
     expect(models[0]?.configurationSchema).toEqual({
       properties: {
@@ -42,12 +42,29 @@ describe('model mapping', () => {
           type: 'string',
           enum: ['low', 'medium', 'high'],
           enumItemLabels: ['Low', 'Medium', 'High'],
-          default: 'high',
+          default: 'medium',
           description: 'Thinking Effort',
           group: 'navigation',
         },
       },
     })
+  })
+
+  it('honors the proxy default reasoning level when it names an offered level', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'gpt-5.4', owned_by: 'openai', context_length: 400_000, max_completion_tokens: 128_000 }],
+      [{
+        slug: 'gpt-5.4',
+        display_name: 'GPT-5.4',
+        default_reasoning_level: 'low',
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }],
+      }],
+      new Map(),
+      {},
+    )
+
+    expect(model?.reasoningEffort).toBe('low')
+    expect(model?.configurationSchema?.properties.reasoningEffort.default).toBe('low')
   })
 
   it('keeps every provider model while filtering media-only endpoints', () => {
@@ -131,7 +148,7 @@ describe('model mapping', () => {
     expect(models.map(model => model.name)).toEqual(['Atlas 3.5 Flash'])
     expect(models[0]).toMatchObject({
       proxyModelId: 'atlas-3-flash-agent',
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
       reasoningLevels: ['low', 'medium', 'high'],
     })
   })
@@ -244,7 +261,7 @@ describe('model mapping', () => {
       maxInputTokens: 1_000_000,
       maxOutputTokens: 50_000,
       reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
-      reasoningEffort: 'auto',
+      reasoningEffort: 'high',
       detail: '1M context · Vendor',
       capabilities: {
         imageInput: true,

@@ -22,6 +22,7 @@ export interface ProxyModelMetadata {
   input_modalities?: string[]
   supports_parallel_tool_calls?: boolean
   supported_reasoning_levels?: { effort: string }[]
+  default_reasoning_level?: string
 }
 
 export interface ProviderModel extends LanguageModelChatInformation {
@@ -236,7 +237,7 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
   // from configurationSchema and echoes back as options.modelConfiguration.
   if (levels.length >= 2) {
     const ordered = [...levels].sort((a, b) => effortRank(a) - effortRank(b))
-    const defaultLevel = ordered[ordered.length - 1]!
+    const defaultLevel = resolveDefaultLevel(detail?.default_reasoning_level, ordered)
     return {
       ...baseModel,
       id: entry.id,
@@ -265,6 +266,16 @@ const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, mediu
 
 function effortRank(level: string | undefined): number {
   return level === undefined ? -1 : EFFORT_RANK[level] ?? 99
+}
+
+// The proxy advertises a `default_reasoning_level` per model; honor it when it
+// names one of the offered levels. Otherwise fall back to the second-highest so
+// the picker doesn't open every model at its most expensive setting.
+function resolveDefaultLevel(advertised: string | undefined, ordered: readonly string[]): string {
+  const normalized = advertised?.trim().toLowerCase()
+  if (normalized !== undefined && ordered.includes(normalized))
+    return normalized
+  return ordered[ordered.length - 2]!
 }
 
 function formatLevel(value: string): string {
