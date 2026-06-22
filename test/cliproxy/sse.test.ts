@@ -41,8 +41,6 @@ describe('server-sent event parser', () => {
     for await (const event of parseServerSentEvents(stream))
       events.push(event)
 
-    // Per the SSE spec, pending data at end-of-stream (no terminating blank
-    // line) is discarded, so the trailing `data: second` is not emitted.
     expect(events).toEqual([{ data: 'first' }])
   })
 

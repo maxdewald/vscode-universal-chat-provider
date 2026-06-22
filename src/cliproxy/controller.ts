@@ -27,7 +27,6 @@ import { buildStatusSnapshot } from './status'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 
-/** globalState key holding the one version the user chose to skip suggesting. */
 const DISMISSED_UPDATE_KEY = 'universalChatProvider.dismissedUpdateVersion'
 
 export class ServerController implements ProxyConnection {
@@ -38,7 +37,6 @@ export class ServerController implements ProxyConnection {
   private managementKey: string | undefined
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
-  /** Coalesce bursts of auth-dir change events into a single refresh. */
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
@@ -85,8 +83,6 @@ export class ServerController implements ProxyConnection {
       this.setStatus('external')
       return
     }
-    // Called before every request; only show "starting" when the server is not
-    // already up so the status bar does not flicker on each call.
     const alreadyUp = this.server?.baseUrl() !== undefined
     try {
       if (!alreadyUp)
@@ -127,7 +123,6 @@ export class ServerController implements ProxyConnection {
     await this.applyBinaryUpdate(this.requestedVersion())
   }
 
-  /** Acquire `version`, restart the managed server, and surface the outcome. */
   private async applyBinaryUpdate(version: string): Promise<void> {
     try {
       await this.bootstrap()
@@ -147,10 +142,6 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  /**
-   * Best-effort, once per window: when a newer release within the running
-   * binary's major version exists, offer to install it. Never throws.
-   */
   private async maybeSuggestUpdate(): Promise<void> {
     if (this.updateCheckStarted)
       return
@@ -163,8 +154,6 @@ export class ServerController implements ProxyConnection {
     const installed = this.server?.installedVersion()
     if (installed === undefined)
       return
-    // Claim the once-per-window slot before the first await so concurrent
-    // ensureReady calls cannot double-fire the prompt.
     this.updateCheckStarted = true
 
     let target: string | null
@@ -235,8 +224,6 @@ export class ServerController implements ProxyConnection {
     this.scheduleRefresh.cancel()
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
-    // Release this window's lease. When it was the last one the shared sidecar
-    // is no longer used, so stop it; otherwise let it run for the other windows.
     if (this.paths !== undefined && releaseLease(this.paths.leaseDir))
       this.server?.shutdown()
     else
@@ -269,15 +256,12 @@ export class ServerController implements ProxyConnection {
     this.server = state.server
     this.managementKey = state.managementKey
     this.disposables.push(...watchAuthDir(state.paths.authDir, () => this.scheduleRefresh()))
-    // Follow the shared server log into its own channel. The path is stable for
-    // the window's lifetime, so one tailer survives re-bootstraps (e.g. reset).
     if (this.logTailer === undefined) {
       this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()
       this.disposables.push(this.logTailer)
     }
   }
 
-  /** A healthy server is ours only if it accepts our management key. */
   private async isOwnServer(baseUrl: string): Promise<boolean> {
     if (this.managementKey === undefined)
       return false

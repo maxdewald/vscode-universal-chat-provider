@@ -15,11 +15,6 @@ export interface ModelRegistryHooks {
   onCredentialsAccepted: () => void
 }
 
-/**
- * Discovers chat models from the proxy, maps them, caches the result, and fires
- * a change event only when the model set actually changes. Refreshes are
- * deduplicated: concurrent callers share one in-flight discovery.
- */
 const REFRESH_TTL_MS = 15_000
 
 export class ModelRegistry {

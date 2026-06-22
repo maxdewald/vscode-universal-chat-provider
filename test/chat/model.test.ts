@@ -118,7 +118,6 @@ describe('model mapping', () => {
       {},
     )
 
-    // claude-opus keeps one entry; the two Atlas aliases dedupe to one survivor.
     expect(models.map(model => model.name)).toEqual([
       'Atlas 3 Pro',
       'Claude Opus',
@@ -213,7 +212,6 @@ describe('model mapping', () => {
       {},
     )
 
-    // Distinct aliases stay distinct: each survives as its own selector entry.
     expect(models).toHaveLength(2)
     expect(new Set(models.map(model => model.proxyModelId))).toEqual(new Set(['model-high', 'model-low']))
     expect(new Set(models.map(model => model.name))).toEqual(new Set(['Model (High)', 'Model (Low)']))
@@ -290,7 +288,6 @@ describe('model mapping', () => {
       atlas: '128K context · Antigravity',
       sonnet: '128K context · Claude Code',
       grok: '128K context · Grok',
-      // Unknown providers fall back to title-casing.
       mystery: '128K context · Acme-labs',
     })
     expect(models.find(model => model.id === 'gpt')?.tooltip).toContain('Codex via CLIProxyAPI')
@@ -315,7 +312,6 @@ describe('model mapping', () => {
       + 'Antigravity via CLIProxyAPI\n\n'
       + '64K max output · Vision · Tools',
     )
-    // The card already shows the name and context window, so the tooltip never repeats them.
     expect(model?.tooltip).not.toContain('Claude Opus 4.6')
     expect(model?.tooltip).not.toContain('200K')
   })
@@ -433,9 +429,7 @@ describe('model mapping', () => {
   it('advertises the full context window as input regardless of the reported output cap', () => {
     const [haiku, over] = mapProxyModels(
       [
-        // Output cap equal to the window ("whole window usable for output").
         { id: 'claude-haiku', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 200_000 },
-        // Output cap larger than the window.
         { id: 'over-reported', owned_by: 'antigravity', context_length: 100_000, max_completion_tokens: 500_000 },
       ],
       [],
@@ -443,8 +437,6 @@ describe('model mapping', () => {
       {},
     )
 
-    // `maxInputTokens` is a separate dimension from output; carving a reserve out
-    // of it only made Copilot compact early, so input always gets the full window.
     expect(haiku).toMatchObject({ id: 'claude-haiku', maxInputTokens: 200_000 })
     expect(over).toMatchObject({ id: 'over-reported', maxInputTokens: 100_000 })
   })

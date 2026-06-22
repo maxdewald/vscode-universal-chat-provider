@@ -5,9 +5,7 @@ import { capitalize, unique } from 'moderndash'
 export interface ProxyModelListEntry {
   id: string
   owned_by?: string
-  /** Context window reported by the proxy's own `/v1/models` (OpenAI format). */
   context_length?: number
-  /** Maximum output tokens reported by the proxy's own `/v1/models`. */
   max_completion_tokens?: number
 }
 
@@ -30,9 +28,6 @@ export interface ProviderModel extends LanguageModelChatInformation {
   reasoningLevels: readonly string[]
   reasoningEffort?: string
   supportsParallelToolCalls: boolean
-  // configurationSchema is part of VS Code's proposed chatProvider API but ships
-  // ungated in stable, so we set it here and let the model picker render a
-  // reasoning-effort dropdown from it.
   configurationSchema?: ModelConfigurationSchema
 }
 
@@ -54,9 +49,6 @@ export interface ModelMappingOptions {
   onCollision?: (message: string) => void
 }
 
-// A trailing reasoning qualifier such as " (Thinking)" or " (Low)" that some
-// providers append to a model's name. Stripped both when deriving the display
-// name and when comparing a description against it.
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
 
 interface ModelCandidate {
@@ -92,10 +84,6 @@ export function mapProxyModels(
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
-    // Context size comes from the proxy first (its `/v1/models` reports an exact
-    // `context_length` for every chat model), then enhanced metadata, then the
-    // shared catalog. We never invent a number: a model the proxy cannot size is
-    // dropped rather than shown with a guessed window that would compress early.
     const totalContext = firstPositiveInteger(
       entry.context_length,
       detail?.context_window,
@@ -107,7 +95,6 @@ export function mapProxyModels(
       continue
     }
 
-    // Output limit mirrors the context rule above: proxy first, then catalog.
     const outputTokens = firstPositiveInteger(
       entry.max_completion_tokens,
       catalogModel?.max_completion_tokens,
@@ -201,9 +188,6 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
   const imageInput = detail?.input_modalities?.includes('image')
     ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
     ?? false
-  // `supports_parallel_tool_calls` is the only tool-related flag the proxy
-  // reports, so its presence (true or false) means the model does tool calls;
-  // its value only decides whether several may run in one turn.
   const parallelToolCalls = detail?.supports_parallel_tool_calls
   const supportsParallelToolCalls = parallelToolCalls ?? true
   const toolCalling = parallelToolCalls !== undefined
@@ -216,11 +200,6 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
     proxyModelId: entry.id,
     family,
     version: catalogModel?.version ?? entry.id,
-    // The full context window. `maxInputTokens` is the only field VS Code
-    // budgets against — Copilot compacts as the prompt approaches it — and is
-    // a separate dimension from `maxOutputTokens`, so we advertise the whole
-    // window and let Copilot headroom and the server enforce input+output.
-    // Carving an output reserve out of it only made Copilot summarize early.
     maxInputTokens: totalContext,
     maxOutputTokens: outputTokens,
     supportsParallelToolCalls,
@@ -232,9 +211,6 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
     },
   }
 
-  // A model with multiple reasoning levels gets a single picker entry; the
-  // level is chosen through a "Thinking Effort" dropdown that VS Code renders
-  // from configurationSchema and echoes back as options.modelConfiguration.
   if (levels.length >= 2) {
     const ordered = [...levels].sort((a, b) => effortRank(a) - effortRank(b))
     const defaultLevel = resolveDefaultLevel(detail?.default_reasoning_level, ordered)
@@ -268,9 +244,6 @@ function effortRank(level: string | undefined): number {
   return level === undefined ? -1 : EFFORT_RANK[level] ?? 99
 }
 
-// The proxy advertises a `default_reasoning_level` per model; honor it when it
-// names one of the offered levels. Otherwise fall back to the second-highest so
-// the picker doesn't open every model at its most expensive setting.
 function resolveDefaultLevel(advertised: string | undefined, ordered: readonly string[]): string {
   const normalized = advertised?.trim().toLowerCase()
   if (normalized !== undefined && ordered.includes(normalized))
@@ -313,13 +286,6 @@ function isMediaOnly(id: string, model: CatalogModel | undefined): boolean {
   return /(?:^|[-_/])(?:image|video)(?:$|[-_/])/.test(id.toLowerCase())
 }
 
-// The hover renders `name` as the title, the input/output budget as "Max
-// context", and the reasoning selector as a "Thinking Effort" chip on its own.
-// The tooltip fills the remaining space with, at most, three stacked lines that
-// never repeat what the card already shows:
-//   <description, unless it just restates the name>
-//   <provider> via CLIProxyAPI
-//   <output> max output · Vision · Tools
 function buildTooltip(
   name: string,
   description: string | undefined,
@@ -345,9 +311,6 @@ function endWithSentencePunctuation(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`
 }
 
-// Many proxied providers fill `description` with nothing more than the model's
-// own name (e.g. "Claude Opus 4.6 (Thinking)"), which the card already shows as
-// the title. Treat those as no description so the tooltip never echoes the name.
 function isNameEcho(description: string, name: string): boolean {
   const normalize = (text: string): string =>
     text.trim().replace(/[.!?]+$/, '').replace(REASONING_NAME_SUFFIX, '').trim().toLowerCase()
@@ -362,9 +325,6 @@ function formatTokens(value: number): string {
   return String(value)
 }
 
-// The proxy reports the company in `owned_by`; show the CLI app instead. Only
-// values that need renaming are listed — the rest (e.g. "kimi" → "Kimi")
-// title-case correctly on their own.
 function formatProviderName(value: string): string {
   const apps: Record<string, string> = {
     anthropic: 'Claude Code',

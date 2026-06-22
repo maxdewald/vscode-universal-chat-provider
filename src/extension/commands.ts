@@ -56,7 +56,6 @@ export function registerCommands(deps: CommandDeps): Disposable[] {
     }),
     commands.registerCommand('universalChatProvider.showLogs', () => output.show(true)),
     commands.registerCommand('universalChatProvider.showServerLogs', () => serverOutput.show(true)),
-    // `@ext:<id>` scopes the Settings editor to just this extension's settings.
     commands.registerCommand('universalChatProvider.openSettings', async () => {
       await commands.executeCommand('workbench.action.openSettings', `@ext:${extensionId}`)
     }),

@@ -25,9 +25,7 @@ export interface ManagedState {
 export interface ProvisionOptions {
   context: ExtensionContext
   output: OutputChannel
-  /** Pinned binary version or `latest`, read fresh on each acquire/restart. */
   requestedVersion: () => string
-  /** Confirms an already-healthy server on a port is ours before adopting it. */
   verifyOwnership: (baseUrl: string) => Promise<boolean>
 }
 
@@ -36,7 +34,6 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   const paths = managedPaths(context.globalStorageUri.fsPath)
   await mkdir(paths.root, { recursive: true })
   await mkdir(paths.authDir, { recursive: true })
-  // Register this window so the last one to close knows to stop the sidecar.
   claimLease(paths.leaseDir)
 
   const apiKey = await ensureSecret(context, SECRET_KEY)

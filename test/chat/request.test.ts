@@ -86,8 +86,6 @@ describe('response request conversion', () => {
       },
     ]
 
-    // The marker leaves no "[cache_control data]" text and no trailing newline, so
-    // the same message serializes identically whether or not Copilot tagged it.
     expect(messages.flatMap(convertMessage)).toEqual([
       { role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
       { type: 'function_call_output', call_id: 'call-1', output: 'result' },

@@ -26,11 +26,6 @@ export interface CatalogModel {
   thinking?: CatalogThinking
 }
 
-/**
- * Fetch the shared CLIProxyAPI model catalog (hosted on GitHub, not the proxy
- * server). Cached for the session; failures degrade to an empty map so model
- * discovery still works from the proxy's own metadata.
- */
 export async function fetchCatalog(signal?: AbortSignal): Promise<Map<string, CatalogModel>> {
   if (catalogCache)
     return catalogCache
@@ -46,7 +41,6 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<Map<string, Ca
   }
 }
 
-/** Collapse the catalog's per-provider arrays into one best-entry-per-id map. */
 export function flattenCatalog(payload: unknown): Map<string, CatalogModel> {
   const result = new Map<string, CatalogModel>()
   if (!isPlainObject(payload))

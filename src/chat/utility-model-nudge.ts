@@ -12,17 +12,6 @@ interface UtilityModelProvider {
   updateUtilityEffort: (modelId: string, effort: string | undefined) => Promise<void>
 }
 
-/**
- * Decide whether to surface the one-time utility-model nudge. Kept pure so the
- * branching is testable without a vscode mock.
- *
- * `chat.utilityModel` / `chat.utilitySmallModel` only take effect inside the
- * Copilot extension's BYOK flows, so only nudge when Copilot is installed.
- * Without an override, Copilot runs its background tasks (commit messages, chat
- * titles, summaries) on its own models even when you chat through our provider
- * — pointing the override at one of our models routes them here instead. Skip
- * if it's already set to one of our models.
- */
 export function shouldNudge(opts: {
   alreadyShown: boolean
   utilityModel: string
@@ -42,8 +31,6 @@ export async function maybeSuggestUtilityModel(context: ExtensionContext): Promi
   if (!should)
     return
 
-  // Show at most once, ever — set the flag up front so a missed notification
-  // doesn't re-nag every launch (it stays in the notification center anyway).
   await context.globalState.update(SHOWN_KEY, true)
 
   const choose = 'Choose Model'
@@ -56,11 +43,6 @@ export async function maybeSuggestUtilityModel(context: ExtensionContext): Promi
     await commands.executeCommand(SET_COMMAND)
 }
 
-/**
- * Point `chat.utilityModel` and `chat.utilitySmallModel` at one of our models,
- * so Copilot's background flows (commit messages, chat titles, summaries) run
- * through this provider instead of Copilot's own models.
- */
 export async function setUtilityModel(provider: UtilityModelProvider): Promise<void> {
   const models = await provider.getModels(true)
   if (models.length === 0) {
@@ -93,8 +75,6 @@ export async function setUtilityModel(provider: UtilityModelProvider): Promise<v
   if (effort === undefined && selected.model.reasoningLevels.length > 0)
     return
 
-  // utilitySmallModel drives the fast flows (commit messages, intent detection);
-  // utilityModel drives the rest. Set both so everything routes through us.
   const value = UCP_PREFIX + selected.model.id
   await provider.updateUtilityEffort(selected.model.id, effort)
   await chat.update('utilityModel', value, ConfigurationTarget.Global)

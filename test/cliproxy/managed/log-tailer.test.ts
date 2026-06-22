@@ -48,7 +48,6 @@ describe('log tailer', () => {
   })
 
   it('replays a recent tail and drops the leading fragment', async () => {
-    // 'aaaaa\n' (6 bytes) + 'bbbbb\n' (6 bytes); seeding 8 bytes seeks mid-first-line.
     await writeFile(logPath, 'aaaaa\nbbbbb\n')
     tail(8)
     await waitFor(() => lines.length >= 1)

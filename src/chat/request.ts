@@ -68,9 +68,6 @@ export function buildPromptCacheKey(
   return `universal-chat-provider-${hash}`
 }
 
-// drop Copilot's cache_control breakpoint marker. Cliproxy sets the real
-// breakpoints itself and /v1/responses has no field for it, so forwarding it as text
-// only breaks the cache prefix — it's on the live turn, gone once that turn is history.
 function isCacheControlPart(part: unknown): boolean {
   return part instanceof LanguageModelDataPart && part.mimeType === 'cache_control'
 }

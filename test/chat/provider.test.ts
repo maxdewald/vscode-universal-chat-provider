@@ -92,7 +92,6 @@ describe('language model provider', () => {
     expect(thinkingPart.id).toEqual(expect.any(String))
     expect(report.mock.calls[1]?.[0]).toEqual(new LanguageModelTextPart('text'))
     expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelToolCallPart('call', 'lookup', { q: 'x' }))
-    // The usage data part drives VS Code's context-window indicator.
     const usagePart = report.mock.calls[3]?.[0] as LanguageModelDataPart
     expect(usagePart).toBeInstanceOf(LanguageModelDataPart)
     expect(usagePart.mimeType).toBe('usage')

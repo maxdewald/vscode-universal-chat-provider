@@ -11,8 +11,6 @@ let controller: ServerController | undefined
 
 export function activate(context: ExtensionContext): void {
   const output = window.createOutputChannel('Universal Chat Provider', { log: true })
-  // A plain (non-log) channel carries the managed server's raw stdout/stderr
-  // verbatim, kept separate from the extension's own diagnostics above.
   const serverOutput = window.createOutputChannel('CLIProxyAPI Server')
   controller = new ServerController(context, output, serverOutput)
   provider = new UniversalChatProvider(context, output, controller)

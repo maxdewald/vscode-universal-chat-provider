@@ -88,7 +88,6 @@ export function configCandidates(): string[] {
   const settings = workspace.getConfiguration('universalChatProvider')
   const configured = settings.get<string>('configPath', '').trim()
   if (configured.length > 0) {
-    // Expand a leading `~` (also `~/` and `~\` on Windows) to the home directory.
     const expanded = configured.replace(/^~(?=$|[/\\])/, homedir())
     return [isAbsolute(expanded) ? normalize(expanded) : resolve(expanded)]
   }

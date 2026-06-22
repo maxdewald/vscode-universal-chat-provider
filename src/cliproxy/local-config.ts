@@ -7,7 +7,6 @@ const PLACEHOLDER_KEY = /^your-api-key(?:-\d+)?$/i
 export interface LocalProxyConfig {
   path: string
   apiKey?: string
-  /** Plaintext `remote-management.secret-key`, when set and not yet hashed. */
   managementKey?: string
 }
 
@@ -30,8 +29,6 @@ function managementSecretKey(value: unknown): string | undefined {
   if (!isPlainObject(value) || !isPlainObject(value['remote-management']))
     return undefined
   const key = value['remote-management']['secret-key']
-  // A bcrypt hash ($2a$...) cannot be replayed as a bearer token; only a
-  // plaintext key is usable, so ignore hashed values.
   if (typeof key !== 'string' || key.trim().length === 0 || key.startsWith('$2'))
     return undefined
   return key.trim()

@@ -32,10 +32,6 @@ import { lowestReasoningEffort } from './utility-model-nudge'
 
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 
-// LanguageModelThinkingPart renders reasoning as a collapsible block that shrinks
-// once the answer streams in. Its type is still proposed, but the runtime class is
-// ungated on stable, so we reach for it directly and type the result as a regular
-// response part.
 const LanguageModelThinkingPart = (vscode as unknown as {
   LanguageModelThinkingPart: new (value: string, id?: string) => LanguageModelResponsePart
 }).LanguageModelThinkingPart
@@ -95,8 +91,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     progress: Progress<LanguageModelResponsePart>,
     token: CancellationToken,
   ): Promise<void> {
-    // modelConfiguration carries the reasoning effort the user picked from the
-    // model's configurationSchema dropdown; fall back to the model's default.
     const requestOptions = options as { modelConfiguration?: { reasoningEffort?: string }, requestInitiator?: string }
     const storedUtilityEffort = this.getUtilityEffort(model.id)
     const utilityEffort = storedUtilityEffort !== undefined && model.reasoningLevels.includes(storedUtilityEffort)

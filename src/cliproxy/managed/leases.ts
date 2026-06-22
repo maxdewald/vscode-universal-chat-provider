@@ -2,23 +2,11 @@ import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join } from 'node:path'
 import process from 'node:process'
 
-/**
- * Reference-counts the VS Code windows that share the managed sidecar. Each
- * window drops a lease file named after its process id; the sidecar is only
- * stopped once the last live lease is released, so a shared server is never
- * killed out from under another open window and no orphan is left running when
- * the final window closes.
- */
 export function claimLease(leaseDir: string, id: number = process.pid): void {
   mkdirSync(leaseDir, { recursive: true })
   writeFileSync(join(leaseDir, String(id)), '')
 }
 
-/**
- * Release this window's lease and report whether it was the last one. Leases
- * owned by a process that no longer exists (a crashed window) are pruned and
- * do not count, so a crash can never permanently pin the sidecar alive.
- */
 export function releaseLease(leaseDir: string, id: number = process.pid): boolean {
   rmSync(join(leaseDir, String(id)), { force: true })
   let names: string[]
@@ -53,14 +41,12 @@ export function readServerPid(pidPath: string): number | undefined {
   }
 }
 
-/** True when a process with this id exists. Signal 0 probes without killing. */
 function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
   }
   catch (error) {
-    // ESRCH means the process is gone; EPERM means it exists but is not ours.
     return (error as NodeJS.ErrnoException).code === 'EPERM'
   }
 }

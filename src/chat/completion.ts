@@ -12,7 +12,6 @@ export interface CompletionDeps {
   onCredentialsRejected: () => void
 }
 
-/** A cancelled request resolves quietly (without throwing) so callers can treat it as a no-op. */
 export async function streamCompletion(
   deps: CompletionDeps,
   body: Record<string, unknown>,

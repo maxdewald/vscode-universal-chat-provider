@@ -13,8 +13,6 @@ export async function manageProvider(controller: ServerController | undefined): 
   const managed = controller?.mode() !== 'external'
   const snapshot = await controller?.statusSnapshot()
 
-  // Logical groups, separated only by plain dividers — the descriptions carry
-  // the meaning, so no floating section labels are needed.
   const groups: ActionItem[][] = [
     [
       {
@@ -112,8 +110,6 @@ function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command:
   const accounts = snapshot.accounts === undefined
     ? undefined
     : `${snapshot.accounts} ${snapshot.accounts === 1 ? 'account' : 'accounts'} connected`
-  // The managed sidecar's output is tailed into its own channel; an external
-  // server is not, so there fall back to the extension's own diagnostics.
   const external = snapshot.status === 'external'
   const detail = [
     snapshot.version !== undefined ? `Version ${snapshot.version}` : undefined,
@@ -121,8 +117,6 @@ function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command:
     external ? 'Select to view logs' : 'Select to view server output',
   ].filter((part): part is string => part !== undefined).join('  ·  ')
   return {
-    // Codicons render in the label and description, but not the detail — keep
-    // the detail plain so it never shows a literal `$(…)`.
     label: `${icon} ${label}`,
     description: snapshot.baseUrl.replace(/^https?:\/\//, ''),
     detail,

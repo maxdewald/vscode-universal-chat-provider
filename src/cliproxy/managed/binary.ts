@@ -28,7 +28,6 @@ export function resolveAsset(platform: NodeJS.Platform, arch: string, version: s
   }
 }
 
-/** Parse a `checksums.txt` (`<sha256>  <filename>`) into a filename→hash map. Pure. */
 export function parseChecksums(text: string): Map<string, string> {
   const result = new Map<string, string>()
   for (const line of text.split('\n')) {
@@ -43,7 +42,6 @@ export function sha256(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex')
 }
 
-/** Strip a leading `v` so `v7.2.5` and `7.2.5` are equivalent. */
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, '')
 }
@@ -58,14 +56,8 @@ export async function fetchOk(url: string, signal?: AbortSignal): Promise<Respon
   return response
 }
 
-/** Max attempts for a GitHub release fetch before giving up. */
 const DOWNLOAD_RETRIES = 3
 
-/**
- * {@link fetchOk} with a few retries so a transient GitHub/CDN hiccup doesn't
- * fail an install. When the caller's signal aborts, the backoff collapses to
- * zero so the pending retries fall through immediately and surface the abort.
- */
 export async function fetchWithRetry(url: string, signal?: AbortSignal): Promise<Response> {
   return retry(async () => fetchOk(url, signal), {
     maxRetries: DOWNLOAD_RETRIES,
@@ -85,7 +77,6 @@ export async function resolveVersion(requested: string, signal?: AbortSignal): P
 
 export interface AcquireOptions {
   binDir: string
-  /** Pinned version or `latest`. */
   requestedVersion: string
   output: OutputChannel
   signal?: AbortSignal
@@ -135,13 +126,6 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   return { binaryPath, version }
 }
 
-/**
- * Extract a release archive (held in memory) into `dest`, preserving its layout.
- * tar.gz (macOS/Linux) and zip (Windows) are both handled in pure JS, so no
- * external `tar` binary needs to be on PATH. The archive is already sha256-verified
- * against the release checksum, but entry names are still rejected if they would
- * escape `dest`.
- */
 export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: string): Promise<void> {
   const entries = isZip
     ? Object.entries(unzipSync(archive)).map(([name, data]) => ({ name, data }))
@@ -149,7 +133,7 @@ export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: 
 
   for (const { name, data } of entries) {
     if (data === undefined || name.endsWith('/'))
-      continue // directory entry; parent dirs are created per file below
+      continue
     if (name.split('/').includes('..'))
       throw new Error(`Refusing to extract unsafe path: ${name}`)
     const target = join(dest, name)
@@ -158,10 +142,6 @@ export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: 
   }
 }
 
-/**
- * Version of the binary on disk — the single dir pruning keeps in `binDir` —
- * letting a window that adopted the shared server still report what is running.
- */
 export async function readInstalledVersion(binDir: string): Promise<string | undefined> {
   let entries: string[]
   try {

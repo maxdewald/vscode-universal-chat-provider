@@ -19,31 +19,18 @@ export interface ServerDeps {
   paths: ManagedPaths
   output: OutputChannel
   host: string
-  /** Pinned binary version or `latest`, read fresh so a config bump (e.g. after an update) takes effect on restart. */
   requestedVersion: () => string
   getPort: () => number | undefined
   setPort: (port: number) => void | Thenable<void>
-  /**
-   * Confirm a healthy server on `baseUrl` is ours (authenticates with our
-   * management key) before adopting it. When it returns false, a foreign
-   * CLIProxyAPI occupies the port and we spawn our own elsewhere instead.
-   */
   verifyOwnership?: (baseUrl: string) => Promise<boolean>
 }
 
 export interface RunningServer {
   baseUrl: string
   port: number
-  /** Version of the binary backing this window's child, or undefined when adopted. */
   version?: string
 }
 
-/**
- * Owns the local CLIProxyAPI process. The running server on a known port *is*
- * the singleton: any window adopts a healthy server, otherwise spawns a
- * detached daemon that outlives the spawning window. A dead server is revived
- * lazily on the next `ensureRunning` call.
- */
 export class ManagedServer {
   private child: ChildProcess | undefined
   private adopted = false
@@ -90,17 +77,10 @@ export class ManagedServer {
   }
 
   dispose(): void {
-    // A detached daemon is meant to outlive a single window: drop our handle
-    // without killing it. Use `stop()` / `shutdown()` for explicit teardown.
     this.child?.removeAllListeners()
     this.child = undefined
   }
 
-  /**
-   * Stop the shared sidecar for good — called when the last window closes so no
-   * orphan is left behind. Works even for a window that merely adopted the
-   * server (and so holds no child handle) by falling back to the recorded pid.
-   */
   shutdown(): void {
     const child = this.child
     this.child = undefined
@@ -155,15 +135,10 @@ export class ManagedServer {
 
   private async spawnServer(binaryPath: string, port: number): Promise<void> {
     await mkdir(this.deps.paths.authDir, { recursive: true })
-    // The binary reads its listen port only from the config file, so the config
-    // must point at the port we chose before we spawn (and health-check) it.
     await setConfigPort(this.deps.paths.configPath, port)
     const logFd = openSync(this.deps.paths.logPath, 'a')
     try {
       const child = spawn(binaryPath, ['--config', this.deps.paths.configPath], {
-        // Anchor the working directory to our managed root so any path the
-        // binary resolves relative to its cwd (e.g. request-log output) stays
-        // inside globalStorage instead of leaking into the host's cwd.
         cwd: this.deps.paths.root,
         detached: true,
         stdio: ['ignore', logFd, logFd],
@@ -173,8 +148,6 @@ export class ManagedServer {
         writeServerPid(this.deps.paths.pidPath, child.pid)
       child.unref()
       child.on('exit', (code, sig) => {
-        // stop()/shutdown() detach this.child before killing, so reaching here
-        // with it still ours means a real crash, not a deliberate stop.
         if (this.child === child) {
           this.child = undefined
           this.port = undefined

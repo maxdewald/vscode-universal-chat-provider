@@ -19,7 +19,6 @@ describe('server controller lifecycle', () => {
   beforeEach(async () => {
     resetVSCodeMock()
     root = await mkdtemp(join(tmpdir(), 'ucp-controller-'))
-    // Avoid touching the real binary/network: the server is stubbed wholesale.
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
   })
 
@@ -49,7 +48,6 @@ describe('server controller lifecycle', () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
 
-    // A second, still-open window holds its own lease.
     claimLease(managedPaths(root).leaseDir, liveProcess().pid)
 
     controller.dispose()
@@ -92,7 +90,6 @@ describe('server controller status snapshot', () => {
 
   it('reports external mode and skips the account probe when no server answers', async () => {
     vscodeMock.settings.set('universalChatProvider.server.mode', 'external')
-    // An unreachable port makes the best-effort account probe fail fast.
     vscodeMock.settings.set('universalChatProvider.baseUrl', 'http://127.0.0.1:9')
     vscodeMock.secrets.set('universalChatProvider.managementKey', 'mgmt-secret')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)

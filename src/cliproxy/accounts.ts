@@ -8,9 +8,7 @@ const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
 
 export interface AccountsDeps {
-  /** Resolve a management endpoint, optionally starting the managed server. */
   resolveManagement: (start: boolean) => Promise<ManagementEndpoint | undefined>
-  /** The live managed endpoint when one is already running (no side effects). */
   currentManagement: () => ManagementEndpoint | undefined
   onAccountsChanged: () => void
 }

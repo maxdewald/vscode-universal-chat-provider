@@ -8,20 +8,10 @@ import {
 } from 'vscode'
 import { serializeToolResult } from './request'
 
-/** Per-message and per-part framing overhead, mirroring chat encodings. */
 const MESSAGE_BASE_TOKENS = 4
 const PART_BASE_TOKENS = 3
-/** Flat allowance for an image part, which carries no countable text. */
 const IMAGE_TOKENS = 256
 
-/**
- * A fast, local token estimate for a single string or message, via `tokenx`'s
- * heuristic counter (no tokenizer vocab, no network). `provideTokenCount` must
- * answer instantly while VS Code assembles a prompt, so this stands in right
- * away while the exact per-provider count is fetched from the proxy in the
- * background. Estimates only steer when VS Code compresses context — the server
- * enforces the real limit regardless.
- */
 export function estimateTokens(value: string | LanguageModelChatRequestMessage): number {
   if (typeof value === 'string')
     return estimateTokenCount(value)

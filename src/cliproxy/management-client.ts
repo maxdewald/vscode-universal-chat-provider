@@ -3,7 +3,6 @@ import { isPlainObject } from 'moderndash'
 export interface LoginProvider {
   label: string
   detail: string
-  /** Management endpoint (relative to `/v0/management/`) that returns an auth URL. */
   endpoint: string
 }
 
@@ -38,11 +37,6 @@ export class ManagementClient {
   ) {}
 
   async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<string> {
-    // `is_webui=true` makes the server run the OAuth flow itself: it starts a
-    // callback forwarder on the provider's fixed port and relays the redirect
-    // into its own `/<provider>/callback` route. Without it the flow expects a
-    // CLI-managed local listener we never start, so the browser redirect lands
-    // on a dead port (ERR_CONNECTION_REFUSED).
     const payload = await this.getJson<{ url?: unknown }>(`/${endpoint}?is_webui=true`, signal)
     if (typeof payload.url !== 'string')
       throw new ManagementError('CLIProxyAPI returned an invalid auth URL response.', 502)

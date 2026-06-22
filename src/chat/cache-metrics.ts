@@ -6,48 +6,32 @@ import { StatusBarAlignment, window, workspace } from 'vscode'
 import { errorMessage } from '../shared/errors'
 import { asRecord, asString } from '../shared/json'
 
-/** Opt-in debug mode: persist per-request diagnostics and show the live status bar. */
 const ENABLED_SETTING = 'debug'
-/** Append-only debug log, kept in the extension's global storage. */
 const LOG_FILE = 'debug.jsonl'
-/** Cap diff-window content so giant turns don't bloat debug.jsonl. */
 const DIVERGED_CONTENT_CAP = 6000
-/** Chars of shared context kept before the first change, for orientation. */
 const DIVERGED_CONTENT_LEAD = 200
 
 export type UsageShape = 'anthropic' | 'openai' | 'unknown'
 
 export interface UsageSummary {
   shape: UsageShape
-  /** Total prompt tokens: cache read + cache write + uncached. */
   inputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
   uncachedInputTokens: number
   outputTokens: number
-  /** cacheReadTokens / inputTokens, or undefined when there is no input. */
   hitRate: number | undefined
 }
 
 export interface UsageContext {
   model: string
-  /** Distinguishes chat traffic from internal calls (e.g. commit messages). */
   label?: string | undefined
-  /** The `Session_id` we asked the proxy to key Claude's cache on. */
   promptCacheKey?: string | undefined
   requestInitiator?: string | undefined
-  /** The reasoning effort sent to the proxy (`request.reasoning.effort`), if any. */
   reasoningEffort?: string | undefined
-  /** The request `input` items, so consecutive turns can be diffed for prefix stability. */
   inputItems?: readonly unknown[] | undefined
 }
 
-/**
- * Per-message fingerprint of the request prefix: `tag:chars:hash` for each
- * input item, in order. Two turns share a cached prefix only up to the first
- * index where these diverge — so diffing consecutive log lines pinpoints what
- * (e.g. a volatile system prompt injected by the chat client) breaks the cache.
- */
 function fingerprintInput(items: readonly unknown[] | undefined): string[] | undefined {
   return items?.map((item) => {
     const json = JSON.stringify(item) ?? ''
@@ -59,19 +43,11 @@ function fingerprintInput(items: readonly unknown[] | undefined): string[] | und
 }
 
 export interface CrossTurnDiff {
-  /** Number of leading items identical to the previous request — the cacheable prefix. */
   stablePrefixLen: number
   totalItems: number
-  /** Same-index items that changed since the previous request, with capped content. */
   diverged: { index: number, before: string, after: string }[]
 }
 
-/**
- * Compare this request's items to the previous request's, in order. Everything
- * up to {@link CrossTurnDiff.stablePrefixLen} is byte-identical (so the proxy
- * can serve it from cache); the `diverged` list is the first thing that broke
- * the prefix and what replaced it — the signal for why a turn cached poorly.
- */
 function crossTurnDiff(
   prev: readonly unknown[] | undefined,
   cur: readonly unknown[] | undefined,
@@ -92,7 +68,6 @@ function crossTurnDiff(
   return { stablePrefixLen: stable, totalItems: cur.length, diverged }
 }
 
-/** Return aligned slices around the first differing char. */
 function windowDiff(before: string, after: string): { before: string, after: string } {
   let head = 0
   while (head < before.length && head < after.length && before[head] === after[head])
@@ -107,7 +82,6 @@ function windowDiff(before: string, after: string): { before: string, after: str
   return { before: slice(before), after: slice(after) }
 }
 
-/** One-line live summary of how the request prefix moved since the last turn. */
 function formatPrefixLine(model: string, diff: CrossTurnDiff): string {
   const base = `[prefix] ${model}: ${diff.stablePrefixLen}/${diff.totalItems} items stable`
   const first = diff.diverged[0]
@@ -122,21 +96,6 @@ function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
-/**
- * Reduce a proxy `usage` object to a single cache-focused view, regardless of
- * which provider shape it carries. The two shapes disagree on what
- * `input_tokens` means, so we must detect the shape before computing a ratio:
- *
- *   Anthropic-native — `input_tokens` is the *uncached remainder*; cache read
- *   and write are reported separately, and the total prompt is their sum.
- *
- *   OpenAI Responses / Chat Completions — `input_tokens` (or `prompt_tokens`)
- *   is the *total*, with the cached subset nested under
- *   `input_tokens_details.cached_tokens`. There is no separate write figure.
- *
- * Anything we can't classify is reported as `unknown` with no hit rate, so the
- * raw object can be surfaced for inspection rather than scored as 0% cached.
- */
 export function normalizeUsage(usage: unknown): UsageSummary {
   const record = asRecord(usage) ?? {}
   const output = num(record.output_tokens ?? record.completion_tokens)
@@ -190,11 +149,6 @@ function formatHitRate(hitRate: number | undefined): string {
   return hitRate === undefined ? 'n/a' : `${Math.round(hitRate * 100)}%`
 }
 
-/**
- * A compact, always-logged summary line. For a recognized shape it ends with
- * the shape tag; for an unrecognized one it appends the raw object so the
- * actual fields can be inspected (the whole point of running a debug session).
- */
 export function formatUsageLine(
   model: string,
   summary: UsageSummary,
@@ -214,18 +168,10 @@ export function formatUsageLine(
     : `${base} (unknown)`
 }
 
-/**
- * Observes every completion's token usage. The one-line log summary is always
- * emitted; the JSONL trail and the status-bar hit rate only when the user has
- * opted in via {@link ENABLED_SETTING}. The setting is read per request, so it
- * takes effect on the next completion without a window reload.
- */
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
   private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0 }
-  /** Serializes appends so concurrent completions can't interleave a line. */
   private writes: Promise<void> = Promise.resolve()
-  /** Previous chat request's items, for the cross-turn prefix diff. */
   private lastItems: readonly unknown[] | undefined
 
   constructor(
@@ -261,7 +207,6 @@ export class CacheMetricsTracker {
     this.statusBar.dispose()
   }
 
-  /** Resolves once every queued metric append has been flushed to disk. */
   async flush(): Promise<void> {
     await this.writes
   }

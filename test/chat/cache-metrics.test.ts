@@ -186,7 +186,6 @@ describe('cacheMetricsTracker', () => {
     expect(first.inputPrefix[0]).toBe(second.inputPrefix[0]) // identical system message → identical fingerprint (cacheable prefix)
     expect(first.inputPrefix[1]).not.toBe(second.inputPrefix[1]) // different user turn → divergent fingerprint
 
-    // second turn carries the cross-turn diff: prefix stable through the system message, broke at the user turn
     expect(second.crossTurn!.stablePrefixLen).toBe(1)
     expect(second.crossTurn!.diverged[0]!.index).toBe(1)
     expect(second.crossTurn!.diverged[0]!.before).toContain('first')

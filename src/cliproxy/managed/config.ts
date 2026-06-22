@@ -13,9 +13,7 @@ export interface ManagedPaths {
   authDir: string
   configPath: string
   logPath: string
-  /** One lease file per open window; the last one out stops the sidecar. */
   leaseDir: string
-  /** Records the running sidecar's process id so any window can stop it. */
   pidPath: string
 }
 
@@ -43,16 +41,6 @@ export interface ManagedConfigOptions {
   authDir: string
 }
 
-/**
- * Render the minimal `config.yaml` for a locally managed server. The plaintext
- * `secret-key` is hashed by CLIProxyAPI on startup; we keep the plaintext in
- * SecretStorage so management calls keep working across restarts.
- *
- * `logging-to-file` is forced off: it defaults on and would make the binary
- * create a `logs/` folder in its working directory. We instead let it log to
- * the console and capture stdout/stderr into our own `cliproxy.log` under
- * globalStorage, so nothing leaks outside the extension's storage.
- */
 export function buildManagedConfig(options: ManagedConfigOptions): string {
   return stringify({
     'host': options.host,
@@ -67,12 +55,6 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
   })
 }
 
-/**
- * Rewrite only the `port` of an existing managed config, preserving the API and
- * management keys. The binary takes its port solely from the config file (there
- * is no `--port` flag), so the server must sync the config to the port it is
- * about to listen on — otherwise it binds the stale port, collides, and exits.
- */
 export async function setConfigPort(configPath: string, port: number): Promise<void> {
   const parsed: unknown = parse(await readFile(configPath, 'utf8'))
   const config = isPlainObject(parsed) ? parsed : {}

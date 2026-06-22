@@ -10,7 +10,6 @@ export interface ServerStatusSnapshot {
   mode: ServerMode
   status: ServerStatus
   baseUrl: string
-  /** Managed binary version, when this window spawned it (absent when adopted). */
   version?: string
   accounts?: number
 }
@@ -23,11 +22,6 @@ export interface StatusInputs {
   management: ManagementEndpoint | undefined
 }
 
-/**
- * Assemble the manage picker's status row. Cheap by design: it reports the given
- * last status rather than re-probing health, and only the account count touches
- * the network (best-effort, never starting the server).
- */
 export async function buildStatusSnapshot(inputs: StatusInputs): Promise<ServerStatusSnapshot> {
   const snapshot: ServerStatusSnapshot = {
     mode: inputs.mode,

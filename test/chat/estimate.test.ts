@@ -10,7 +10,6 @@ import {
 } from 'vscode'
 import { estimateTokens } from '../../src/chat/estimate'
 
-// Framing overhead constants mirrored from estimate.ts.
 const MESSAGE_BASE = 4
 const PART_BASE = 3
 const IMAGE_TOKENS = 256
