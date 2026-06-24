@@ -57,6 +57,19 @@ export class ManagementClient {
     await this.send('DELETE', `/auth-files?name=${encodeURIComponent(name)}`, undefined, signal)
   }
 
+  async listAuthFilesRaw(signal?: AbortSignal): Promise<Record<string, unknown>[]> {
+    const payload = await this.getJson<{ files?: unknown }>('/auth-files', signal)
+    return Array.isArray(payload.files) ? payload.files.filter(isPlainObject) : []
+  }
+
+  // Proxies an upstream request through CLIProxyAPI using a stored credential.
+  // CPA substitutes the literal "$TOKEN$" in headers with the account's token.
+  async apiCall(payload: Record<string, unknown>, signal?: AbortSignal): Promise<{ statusCode: number, body: unknown }> {
+    const response = await this.send('POST', '/api-call', payload, signal)
+    const json = await response.json() as { status_code?: number, statusCode?: number, body?: unknown }
+    return { statusCode: json.status_code ?? json.statusCode ?? 0, body: json.body }
+  }
+
   private async getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     const response = await this.send('GET', path, undefined, signal)
     return await response.json() as T

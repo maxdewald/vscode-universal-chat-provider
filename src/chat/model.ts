@@ -25,6 +25,7 @@ export interface ProxyModelMetadata {
 
 export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string
+  proxyOwner: string
   reasoningLevels: readonly string[]
   reasoningEffort?: string
   supportsParallelToolCalls: boolean
@@ -198,6 +199,7 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
 
   const baseModel = {
     proxyModelId: entry.id,
+    proxyOwner: providerName,
     family,
     version: catalogModel?.version ?? entry.id,
     maxInputTokens: totalContext,

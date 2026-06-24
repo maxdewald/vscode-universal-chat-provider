@@ -137,6 +137,7 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 | `universalChatProvider.manage`           | Universal Chat Provider: Manage Provider                                             |
 | `universalChatProvider.login`            | Universal Chat Provider: Add Account (Login)                                         |
 | `universalChatProvider.manageAccounts`   | Universal Chat Provider: Manage Accounts                                             |
+| `universalChatProvider.showQuota`        | Universal Chat Provider: Show Quota                                                  |
 | `universalChatProvider.restartServer`    | Universal Chat Provider: Restart Managed Server                                      |
 | `universalChatProvider.updateBinary`     | Universal Chat Provider: Update Proxy Binary                                         |
 | `universalChatProvider.resetServer`      | Universal Chat Provider: Reset Managed Server                                        |

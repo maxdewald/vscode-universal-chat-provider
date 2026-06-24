@@ -25,6 +25,11 @@ export async function manageProvider(controller: ServerController | undefined): 
         description: 'List or remove connected accounts',
         command: 'universalChatProvider.manageAccounts',
       },
+      {
+        label: '$(pulse) Show Quota Usage',
+        description: 'Remaining quota for Codex and Antigravity accounts',
+        command: 'universalChatProvider.showQuota',
+      },
     ],
     [
       {

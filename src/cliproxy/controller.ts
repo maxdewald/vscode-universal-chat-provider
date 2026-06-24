@@ -3,6 +3,7 @@ import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
 import type { ManagedServer } from './managed/server'
 import type { ManagementEndpoint } from './management-client'
+import type { QuotaReport } from './quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 import { rm } from 'node:fs/promises'
 import { debounce } from 'moderndash'
@@ -23,6 +24,7 @@ import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
 import { listReleaseVersions, pickSuggestedUpdate } from './managed/updates'
 import { ManagementClient } from './management-client'
+import { fetchQuotas } from './quota'
 import { buildStatusSnapshot } from './status'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
@@ -40,6 +42,7 @@ export class ServerController implements ProxyConnection {
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
+  private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
 
@@ -90,6 +93,7 @@ export class ServerController implements ProxyConnection {
       await this.bootstrap()
       await this.server!.ensureRunning()
       this.setStatus('running')
+      void this.refreshQuotas()
       void this.accounts.maybePromptLogin()
       void this.maybeSuggestUpdate()
     }
@@ -105,6 +109,10 @@ export class ServerController implements ProxyConnection {
 
   setStatusListener(listener: (status: ServerStatus) => void): void {
     this.statusListener = listener
+  }
+
+  setQuotaListener(listener: (reports: QuotaReport[]) => void): void {
+    this.quotaListener = listener
   }
 
   async login(): Promise<void> {
@@ -276,6 +284,21 @@ export class ServerController implements ProxyConnection {
 
   private notifyAccountsChanged(): void {
     this.refreshListener?.()
+    void this.refreshQuotas()
+  }
+
+  // Refreshes quota and notifies the listener. Triggered on server/account events and when
+  // the quota menu opens. ponytail: no poll — add a timer only if staleness becomes a problem.
+  async refreshQuotas(): Promise<void> {
+    if (this.quotaListener === undefined)
+      return
+    const management = await this.managementForStatus()
+    if (management === undefined)
+      return
+    try {
+      this.quotaListener(await fetchQuotas(new ManagementClient(management.baseUrl, management.key)))
+    }
+    catch {}
   }
 
   private async resolveManagement(start: boolean): Promise<ManagementEndpoint | undefined> {

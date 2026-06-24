@@ -41,6 +41,10 @@ export class ModelRegistry {
     return this.refreshPromise !== undefined
   }
 
+  snapshot(): ProviderModel[] {
+    return this.cachedModels
+  }
+
   reset(): void {
     this.cachedModels = []
     this.cachedFingerprint = ''

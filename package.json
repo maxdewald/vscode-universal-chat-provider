@@ -45,7 +45,8 @@
     "languageModelChatProviders": [
       {
         "vendor": "universal-chat-provider",
-        "displayName": "Universal Chat Provider"
+        "displayName": "Universal Chat Provider",
+        "managementCommand": "universalChatProvider.login"
       }
     ],
     "commands": [
@@ -60,6 +61,10 @@
       {
         "command": "universalChatProvider.manageAccounts",
         "title": "Universal Chat Provider: Manage Accounts"
+      },
+      {
+        "command": "universalChatProvider.showQuota",
+        "title": "Universal Chat Provider: Show Quota"
       },
       {
         "command": "universalChatProvider.restartServer",

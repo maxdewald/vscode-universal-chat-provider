@@ -11,6 +11,7 @@ import type {
   ProvideLanguageModelChatResponseOptions,
 } from 'vscode'
 import type { ProxyConnection } from '../cliproxy/connection'
+import type { QuotaReport } from '../cliproxy/quota'
 import type { CompletionDeps } from './completion'
 import type { ProviderModel } from './model'
 import * as vscode from 'vscode'
@@ -41,11 +42,13 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly registry: ModelRegistry
   private readonly credentialFlows: CredentialFlows
   private readonly cacheMetrics: CacheMetricsTracker
+  private quotaReports: QuotaReport[] = []
 
   constructor(
     private readonly context: ExtensionContext,
     private readonly output: OutputChannel,
     private readonly connection: ProxyConnection = new SettingsConnection(),
+    private readonly onSignIn?: () => Promise<void>,
   ) {
     this.credentials = new CredentialStore(context)
     this.registry = new ModelRegistry(connection, this.credentials, output, {
@@ -59,6 +62,30 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   get onDidChangeLanguageModelChatInformation(): Event<void> {
     return this.registry.onDidChange
+  }
+
+  setQuotas(reports: QuotaReport[]): void {
+    this.quotaReports = reports
+  }
+
+  // Structured quota for the menu: Codex as its account windows (5h/7d), Antigravity per model.
+  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined }> }> {
+    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined }> }> = []
+    const codex = this.quotaReports.find(report => report.provider === 'codex' && report.error === undefined)
+    if (codex !== undefined && codex.windows.length > 0)
+      sections.push({ title: 'Codex', entries: codex.windows.map(window => ({ name: window.label, remainingPercent: window.remainingPercent })) })
+
+    const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)
+    const models = antigravity?.models
+    if (models !== undefined) {
+      const entries = this.registry.snapshot()
+        .filter(model => model.proxyOwner.toLowerCase() === 'antigravity' && models[model.proxyModelId] !== undefined)
+        .map(model => ({ name: model.name, remainingPercent: models[model.proxyModelId]! }))
+        .sort((a, b) => (a.remainingPercent ?? 101) - (b.remainingPercent ?? 101))
+      if (entries.length > 0)
+        sections.push({ title: 'Antigravity', entries })
+    }
+    return sections
   }
 
   dispose(): void {
@@ -81,6 +108,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   ): Promise<ProviderModel[]> {
     if (token.isCancellationRequested)
       return []
+    // Interactive resolve (silent:false) only happens when the user picks us in "Add Models",
+    // so open the account login flow first; the refresh then shows whatever they connected.
+    if (!options.silent && this.onSignIn !== undefined) {
+      await this.onSignIn()
+      return this.registry.forceRefresh(false)
+    }
     return this.registry.refresh(!options.silent, token)
   }
 

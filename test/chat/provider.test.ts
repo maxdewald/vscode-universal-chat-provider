@@ -223,6 +223,33 @@ describe('language model provider', () => {
     expect(clientMocks.discover).toHaveBeenCalledTimes(1)
   })
 
+  it('opens sign-in on an interactive resolve, then resolves models', async () => {
+    const onSignIn = vi.fn(async () => {})
+    const provider = createProvider('secret', onSignIn)
+    clientMocks.discover.mockResolvedValueOnce(discovery())
+
+    const models = await provider.provideLanguageModelChatInformation(
+      { silent: false },
+      new CancellationTokenSource().token,
+    )
+
+    expect(onSignIn).toHaveBeenCalledTimes(1)
+    expect(models).toHaveLength(1)
+  })
+
+  it('does not prompt sign-in for a silent resolve', async () => {
+    const onSignIn = vi.fn(async () => {})
+    const provider = createProvider('secret', onSignIn)
+    clientMocks.discover.mockResolvedValueOnce({ available: [], metadata: [] })
+
+    await provider.provideLanguageModelChatInformation(
+      { silent: true },
+      new CancellationTokenSource().token,
+    )
+
+    expect(onSignIn).not.toHaveBeenCalled()
+  })
+
   it('counts tokens locally without querying the proxy', async () => {
     const provider = createProvider('secret')
 
@@ -235,7 +262,7 @@ describe('language model provider', () => {
   })
 })
 
-function createProvider(apiKey?: string): UniversalChatProvider {
+function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {
   if (apiKey !== undefined)
     vscodeMock.secrets.set('universalChatProvider.apiKey', apiKey)
   const context = {
@@ -260,6 +287,8 @@ function createProvider(apiKey?: string): UniversalChatProvider {
   return new UniversalChatProvider(
     context,
     vscodeMock.output as unknown as OutputChannel,
+    undefined,
+    onSignIn,
   )
 }
 
@@ -267,6 +296,7 @@ function model(): ProviderModel {
   return {
     id: 'model-a',
     proxyModelId: 'model-a',
+    proxyOwner: 'openai',
     name: 'Model A',
     family: 'test',
     version: '1',

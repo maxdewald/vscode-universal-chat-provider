@@ -5,6 +5,7 @@ import { commands, window } from 'vscode'
 import { setUtilityModel } from '../chat/utility-model-nudge'
 import { extensionId } from '../generated/meta'
 import { manageProvider } from './manage-menu'
+import { showQuotaMenu } from './quota-menu'
 
 export interface CommandDeps {
   provider: UniversalChatProvider
@@ -22,6 +23,9 @@ export function registerCommands(deps: CommandDeps): Disposable[] {
     }),
     commands.registerCommand('universalChatProvider.manageAccounts', async () => {
       await controller.manageAccounts()
+    }),
+    commands.registerCommand('universalChatProvider.showQuota', async () => {
+      await showQuotaMenu(provider, async () => controller.refreshQuotas())
     }),
     commands.registerCommand('universalChatProvider.configure', async () => {
       await provider.configure()
