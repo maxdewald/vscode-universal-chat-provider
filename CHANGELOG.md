@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.11.0...v0.12.0) (2026-06-24)
+
+
+### Features
+
+* add model quota tracking ([5ab9f2e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5ab9f2eeb5d241f3c9a28a31954874ecf8b1bb1e))
+
+
+### Bug Fixes
+
+* update Antigravity badge and add CLIProxyAPI attribution ([97beb31](https://github.com/maxdewald/vscode-universal-chat-provider/commit/97beb31762e085810147fa389bda85584aec3cc6))
+
 ## [0.11.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.10.0...v0.11.0) (2026-06-22)
 
 
