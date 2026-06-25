@@ -1,8 +1,9 @@
+import type { ThemeColor } from 'vscode'
 import type { MarkdownString } from '../support/vscode'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
 import { createStatusBar, updateStatusBar } from '../../src/extension/status-bar'
-import { resetVSCodeMock, statusBarItem, window } from '../support/vscode'
+import { resetVSCodeMock, statusBarItem, vscodeMock, window } from '../support/vscode'
 
 function tooltipValue(): string {
   return (statusBarItem.tooltip as MarkdownString).value
@@ -30,6 +31,38 @@ describe('status bar', () => {
 
     expect(statusBarItem.text).toBe(text)
     expect(tooltipValue()).toContain(tooltip)
+  })
+
+  it('warns in the bar when the active model is low on quota', () => {
+    updateStatusBar(statusBarItem as never, 'running', [], { name: 'Gemini 3 Pro', remainingPercent: 6 })
+
+    expect(statusBarItem.text).toBe('$(warning) Gemini 3 Pro · 6% left')
+    expect((statusBarItem.backgroundColor as ThemeColor).id).toBe('statusBarItem.warningBackground')
+  })
+
+  it('stays normal when the active model is above the low threshold', () => {
+    updateStatusBar(statusBarItem as never, 'running', [], { name: 'Gemini 3 Pro', remainingPercent: 12 })
+
+    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(statusBarItem.backgroundColor).toBeUndefined()
+  })
+
+  it('never warns when showQuotaWarnings is disabled', () => {
+    vscodeMock.settings.set('universalChatProvider.showQuotaWarnings', false)
+    updateStatusBar(statusBarItem as never, 'running', [
+      { title: 'Codex', entries: [{ name: '7d Quota', remainingPercent: 2 }] },
+    ], { name: 'Gemini 3 Pro', remainingPercent: 2 })
+
+    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(statusBarItem.backgroundColor).toBeUndefined()
+    expect(tooltipValue()).not.toContain('$(warning)')
+  })
+
+  it('honors a custom quotaWarningThreshold', () => {
+    vscodeMock.settings.set('universalChatProvider.quotaWarningThreshold', 50)
+    updateStatusBar(statusBarItem as never, 'running', [], { name: 'Gemini 3 Pro', remainingPercent: 40 })
+
+    expect(statusBarItem.text).toBe('$(warning) Gemini 3 Pro · 40% left')
   })
 
   it('renders quota sections with bars and command links', () => {

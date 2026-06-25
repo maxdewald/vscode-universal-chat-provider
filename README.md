@@ -120,6 +120,9 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 | ▿ <b>Managed Server</b>                       |
 | `universalChatProvider.server.version`        | CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or latest to track new releases. | `string`  | `"7.2.5"`                 |
 | `universalChatProvider.server.suggestUpdates` | Offer same-major updates for pinned managed server versions.                                                           | `boolean` | `true`                    |
+| ▿ <b>Status Bar</b>                           |
+| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                          | `boolean` | `true`                    |
+| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                    | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
 | `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                                     | `boolean` | `false`                   |
 

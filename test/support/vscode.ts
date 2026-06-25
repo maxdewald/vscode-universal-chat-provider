@@ -84,6 +84,10 @@ export class MarkdownString {
   }
 }
 
+export class ThemeColor {
+  constructor(public readonly id: string) {}
+}
+
 export enum QuickPickItemKind {
   Separator = -1,
   Default = 0,
@@ -202,6 +206,7 @@ export const statusBarItem = {
   text: '',
   tooltip: '' as string | MarkdownString | undefined,
   command: undefined as string | undefined,
+  backgroundColor: undefined as ThemeColor | undefined,
   show: vi.fn(),
   hide: vi.fn(),
   dispose: vi.fn(),
@@ -304,6 +309,7 @@ export function resetVSCodeMock(): void {
   statusBarItem.text = ''
   statusBarItem.tooltip = ''
   statusBarItem.command = undefined
+  statusBarItem.backgroundColor = undefined
   statusBarItem.show.mockClear()
   statusBarItem.hide.mockClear()
   statusBarItem.dispose.mockClear()

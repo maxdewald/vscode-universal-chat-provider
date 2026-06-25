@@ -6,7 +6,7 @@ import type { ManagementEndpoint } from './management-client'
 import type { QuotaReport } from './quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 import { rm } from 'node:fs/promises'
-import { debounce } from 'moderndash'
+import { debounce, throttle } from 'moderndash'
 import {
   ConfigurationTarget,
   ProgressLocation,
@@ -40,6 +40,9 @@ export class ServerController implements ProxyConnection {
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
+  // Refreshes immediately on the first prompt, then at most once per window during a long session,
+  // so the quota warning stays current without hammering the upstream usage endpoints.
+  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 30_000)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined

@@ -21,6 +21,7 @@ import {
 } from 'vscode'
 import { SettingsConnection } from '../cliproxy/connection'
 import { CredentialStore } from '../cliproxy/credentials'
+import { remainingForModel } from '../cliproxy/quota'
 import { asRecord, asString } from '../shared/json'
 import { CacheMetricsTracker } from './cache-metrics'
 import { streamCompletion } from './completion'
@@ -43,6 +44,10 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly credentialFlows: CredentialFlows
   private readonly cacheMetrics: CacheMetricsTracker
   private quotaReports: QuotaReport[] = []
+  private lastUsedModel: { proxyModelId: string, proxyOwner: string, name: string } | undefined
+  // Fired after each request so the host can re-render the status bar for the active model and
+  // refresh quota (throttled) once the spend has landed. Wired by the extension entrypoint.
+  onActivity: (() => void) | undefined
 
   constructor(
     private readonly context: ExtensionContext,
@@ -66,6 +71,15 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   setQuotas(reports: QuotaReport[]): void {
     this.quotaReports = reports
+  }
+
+  // Remaining quota for the model in the most recent request, or undefined when no model has run
+  // yet or its provider exposes no quota. Drives the status-bar low-quota warning.
+  currentModelQuota(): { name: string, remainingPercent: number } | undefined {
+    if (this.lastUsedModel === undefined)
+      return undefined
+    const remaining = remainingForModel(this.quotaReports, this.lastUsedModel)
+    return remaining === undefined ? undefined : { name: this.lastUsedModel.name, remainingPercent: remaining }
   }
 
   // Structured quota for the menu: Codex as its account windows (5h/7d), Antigravity per model.
@@ -124,6 +138,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     progress: Progress<LanguageModelResponsePart>,
     token: CancellationToken,
   ): Promise<void> {
+    this.lastUsedModel = { proxyModelId: model.proxyModelId, proxyOwner: model.proxyOwner, name: model.name }
     const requestOptions = options as { modelConfiguration?: { reasoningEffort?: string }, requestInitiator?: string }
     const storedUtilityEffort = this.getUtilityEffort(model.id)
     const utilityEffort = storedUtilityEffort !== undefined && model.reasoningLevels.includes(storedUtilityEffort)
@@ -133,32 +148,38 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       ? utilityEffort ?? requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
       : requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
     const request = buildRequest(model, messages, options, chosenEffort)
-    await streamCompletion(
-      this.completionDeps(),
-      request,
-      {
-        onText: (delta) => {
-          progress.report(new LanguageModelTextPart(delta))
+    try {
+      await streamCompletion(
+        this.completionDeps(),
+        request,
+        {
+          onText: (delta) => {
+            progress.report(new LanguageModelTextPart(delta))
+          },
+          onThinking: (delta) => {
+            progress.report(new LanguageModelThinkingPart(delta, 'thinking'))
+          },
+          onToolCall: (callId, name, input) =>
+            progress.report(new LanguageModelToolCallPart(callId, name, input)),
+          onUsage: (usage) => {
+            this.cacheMetrics.record(usage, {
+              model: model.proxyModelId,
+              promptCacheKey: asString(request.prompt_cache_key),
+              reasoningEffort: asString(asRecord(request.reasoning)?.effort),
+              inputItems: request.input as readonly unknown[],
+            })
+            const part = createContextUsagePart(usage)
+            if (part !== undefined)
+              progress.report(part)
+          },
         },
-        onThinking: (delta) => {
-          progress.report(new LanguageModelThinkingPart(delta, 'thinking'))
-        },
-        onToolCall: (callId, name, input) =>
-          progress.report(new LanguageModelToolCallPart(callId, name, input)),
-        onUsage: (usage) => {
-          this.cacheMetrics.record(usage, {
-            model: model.proxyModelId,
-            promptCacheKey: asString(request.prompt_cache_key),
-            reasoningEffort: asString(asRecord(request.reasoning)?.effort),
-            inputItems: request.input as readonly unknown[],
-          })
-          const part = createContextUsagePart(usage)
-          if (part !== undefined)
-            progress.report(part)
-        },
-      },
-      token,
-    )
+        token,
+      )
+    }
+    finally {
+      // Spend just happened — let the host refresh quota (throttled) so the warning stays current.
+      this.onActivity?.()
+    }
   }
 
   async provideTokenCount(

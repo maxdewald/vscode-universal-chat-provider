@@ -1,6 +1,7 @@
 import type { ManagementClient } from '../../src/cliproxy/management-client'
+import type { QuotaReport } from '../../src/cliproxy/quota'
 import { describe, expect, it, vi } from 'vitest'
-import { fetchQuotas, formatPercent } from '../../src/cliproxy/quota'
+import { fetchQuotas, formatPercent, remainingForModel } from '../../src/cliproxy/quota'
 
 interface ApiCallResult { statusCode: number, body: unknown }
 
@@ -84,6 +85,28 @@ describe('fetchQuotas', () => {
     const report = (await fetchQuotas(client))[0]!
     expect(report).toMatchObject({ error: 'missing project_id' })
     expect(apiCall).not.toHaveBeenCalled()
+  })
+})
+
+describe('remainingForModel', () => {
+  const reports: QuotaReport[] = [
+    { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 80 }, { label: '7d Quota', remainingPercent: 8 }] },
+    { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': 35 } },
+  ]
+
+  it('returns the antigravity per-model percent', () => {
+    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(35)
+  })
+
+  it('returns the tightest codex window for any openai model', () => {
+    expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
+  })
+
+  it('is undefined for an untracked antigravity model, owner, or errored report', () => {
+    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'unknown' })).toBeUndefined()
+    expect(remainingForModel(reports, { proxyOwner: 'anthropic', proxyModelId: 'claude' })).toBeUndefined()
+    const errored: QuotaReport[] = [{ provider: 'codex', windows: [], error: 'HTTP 401' }]
+    expect(remainingForModel(errored, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
   })
 })
 

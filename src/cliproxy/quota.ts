@@ -34,6 +34,22 @@ export function formatPercent(value?: number): string {
   return value === undefined ? '?' : `${Math.round(value)}%`
 }
 
+// Maps a model to its remaining-quota percent. Antigravity is keyed per model; Codex quota is
+// account-level (5h/7d windows), so we report the tighter of the two windows for any Codex model.
+export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: string, proxyModelId: string }): number | undefined {
+  const owner = model.proxyOwner.toLowerCase()
+  if (owner === 'antigravity') {
+    const report = reports.find(r => r.provider === 'antigravity' && r.error === undefined)
+    return report?.models?.[model.proxyModelId]
+  }
+  if (owner === 'openai') {
+    const report = reports.find(r => r.provider === 'codex' && r.error === undefined)
+    const percents = (report?.windows ?? []).map(w => w.remainingPercent).filter((p): p is number => p !== undefined)
+    return percents.length > 0 ? Math.min(...percents) : undefined
+  }
+  return undefined
+}
+
 async function fetchCodexQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
   const report: QuotaReport = { provider: 'codex', windows: [] }
   const authIndex = str(entry.auth_index)
