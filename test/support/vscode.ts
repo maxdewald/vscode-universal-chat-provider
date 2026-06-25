@@ -1,6 +1,12 @@
+import type * as vscode from 'vscode'
+import { createVSCodeMock } from 'jest-mock-vscode'
 import { vi } from 'vitest'
 
-type Listener<T> = (value: T) => void
+// Value-types/enums come from jest-mock-vscode; the LM provider API, env, extensions,
+// CancellationTokenSource and the behavioral fakes below are hand-written (jmv omits them).
+const base = createVSCodeMock(vi) as unknown as typeof vscode
+
+export const { Uri, EventEmitter, MarkdownString, ThemeColor, ConfigurationTarget, StatusBarAlignment, ProgressLocation, LanguageModelDataPart } = base
 
 class MockDisposable {
   disposed = false
@@ -12,23 +18,6 @@ class MockDisposable {
       return
     this.disposed = true
     this.callback()
-  }
-}
-
-export class EventEmitter<T> {
-  private readonly listeners = new Set<Listener<T>>()
-  readonly event = (listener: Listener<T>): MockDisposable => {
-    this.listeners.add(listener)
-    return new MockDisposable(() => this.listeners.delete(listener))
-  }
-
-  fire(value: T): void {
-    for (const listener of this.listeners)
-      listener(value)
-  }
-
-  dispose(): void {
-    this.listeners.clear()
   }
 }
 
@@ -59,35 +48,6 @@ export enum LanguageModelChatToolMode {
   Required = 2,
 }
 
-export enum ConfigurationTarget {
-  Global = 1,
-  Workspace = 2,
-}
-
-export enum StatusBarAlignment {
-  Left = 1,
-  Right = 2,
-}
-
-export enum ProgressLocation {
-  Notification = 15,
-}
-
-export class MarkdownString {
-  supportThemeIcons = false
-
-  constructor(public value = '') {}
-
-  appendMarkdown(value: string): this {
-    this.value += value
-    return this
-  }
-}
-
-export class ThemeColor {
-  constructor(public readonly id: string) {}
-}
-
 export enum QuickPickItemKind {
   Separator = -1,
   Default = 0,
@@ -100,29 +60,6 @@ export class RelativePattern {
   ) {}
 }
 
-export class Uri {
-  static file(fsPath: string): Uri {
-    return new Uri('file', fsPath)
-  }
-
-  static parse(value: string): Uri {
-    return new Uri('parsed', value)
-  }
-
-  readonly path: string
-
-  constructor(
-    readonly scheme: string,
-    readonly fsPath: string,
-  ) {
-    this.path = fsPath
-  }
-
-  toString(): string {
-    return `${this.scheme}://${this.fsPath}`
-  }
-}
-
 export class LanguageModelTextPart {
   constructor(readonly value: string) {}
 }
@@ -131,25 +68,6 @@ export class LanguageModelThinkingPart {
   constructor(
     readonly value: string,
     readonly id?: string,
-  ) {}
-}
-
-export class LanguageModelDataPart {
-  static image(data: Uint8Array, mimeType: string): LanguageModelDataPart {
-    return new LanguageModelDataPart(data, mimeType)
-  }
-
-  static text(value: string, mimeType = 'text/plain'): LanguageModelDataPart {
-    return new LanguageModelDataPart(new TextEncoder().encode(value), mimeType)
-  }
-
-  static json(value: unknown, mimeType = 'application/json'): LanguageModelDataPart {
-    return new LanguageModelDataPart(new TextEncoder().encode(JSON.stringify(value)), mimeType)
-  }
-
-  constructor(
-    readonly data: Uint8Array,
-    readonly mimeType: string,
   ) {}
 }
 
@@ -204,9 +122,9 @@ export const vscodeMock = {
 
 export const statusBarItem = {
   text: '',
-  tooltip: '' as string | MarkdownString | undefined,
+  tooltip: '' as string | vscode.MarkdownString | undefined,
   command: undefined as string | undefined,
-  backgroundColor: undefined as ThemeColor | undefined,
+  backgroundColor: undefined as vscode.ThemeColor | undefined,
   show: vi.fn(),
   hide: vi.fn(),
   dispose: vi.fn(),
@@ -261,13 +179,13 @@ export const workspace = {
   createFileSystemWatcher: vi.fn((_pattern: unknown) => createWatcher()),
   onDidChangeConfiguration: vi.fn((_listener: (event: { affectsConfiguration: (section: string) => boolean }) => void) => new MockDisposable()),
   fs: {
-    stat: vi.fn(async (_uri: Uri) => ({ size: 0 })),
-    readFile: vi.fn(async (_uri: Uri) => new Uint8Array()),
+    stat: vi.fn(async (_uri: vscode.Uri) => ({ size: 0 })),
+    readFile: vi.fn(async (_uri: vscode.Uri) => new Uint8Array()),
   },
 }
 
 export const env = {
-  openExternal: vi.fn(async (_uri: Uri) => true),
+  openExternal: vi.fn(async (_uri: vscode.Uri) => true),
 }
 
 export const extensions = {
@@ -296,9 +214,6 @@ export function resetVSCodeMock(): void {
   secrets.clear()
   commandHandlers.clear()
   vscodeMock.registeredProviders.length = 0
-  vscodeMock.output.appendLine.mockReset()
-  vscodeMock.output.show.mockReset()
-  vscodeMock.output.dispose.mockReset()
   for (const value of Object.values(window))
     value.mockReset()
   window.createOutputChannel.mockReturnValue(vscodeMock.output)
@@ -310,23 +225,10 @@ export function resetVSCodeMock(): void {
   statusBarItem.tooltip = ''
   statusBarItem.command = undefined
   statusBarItem.backgroundColor = undefined
-  statusBarItem.show.mockClear()
-  statusBarItem.hide.mockClear()
-  statusBarItem.dispose.mockClear()
   quickPick.title = ''
   quickPick.placeholder = ''
   quickPick.busy = false
   quickPick.items = []
-  quickPick.show.mockClear()
-  quickPick.hide.mockClear()
-  quickPick.dispose.mockClear()
-  quickPick.onDidAccept.mockClear()
-  quickPick.onDidHide.mockClear()
-  for (const value of Object.values(workspace)) {
-    if ('mockClear' in value) {
-      value.mockClear()
-    }
-  }
   workspace.fs.stat.mockReset()
   workspace.fs.readFile.mockReset()
   workspace.fs.stat.mockResolvedValue({ size: 0 })
@@ -334,7 +236,4 @@ export function resetVSCodeMock(): void {
   env.openExternal.mockReset()
   env.openExternal.mockResolvedValue(true)
   extensions.getExtension.mockReset()
-  for (const value of Object.values(commands))
-    value.mockClear()
-  lm.registerLanguageModelChatProvider.mockClear()
 }

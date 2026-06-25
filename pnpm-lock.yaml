@@ -54,8 +54,11 @@ importers:
       eslint:
         specifier: ^10.5.0
         version: 10.5.0(jiti@2.7.0)
+      jest-mock-vscode:
+        specifier: ^4.12.0
+        version: 4.12.0(@types/vscode@1.125.0)
       tsdown:
-        specifier: ^0.22.2
+        specifier: ^0.22.3
         version: 0.22.3(typescript@6.0.3)
       typescript:
         specifier: ^6.0.3
@@ -1830,6 +1833,12 @@ packages:
     resolution: {integrity: sha512-5mbUj3SiZXCuRf9fT3ibzbSSEWiy63gFfksmGfdOzujPjW3k+z8WvIBxcJHBoQNlaZaiyB25deviif2+osLmLw==}
     engines: {node: '>=4'}
 
+  jest-mock-vscode@4.12.0:
+    resolution: {integrity: sha512-/TbB5hE52qHZUomOiU3WLAqGVxousFXCHIJtRhgpCIi+UsuWWKra4SFb5sQzcZfrGKYEFlHLWqpcYgWzZ/td9g==}
+    engines: {node: '>22.0.0'}
+    peerDependencies:
+      '@types/vscode': ^1.90.0
+
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
@@ -2963,6 +2972,9 @@ packages:
     resolution: {integrity: sha512-oYg4QCx56hs1+EOVInhQMeuO4jKOCHuBrG9uppivGac8Cu9crJ7YKZg8bviDO60iX9IHqX7o5oRIV/Y+f96XwA==}
     hasBin: true
 
+  vscode-uri@3.1.0:
+    resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
+
   vue-eslint-parser@10.4.1:
     resolution: {integrity: sha512-Gk6gRDj0n/fkRa3C3l0bBheoBckUq/Rs0F/TvMWIS6nzzx67amAViMe9CkNgsP2tXyQONvGiHQESHwFtZ3aYDA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -3242,7 +3254,7 @@ snapshots:
     dependencies:
       empathic: 2.0.1
       module-replacements: 3.0.0-beta.8
-      semver: 7.8.4
+      semver: 7.8.5
     optionalDependencies:
       eslint: 10.5.0(jiti@2.7.0)
 
@@ -3741,7 +3753,7 @@ snapshots:
       eslint: 10.5.0(jiti@2.7.0)
       json-stable-stringify-without-jsonify: 1.0.1
       lodash.merge: 4.6.2
-      semver: 7.8.4
+      semver: 7.8.5
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -3777,7 +3789,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.61.0
       debug: 4.4.3
       minimatch: 10.2.5
-      semver: 7.8.4
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -4346,7 +4358,7 @@ snapshots:
   eslint-compat-utils@0.5.1(eslint@10.5.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.5.0(jiti@2.7.0)
-      semver: 7.8.4
+      semver: 7.8.5
 
   eslint-config-flat-gitignore@2.3.0(eslint@10.5.0(jiti@2.7.0)):
     dependencies:
@@ -4405,7 +4417,7 @@ snapshots:
       html-entities: 2.6.0
       object-deep-merge: 2.0.1
       parse-imports-exports: 0.2.4
-      semver: 7.8.4
+      semver: 7.8.5
       spdx-expression-parse: 4.0.0
       to-valid-identifier: 1.0.0
     transitivePeerDependencies:
@@ -4436,7 +4448,7 @@ snapshots:
       globals: 15.15.0
       globrex: 0.1.2
       ignore: 5.3.2
-      semver: 7.8.4
+      semver: 7.8.5
     optionalDependencies:
       typescript: 6.0.3
 
@@ -4501,7 +4513,7 @@ snapshots:
       pluralize: 8.0.0
       regexp-tree: 0.1.27
       regjsparser: 0.13.1
-      semver: 7.8.4
+      semver: 7.8.5
       strip-indent: 4.1.1
 
   eslint-plugin-unused-imports@4.4.1(@typescript-eslint/eslint-plugin@8.61.0(@typescript-eslint/parser@8.61.0(eslint@10.5.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.5.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.5.0(jiti@2.7.0)):
@@ -4517,7 +4529,7 @@ snapshots:
       natural-compare: 1.4.0
       nth-check: 2.1.1
       postcss-selector-parser: 7.1.4
-      semver: 7.8.4
+      semver: 7.8.5
       vue-eslint-parser: 10.4.1(eslint@10.5.0(jiti@2.7.0))
       xml-name-validator: 4.0.0
     optionalDependencies:
@@ -4900,6 +4912,11 @@ snapshots:
       editions: 6.22.0
       textextensions: 6.11.0
 
+  jest-mock-vscode@4.12.0(@types/vscode@1.125.0):
+    dependencies:
+      '@types/vscode': 1.125.0
+      vscode-uri: 3.1.0
+
   jiti@2.7.0:
     optional: true
 
@@ -4931,7 +4948,7 @@ snapshots:
     dependencies:
       acorn: 8.17.0
       eslint-visitor-keys: 5.0.1
-      semver: 7.8.4
+      semver: 7.8.5
 
   jsonc-parser@3.3.1: {}
 
@@ -4952,7 +4969,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.4
+      semver: 7.8.5
 
   jwa@2.0.1:
     dependencies:
@@ -5091,7 +5108,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   markdown-it@14.2.0:
     dependencies:
@@ -5502,7 +5519,7 @@ snapshots:
 
   node-abi@3.92.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
     optional: true
 
   node-addon-api@4.3.0:
@@ -5518,7 +5535,7 @@ snapshots:
   normalize-package-data@6.0.2:
     dependencies:
       hosted-git-info: 7.0.2
-      semver: 7.8.4
+      semver: 7.8.5
       validate-npm-package-license: 3.0.4
 
   nth-check@2.1.1:
@@ -6046,7 +6063,7 @@ snapshots:
       picomatch: 4.0.4
       rolldown: 1.1.1
       rolldown-plugin-dts: 0.26.0(rolldown@1.1.1)(typescript@6.0.3)
-      semver: 7.8.4
+      semver: 7.8.5
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tree-kill: 1.2.2
@@ -6198,6 +6215,8 @@ snapshots:
       cac: 6.7.14
       tinyglobby: 0.2.17
 
+  vscode-uri@3.1.0: {}
+
   vue-eslint-parser@10.4.1(eslint@10.5.0(jiti@2.7.0)):
     dependencies:
       debug: 4.4.3
@@ -6206,7 +6225,7 @@ snapshots:
       eslint-visitor-keys: 5.0.1
       espree: 11.2.0
       esquery: 1.7.0
-      semver: 7.8.4
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 

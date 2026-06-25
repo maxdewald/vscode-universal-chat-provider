@@ -1,5 +1,4 @@
-import type { ThemeColor } from 'vscode'
-import type { MarkdownString } from '../support/vscode'
+import type { MarkdownString, ThemeColor } from 'vscode'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
 import { createStatusBar, updateStatusBar } from '../../src/extension/status-bar'
