@@ -1,4 +1,5 @@
 import type { ExtensionContext } from 'vscode'
+import type { ServerStatus } from './cliproxy/controller'
 import { lm, window } from 'vscode'
 import { UniversalChatProvider } from './chat/provider'
 import { maybeSuggestUtilityModel } from './chat/utility-model-nudge'
@@ -16,9 +17,19 @@ export function activate(context: ExtensionContext): void {
   provider = new UniversalChatProvider(context, output, controller, async () => controller!.login())
 
   const statusBar = createStatusBar()
+  // Status and quota arrive on separate listeners; re-render the bar from both on either change.
+  let lastStatus: ServerStatus = 'starting'
+  const renderStatusBar = (): void => updateStatusBar(statusBar, lastStatus, provider?.quotaSections() ?? [])
   controller.setRefreshListener(() => void provider?.forceRefresh(false))
-  controller.setStatusListener(status => updateStatusBar(statusBar, status))
-  controller.setQuotaListener(reports => provider?.setQuotas(reports))
+  controller.setStatusListener((status) => {
+    lastStatus = status
+    renderStatusBar()
+  })
+  controller.setQuotaListener((reports) => {
+    provider?.setQuotas(reports)
+    renderStatusBar()
+  })
+  renderStatusBar()
 
   context.subscriptions.push(
     output,
