@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.13.0...v0.14.0) (2026-06-26)
+
+
+### Features
+
+* add Claude quota tracking and migrate HTTP clients to ky ([187d6c7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/187d6c7259871f9447bbec8ec983af8262dc55bd))
+
 ## [0.13.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.12.0...v0.13.0) (2026-06-25)
 
 
