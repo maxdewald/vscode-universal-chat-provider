@@ -84,10 +84,13 @@ export class CLIProxyClient {
 
     const pending = new Map<string, PendingToolCall>()
     const emitted = new Set<string>()
+    const thinking = thinkingSentinelFilter(callbacks.onThinking)
 
     for await (const event of parseServerSentEvents(response.body)) {
-      if (event.data === '[DONE]')
+      if (event.data === '[DONE]') {
+        thinking.end()
         break
+      }
 
       let payload: Record<string, unknown>
       try {
@@ -106,7 +109,10 @@ export class CLIProxyClient {
       else if (type === 'response.reasoning_summary_text.delta') {
         const delta = asString(payload.delta)
         if (delta !== undefined && delta.length > 0)
-          callbacks.onThinking?.(delta)
+          thinking.push(delta)
+      }
+      else if (type === 'response.reasoning_summary_text.done' || type === 'response.reasoning_summary_part.done') {
+        thinking.end()
       }
       else if (type === 'response.output_item.added') {
         const item = asRecord(payload.item)
@@ -139,6 +145,7 @@ export class CLIProxyClient {
         }
       }
       else if (type === 'response.completed') {
+        thinking.end()
         for (const call of pending.values())
           emitToolCall(call, callbacks, emitted)
         callbacks.onUsage?.(asRecord(payload.response)?.usage)
@@ -147,6 +154,36 @@ export class CLIProxyClient {
         throw streamError(payload)
       }
     }
+  }
+}
+
+function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta: string) => void, end: () => void } {
+  const sentinel = '<!-- -->'
+  let tail = ''
+  const flush = (value: string): void => {
+    if (value.length > 0)
+      emit?.(value)
+  }
+
+  return {
+    push(delta) {
+      const value = tail + delta
+      tail = ''
+      for (let start = value.length - 1; start >= 0; start--) {
+        const suffix = value.slice(start)
+        if (sentinel.startsWith(suffix) || (suffix.startsWith(sentinel) && suffix.slice(sentinel.length).trim() === '')) {
+          tail = suffix
+          flush(value.slice(0, start))
+          return
+        }
+      }
+      flush(value)
+    },
+    end() {
+      if (tail !== sentinel && !(tail.startsWith(sentinel) && tail.slice(sentinel.length).trim() === ''))
+        flush(tail)
+      tail = ''
+    },
   }
 }
 
