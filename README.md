@@ -6,8 +6,7 @@
 
 <p>
   <b>The VS&nbsp;Code extension that brings your Claude, ChatGPT&nbsp;/&nbsp;Codex, Antigravity, and more subscriptions into GitHub&nbsp;Copilot&nbsp;Chat</b><br/>
-  <sub>No API key — just OAuth&#8209;login the subscriptions you already pay for.</sub><br/>
-  <sub>…and use them to write your Git commit messages, too.</sub>
+  <sub>No API key — just OAuth. <br/>…and use them to write your Git commit messages, too.</sub>
 </p>
 
 <p>
@@ -26,10 +25,9 @@
 </p>
 
 <p>
-  <a href="#features"><b>Features</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
-  <a href="#supported-logins"><b>Logins</b></a> &nbsp;·&nbsp;
-  <a href="#configuration"><b>Configuration</b></a>
+  <a href="#features"><b>Features</b></a> &nbsp;·&nbsp;
+  <a href="#advanced"><b>Advanced</b></a>
 </p>
 
 <p>
@@ -42,20 +40,12 @@
 
 ## Features
 
-- **Native model picker** — your subscription models appear under *Universal Chat Provider* in Copilot Chat, with context, output, tool, image, and reasoning metadata.
-- **Reasoning support** — models with multiple reasoning levels use VS Code's built-in selector, and emitted reasoning summaries stream into a collapsible thinking block.
-- **Utility model** — point Copilot's commit messages, chat titles, and summaries at your subscription models with one command. No Copilot subscription required.
-- **Zero setup (managed mode)** — the extension downloads, verifies, and supervises the proxy for you; one shared server across all windows.
-
-## Supported logins
-
-Sign in with any subscription you already have — no API key:
-
-- 🟣 **Claude** — Claude Code / Pro / Max
-- 🟢 **Codex** — ChatGPT Plus / Pro
-- ⚪ **Grok** — Grok Build
-- 🟡 **Kimi** — Moonshot
-- ⚫ **Antigravity**
+- **Works out of the box** — install, sign in with your browser, done. No servers, terminals, API keys, or config files.
+- **Right in the model picker** — your models show up in the Copilot Chat dropdown next to the built-in ones, with full tool, image, and reasoning support.
+- **Watch the model think** — reasoning models stream their thoughts into a collapsible thinking block, and you pick the reasoning effort with VS Code's built-in selector.
+- **Quota at a glance** — the status bar shows how much usage your accounts have left and warns you before you hit a limit.
+- **Your models everywhere** — one command points Copilot's commit messages, chat titles, and summaries at your models too. No Copilot subscription required.
+- **Multiple accounts** — add several accounts, even for the same provider, and manage them all from the status bar.
 
 > [!WARNING]
 > **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI **subscription** accounts (Claude, ChatGPT / Codex, Antigravity, …) over OAuth. Accessing these subscriptions outside their official apps may violate the providers' **Terms of Service** and could result in rate limiting or account suspension. You alone are responsible for how you use it.
@@ -70,24 +60,18 @@ Sign in with any subscription you already have — no API key:
 
 Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — list/remove accounts, restart, update, or reset the managed server.
 
+## Utility model
+
+Let your models write Copilot's commit messages, chat titles, and summaries. Run *Universal Chat Provider: Set Utility Model* (or use the status bar menu), pick a model (and thinking effort), done. Clear it to undo.
+
 <details>
-<summary><b>External mode</b> — bring your own CLIProxyAPI server</summary>
+<summary>Details</summary>
 
 <br>
 
-Prefer to run CLIProxyAPI yourself (e.g. a remote or shared instance)?
-
-1. Set `universalChatProvider.server.mode` to `external`.
-2. Start CLIProxyAPI and complete the provider login there.
-3. Use the **Import API Key** notification action (when a local config is found) or *Configure Connection* to set the URL and key manually.
-
-The API key is stored in VS Code `SecretStorage`. In external mode the extension never starts or stops the server. If your server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
+The command points Copilot's `chat.utilityModel` and `chat.utilitySmallModel` settings at your selected model, so those background flows run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
 
 </details>
-
-## Utility model
-
-Copilot generates commit messages, chat titles, and summaries with its own background models. Run *Universal Chat Provider: Set Utility Model* (or use the status bar menu) to point Copilot's `chat.utilityModel` and `chat.utilitySmallModel` at one of your subscription models instead, so those background flows run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required. Clear the selection to undo.
 
 ## How it works
 
@@ -103,9 +87,24 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
   └────────────────────┘     └──────────────┘     └──────────────────┘
 ```
 
-## Configuration
+## Advanced
 
-The managed server checks for stable CLIProxyAPI releases when VS Code starts. The default `automatic` policy installs newer releases and restarts the server. Use `suggestUpdates` to receive a prompt before installation, or `manual` to disable startup checks and use the exact configured version. Update checks do not apply in external mode.
+Managed-server updates are automatic by default; set `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` to change that.
+
+<details>
+<summary><b>Bring your own CLIProxyAPI server</b></summary>
+
+<br>
+
+Prefer to run CLIProxyAPI yourself, such as on a remote or shared machine?
+
+1. Set `universalChatProvider.server.mode` to `external`.
+2. Start CLIProxyAPI and complete the provider login there.
+3. Use the **Import API Key** notification action when a local config is found, or run *Configure Connection* to enter the URL and key manually.
+
+The API key is stored in VS Code `SecretStorage`. In external mode, the extension never starts or stops the server. If the server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
+
+</details>
 
 <details>
 <summary>All settings</summary>
