@@ -267,7 +267,7 @@
     "eslint": "^10.5.0",
     "jest-mock-vscode": "^4.12.0",
     "tsdown": "^0.22.3",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.0",
     "vite": "^8.0.16",
     "vitest": "^4.1.10",
     "vscode-ext-gen": "^1.6.0"
