@@ -262,14 +262,14 @@
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",
     "@types/vscode": "^1.124.0",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.10",
     "@vscode/vsce": "^3.9.2",
-    "eslint": "^10.5.0",
+    "eslint": "^10.7.0",
     "jest-mock-vscode": "^4.12.0",
     "tsdown": "^0.22.3",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.8",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10",
     "vscode-ext-gen": "^1.6.0"
   }
 }
