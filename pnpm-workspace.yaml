@@ -1,7 +1,7 @@
 engineStrict: true
 ignoreWorkspaceRootCheck: true
 minimumReleaseAgeExclude:
-  - eslint@10.5.0
+  - eslint@10.5.0 || 10.7.0
   # Babel 8.0.0 line (published 2026-06-16) pulled in by tsdown -> rolldown-plugin-dts.
   - '@babel/*'
 nodeLinker: hoisted
