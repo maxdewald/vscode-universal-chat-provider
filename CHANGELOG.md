@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.14.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.13.0...v0.14.0) (2026-07-11)
+
+
+### Features
+
+* add Claude quota tracking and migrate HTTP clients to ky ([187d6c7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/187d6c7259871f9447bbec8ec983af8262dc55bd))
+* replace update suggestion with 3-mode update policy ([87ce0e8](https://github.com/maxdewald/vscode-universal-chat-provider/commit/87ce0e8a0c99e4de5909c04b4df92bf8a09c0051))
+* strip reasoning summary sentinels from streaming ([6c15277](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6c152772f53873b3f2892af439e2b85322bd97aa))
+
+
+### Refactoring
+
+* deduplicate quota fetching logic ([ecc468a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/ecc468a9d54738d3ffe54756303d7892b9259aab))
+* use Map.groupBy and remove unused helpers ([dd11744](https://github.com/maxdewald/vscode-universal-chat-provider/commit/dd117447b94f1336f52bc7870b3a17609843b2e6))
+
 ## [0.13.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.12.0...v0.13.0) (2026-06-25)
 
 
