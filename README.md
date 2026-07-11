@@ -105,26 +105,28 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 
 ## Configuration
 
+The managed server checks for stable CLIProxyAPI releases when VS Code starts. The default `automatic` policy installs newer releases and restarts the server. Use `suggestUpdates` to receive a prompt before installation, or `manual` to disable startup checks and use the exact configured version. Update checks do not apply in external mode.
+
 <details>
 <summary>All settings</summary>
 
 <!-- configs -->
 
-| Key                                           | Description                                                                                                            | Type      | Default                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
+| Key                                           | Description                                                                        | Type      | Default                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- | --------- | ------------------------- |
 | ▿ <b>Connection</b>                           |
-| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                           | `string`  | `"managed"`               |
-| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                    | `string`  | `"http://127.0.0.1:8317"` |
-| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                     | `string`  | `""`                      |
-| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                 | `boolean` | `true`                    |
+| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                       | `string`  | `"managed"`               |
+| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                | `string`  | `"http://127.0.0.1:8317"` |
+| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery. | `string`  | `""`                      |
+| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.             | `boolean` | `true`                    |
 | ▿ <b>Managed Server</b>                       |
-| `universalChatProvider.server.version`        | CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or latest to track new releases. | `string`  | `"7.2.5"`                 |
-| `universalChatProvider.server.suggestUpdates` | Offer same-major updates for pinned managed server versions.                                                           | `boolean` | `true`                    |
+| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                       | `string`  | `"automatic"`             |
+| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                       | `string`  | `"7.2.5"`                 |
 | ▿ <b>Status Bar</b>                           |
-| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                          | `boolean` | `true`                    |
-| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                    | `number`  | `10`                      |
+| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                      | `boolean` | `true`                    |
+| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
-| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                                     | `boolean` | `false`                   |
+| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage. | `boolean` | `false`                   |
 
 <!-- configs -->
 

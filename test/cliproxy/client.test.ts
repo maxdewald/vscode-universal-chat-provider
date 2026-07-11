@@ -95,6 +95,73 @@ describe('cLIProxyClient', () => {
     expect(handlers.onUsage).toHaveBeenCalledWith({ output_tokens: 2 })
   })
 
+  it.each([
+    {
+      name: 'drops a trailing empty-summary sentinel',
+      deltas: ['**Checking settings**\n\n<!-- -->'],
+      expected: '**Checking settings**\n\n',
+    },
+    {
+      name: 'drops a sentinel split across deltas',
+      deltas: ['**Checking settings**\n\n<!-', '- -->'],
+      expected: '**Checking settings**\n\n',
+    },
+    {
+      name: 'preserves a literal sentinel in prose',
+      deltas: ['**Plan**\n\nUse `<!-- -->` in JSX.'],
+      expected: '**Plan**\n\nUse `<!-- -->` in JSX.',
+    },
+  ])('$name', async ({ deltas, expected }) => {
+    const body = [
+      ...deltas.map(delta => event({ type: 'response.reasoning_summary_text.delta', delta })),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.completed' }),
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    const { CLIProxyClient } = await import('../../src/cliproxy/client')
+    const handlers = callbacks()
+
+    await new CLIProxyClient('http://proxy', 'key')
+      .streamResponse({}, handlers, new AbortController().signal)
+
+    expect(handlers.onThinking.mock.calls.flat().join('')).toBe(expected)
+  })
+
+  it('keeps consecutive reasoning headings streaming without sentinels between them', async () => {
+    const body = [
+      event({ type: 'response.reasoning_summary_text.delta', delta: '**First**\n\n<!-- -->' }),
+      event({ type: 'response.reasoning_summary_text.done' }),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: '**Second**\n\n<!-- -->' }),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.completed' }),
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    const { CLIProxyClient } = await import('../../src/cliproxy/client')
+    const handlers = callbacks()
+
+    await new CLIProxyClient('http://proxy', 'key')
+      .streamResponse({}, handlers, new AbortController().signal)
+
+    expect(handlers.onThinking.mock.calls.flat().join('')).toBe('**First**\n\n**Second**\n\n')
+  })
+
+  it('does not emit an empty thinking block for a sentinel-only part', async () => {
+    const body = [
+      event({ type: 'response.reasoning_summary_text.delta', delta: '<!-- -->' }),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.completed' }),
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    const { CLIProxyClient } = await import('../../src/cliproxy/client')
+    const handlers = callbacks()
+
+    await new CLIProxyClient('http://proxy', 'key')
+      .streamResponse({}, handlers, new AbortController().signal)
+
+    expect(handlers.onThinking).not.toHaveBeenCalled()
+  })
+
   it('forwards prompt cache keys as CLIProxyAPI session hints', async () => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>()
       .mockResolvedValue(new Response(event({ type: 'response.completed' })))

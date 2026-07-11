@@ -23,7 +23,7 @@ export interface ServerDeps {
   requestedVersion: () => string
   getPort: () => number | undefined
   setPort: (port: number) => void | Thenable<void>
-  verifyOwnership?: (baseUrl: string) => Promise<boolean>
+  inspectServer?: (baseUrl: string) => Promise<string | undefined | false>
 }
 
 export interface RunningServer {
@@ -61,13 +61,20 @@ export class ManagedServer {
     return this.startPromise
   }
 
-  async restart(signal?: AbortSignal): Promise<RunningServer> {
+  async restart(signal?: AbortSignal, requestedVersion?: string): Promise<RunningServer> {
     await this.stop()
-    return this.ensureRunning(signal)
+    if (requestedVersion === undefined)
+      return this.ensureRunning(signal)
+    this.startPromise = this.start(signal, requestedVersion).finally(() => {
+      this.startPromise = undefined
+    })
+    return this.startPromise
   }
 
   async stop(): Promise<void> {
     const child = this.child
+    const adopted = this.adopted
+    const port = this.port
     this.child = undefined
     this.adopted = false
     this.port = undefined
@@ -75,6 +82,21 @@ export class ManagedServer {
       child.kill()
       this.deps.output.appendLine('Stopped the managed CLIProxyAPI server.')
     }
+    else if (adopted) {
+      const pid = readServerPid(this.deps.paths.pidPath)
+      if (pid === undefined)
+        throw new Error('Could not restart the shared CLIProxyAPI server because its process ID is unavailable.')
+      try {
+        process.kill(pid)
+      }
+      catch (error) {
+        throw new Error(`Could not stop the shared CLIProxyAPI server: ${(error as Error).message}`)
+      }
+      if (port !== undefined)
+        await waitForStop(this.deps.host, port)
+      this.deps.output.appendLine('Stopped the shared managed CLIProxyAPI server.')
+    }
+    rmSync(this.deps.paths.pidPath, { force: true })
   }
 
   dispose(): void {
@@ -102,14 +124,15 @@ export class ManagedServer {
     rmSync(this.deps.paths.pidPath, { force: true })
   }
 
-  private async start(signal?: AbortSignal): Promise<RunningServer> {
+  private async start(signal?: AbortSignal, requestedVersion: string = this.deps.requestedVersion()): Promise<RunningServer> {
     const preferred = this.deps.getPort() ?? DEFAULT_PORT
     const preferredBase = `http://${this.deps.host}:${preferred}`
     if (await isHealthy(this.deps.host, preferred, signal)) {
-      if (this.deps.verifyOwnership === undefined || await this.deps.verifyOwnership(preferredBase)) {
+      const inspected = this.deps.inspectServer === undefined ? undefined : await this.deps.inspectServer(preferredBase)
+      if (inspected !== false) {
         this.adopted = true
         this.port = preferred
-        this.version = await readInstalledVersion(this.deps.paths.binDir)
+        this.version = inspected ?? await readInstalledVersion(this.deps.paths.binDir)
         this.deps.output.appendLine(`Adopted a healthy CLIProxyAPI server on port ${preferred}.`)
         return { baseUrl: preferredBase, port: preferred, ...(this.version !== undefined ? { version: this.version } : {}) }
       }
@@ -118,7 +141,7 @@ export class ManagedServer {
 
     const { binaryPath, version } = await acquireBinary({
       binDir: this.deps.paths.binDir,
-      requestedVersion: this.deps.requestedVersion(),
+      requestedVersion,
       output: this.deps.output,
       ...(signal ? { signal } : {}),
     })
@@ -190,4 +213,14 @@ async function waitForHealthz(host: string, port: number, signal?: AbortSignal):
     await sleep(STARTUP_POLL_MS)
   }
   throw new Error(`CLIProxyAPI did not become healthy on port ${port} within ${STARTUP_TIMEOUT_MS / 1000}s.`)
+}
+
+async function waitForStop(host: string, port: number): Promise<void> {
+  const deadline = Date.now() + STARTUP_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if (!(await isHealthy(host, port)))
+      return
+    await sleep(STARTUP_POLL_MS)
+  }
+  throw new Error(`CLIProxyAPI did not stop on port ${port} within ${STARTUP_TIMEOUT_MS / 1000}s.`)
 }

@@ -70,30 +70,42 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
   return undefined
 }
 
-async function fetchCodexQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
-  const report: QuotaReport = { provider: 'codex', windows: [] }
-  const authIndex = str(entry.auth_index)
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
+async function fetchQuotaReport(
+  client: ManagementClient,
+  report: QuotaReport,
+  request: Record<string, unknown>,
+  apply: (report: QuotaReport, data: Record<string, unknown>) => void,
+  signal?: AbortSignal,
+): Promise<QuotaReport> {
   try {
-    // The credential identifies the account; no Chatgpt-Account-Id header needed.
-    const { statusCode, body } = await client.apiCall({
-      auth_index: authIndex,
-      method: 'GET',
-      url: WHAM_USAGE_URL,
-      header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' },
-    }, signal)
+    const { statusCode, body } = await client.apiCall(request, signal)
     if (statusCode < 200 || statusCode >= 300)
       return { ...report, error: `HTTP ${statusCode}` }
     const data = parseBody(body)
     if (data === undefined)
       return { ...report, error: 'invalid quota payload' }
-    report.windows = parseCodexWindows(data)
+    apply(report, data)
     return report
   }
   catch (error) {
     return { ...report, error: errorMessage(error) }
   }
+}
+
+async function fetchCodexQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
+  const report: QuotaReport = { provider: 'codex', windows: [] }
+  const authIndex = str(entry.auth_index)
+  if (authIndex === '')
+    return { ...report, error: 'missing auth_index' }
+  // The credential identifies the account; no Chatgpt-Account-Id header needed.
+  return fetchQuotaReport(client, report, {
+    auth_index: authIndex,
+    method: 'GET',
+    url: WHAM_USAGE_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' },
+  }, (r, data) => {
+    r.windows = parseCodexWindows(data)
+  }, signal)
 }
 
 async function fetchAntigravityQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
@@ -104,25 +116,15 @@ async function fetchAntigravityQuota(client: ManagementClient, entry: Record<str
     return { ...report, error: 'missing auth_index' }
   if (projectId === '')
     return { ...report, error: 'missing project_id' }
-  try {
-    const { statusCode, body } = await client.apiCall({
-      auth_index: authIndex,
-      method: 'POST',
-      url: ANTIGRAVITY_MODELS_URL,
-      header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json', 'User-Agent': 'antigravity/1.11.5 windows/amd64' },
-      data: JSON.stringify({ project: projectId }),
-    }, signal)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode}` }
-    const data = parseBody(body)
-    if (data === undefined)
-      return { ...report, error: 'invalid quota payload' }
-    report.models = parseAntigravityModels(data)
-    return report
-  }
-  catch (error) {
-    return { ...report, error: errorMessage(error) }
-  }
+  return fetchQuotaReport(client, report, {
+    auth_index: authIndex,
+    method: 'POST',
+    url: ANTIGRAVITY_MODELS_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json', 'User-Agent': 'antigravity/1.11.5 windows/amd64' },
+    data: JSON.stringify({ project: projectId }),
+  }, (r, data) => {
+    r.models = parseAntigravityModels(data)
+  }, signal)
 }
 
 async function fetchClaudeQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
@@ -130,24 +132,14 @@ async function fetchClaudeQuota(client: ManagementClient, entry: Record<string, 
   const authIndex = str(entry.auth_index)
   if (authIndex === '')
     return { ...report, error: 'missing auth_index' }
-  try {
-    const { statusCode, body } = await client.apiCall({
-      auth_index: authIndex,
-      method: 'GET',
-      url: CLAUDE_USAGE_URL,
-      header: { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' },
-    }, signal)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode}` }
-    const data = parseBody(body)
-    if (data === undefined)
-      return { ...report, error: 'invalid quota payload' }
-    report.windows = parseClaudeWindows(data)
-    return report
-  }
-  catch (error) {
-    return { ...report, error: errorMessage(error) }
-  }
+  return fetchQuotaReport(client, report, {
+    auth_index: authIndex,
+    method: 'GET',
+    url: CLAUDE_USAGE_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' },
+  }, (r, data) => {
+    r.windows = parseClaudeWindows(data)
+  }, signal)
 }
 
 // Account-level utilization (percent used) per window, plus optional extra-usage credits.

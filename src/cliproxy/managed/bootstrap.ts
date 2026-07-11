@@ -26,7 +26,7 @@ export interface ProvisionOptions {
   context: ExtensionContext
   output: OutputChannel
   requestedVersion: () => string
-  verifyOwnership: (baseUrl: string) => Promise<boolean>
+  inspectServer: (baseUrl: string) => Promise<string | undefined | false>
 }
 
 export async function provisionManagedState(options: ProvisionOptions): Promise<ManagedState> {
@@ -58,7 +58,7 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
     requestedVersion: options.requestedVersion,
     getPort: () => context.globalState.get<number>(PORT_STATE_KEY),
     setPort: port => context.globalState.update(PORT_STATE_KEY, port),
-    verifyOwnership: options.verifyOwnership,
+    inspectServer: options.inspectServer,
   })
   return { paths, server, managementKey }
 }

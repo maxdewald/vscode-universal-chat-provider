@@ -162,18 +162,35 @@
         "title": "Managed Server",
         "order": 2,
         "properties": {
+          "universalChatProvider.server.updatePolicy": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "suggestUpdates",
+              "manual"
+            ],
+            "enumItemLabels": [
+              "Automatic",
+              "Suggest Updates",
+              "Manual"
+            ],
+            "enumDescriptions": [
+              "Install the latest stable CLIProxyAPI release when VS Code starts.",
+              "Check for stable updates when VS Code starts and ask before installing.",
+              "Use only the configured version and do not check for updates."
+            ],
+            "default": "automatic",
+            "scope": "machine",
+            "order": 1,
+            "description": "How managed CLIProxyAPI updates are handled."
+          },
           "universalChatProvider.server.version": {
             "type": "string",
             "default": "7.2.5",
-            "order": 1,
-            "description": "CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or latest to track new releases.",
-            "markdownDescription": "CLIProxyAPI release for managed mode. Use a pinned version for reproducible installs, or `latest` to track new releases."
-          },
-          "universalChatProvider.server.suggestUpdates": {
-            "type": "boolean",
-            "default": true,
+            "scope": "machine",
             "order": 2,
-            "description": "Offer same-major updates for pinned managed server versions."
+            "description": "Exact CLIProxyAPI release used when update policy is Manual.",
+            "markdownDescription": "Exact CLIProxyAPI release used when `#universalChatProvider.server.updatePolicy#` is `manual`."
           }
         }
       },

@@ -135,26 +135,12 @@ export function mapProxyModels(
 }
 
 function chooseDisplayModelWinners(candidates: readonly ModelCandidate[], options: ModelMappingOptions): ModelCandidate[] {
-  const byDisplay = new Map<string, ModelCandidate[]>()
-  for (const candidate of candidates) {
-    const key = displayDedupeKey(candidate)
-    const existing = byDisplay.get(key)
-    if (existing === undefined)
-      byDisplay.set(key, [candidate])
-    else
-      existing.push(candidate)
-  }
-
-  return Array.from(byDisplay.values(), group => chooseDisplayModelWinner(group, options))
-}
-
-function chooseDisplayModelWinner(candidates: readonly ModelCandidate[], options: ModelMappingOptions): ModelCandidate {
-  const first = candidates[0]!
-  if (candidates.length === 1)
-    return first
-
-  options.onCollision?.(formatCollision(first, candidates))
-  return first
+  const byDisplay = Map.groupBy(candidates, displayDedupeKey)
+  return Array.from(byDisplay.values(), (group) => {
+    if (group.length > 1)
+      options.onCollision?.(formatCollision(group[0]!, group))
+    return group[0]!
+  })
 }
 
 function formatCollision(kept: ModelCandidate, candidates: readonly ModelCandidate[]): string {
