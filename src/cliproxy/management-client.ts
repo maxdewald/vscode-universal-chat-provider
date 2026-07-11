@@ -78,6 +78,12 @@ export class ManagementClient {
     return Array.isArray(payload.files) ? payload.files.filter(isPlainObject) : []
   }
 
+  async serverVersion(signal?: AbortSignal): Promise<string | undefined> {
+    const response = await this.fetcher.get('/auth-files', { signal: signal ?? null })
+    const version = response.headers.get('x-cpa-version')?.trim()
+    return version === undefined || version === '' ? undefined : version
+  }
+
   // Proxies an upstream request through CLIProxyAPI using a stored credential.
   // CPA substitutes the literal "$TOKEN$" in headers with the account's token.
   async apiCall(payload: Record<string, unknown>, signal?: AbortSignal): Promise<{ statusCode: number, body: unknown }> {

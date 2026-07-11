@@ -30,6 +30,22 @@ describe('management client', () => {
     ])
   })
 
+  it('reads the running server version from the management response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [] }, {
+      headers: { 'X-CPA-VERSION': '7.3.1' },
+    })))
+    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+
+    await expect(client.serverVersion()).resolves.toBe('7.3.1')
+  })
+
+  it('returns undefined when the server does not expose its version', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [] })))
+    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+
+    await expect(client.serverVersion()).resolves.toBeUndefined()
+  })
+
   it('encodes the account name when deleting', async () => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)

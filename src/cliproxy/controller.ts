@@ -2,6 +2,7 @@ import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
 import type { ManagedServer } from './managed/server'
+import type { UpdatePolicy } from './managed/updates'
 import type { ManagementEndpoint } from './management-client'
 import type { QuotaReport } from './quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
@@ -22,14 +23,12 @@ import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } 
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
-import { listReleaseVersions, pickSuggestedUpdate } from './managed/updates'
+import { latestReleaseVersion, pickUpdate } from './managed/updates'
 import { ManagementClient } from './management-client'
 import { fetchQuotas } from './quota'
 import { buildStatusSnapshot } from './status'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
-
-const DISMISSED_UPDATE_KEY = 'universalChatProvider.dismissedUpdateVersion'
 
 export class ServerController implements ProxyConnection {
   private readonly disposables: Disposable[] = []
@@ -98,7 +97,7 @@ export class ServerController implements ProxyConnection {
       this.setStatus('running')
       void this.refreshQuotas()
       void this.accounts.maybePromptLogin()
-      void this.maybeSuggestUpdate()
+      void this.maybeUpdateOnStartup()
     }
     catch (error) {
       this.setStatus('error')
@@ -131,21 +130,25 @@ export class ServerController implements ProxyConnection {
       void window.showInformationMessage('Binary updates apply only to the managed server.')
       return
     }
-    await this.applyBinaryUpdate(this.requestedVersion())
+    await this.applyBinaryUpdate(this.updatePolicy() === 'manual' ? this.configuredVersion() : 'latest')
   }
 
   private async applyBinaryUpdate(version: string): Promise<void> {
     try {
       await this.bootstrap()
+      const previous = this.server!.installedVersion()
       await window.withProgress(
         { location: ProgressLocation.Notification, title: 'Updating CLIProxyAPI…' },
         async () => {
           await acquireBinary({ binDir: this.paths!.binDir, requestedVersion: version, output: this.output })
-          await this.server!.restart()
+          await this.server!.restart(undefined, version)
         },
       )
       this.setStatus('running')
-      void window.showInformationMessage('CLIProxyAPI updated and restarted.')
+      const current = this.server!.installedVersion()
+      void window.showInformationMessage(previous === current
+        ? `CLIProxyAPI ${current ?? 'binary'} is already installed.`
+        : `CLIProxyAPI updated from ${previous ?? 'an unknown version'} to ${current ?? version}.`)
       this.notifyAccountsChanged()
     }
     catch (error) {
@@ -153,45 +156,36 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  private async maybeSuggestUpdate(): Promise<void> {
+  private async maybeUpdateOnStartup(): Promise<void> {
     if (this.updateCheckStarted)
       return
-    const config = workspace.getConfiguration('universalChatProvider')
-    if (this.mode() === 'external' || !config.get<boolean>('server.suggestUpdates', true))
-      return
-    const requested = this.requestedVersion()
-    if (requested.toLowerCase() === 'latest')
+    const policy = this.updatePolicy()
+    if (this.mode() === 'external' || policy === 'manual')
       return
     const installed = this.server?.installedVersion()
-    if (installed === undefined)
-      return
     this.updateCheckStarted = true
 
     let target: string | null
     try {
-      target = pickSuggestedUpdate(installed, await listReleaseVersions())
+      target = pickUpdate(installed, await latestReleaseVersion())
     }
     catch (error) {
       this.output.appendLine(`CLIProxyAPI update check failed: ${errorMessage(error)}`)
       return
     }
-    if (target === null || target === this.context.globalState.get<string>(DISMISSED_UPDATE_KEY))
+    if (target === null)
       return
 
-    const update = 'Update'
-    const skip = 'Skip This Version'
-    const choice = await window.showInformationMessage(
-      `CLIProxyAPI ${target} is available (you're on ${installed}).`,
-      update,
-      skip,
-    )
-    if (choice === update) {
-      await config.update('server.version', target, ConfigurationTarget.Global)
-      await this.applyBinaryUpdate(target)
+    if (policy === 'suggestUpdates') {
+      const choice = await window.showInformationMessage(
+        `CLIProxyAPI ${target} is available (you're on ${installed ?? 'an unknown version'}).`,
+        'Update',
+        'Not Now',
+      )
+      if (choice !== 'Update')
+        return
     }
-    else if (choice === skip) {
-      await this.context.globalState.update(DISMISSED_UPDATE_KEY, target)
-    }
+    await this.applyBinaryUpdate(target)
   }
 
   async restartServer(): Promise<void> {
@@ -241,9 +235,18 @@ export class ServerController implements ProxyConnection {
       this.server?.dispose()
   }
 
-  private requestedVersion(): string {
+  private configuredVersion(): string {
     return workspace.getConfiguration('universalChatProvider').get<string>('server.version', DEFAULT_BINARY_VERSION).trim()
       || DEFAULT_BINARY_VERSION
+  }
+
+  private updatePolicy(): UpdatePolicy {
+    const value = workspace.getConfiguration('universalChatProvider').get<string>('server.updatePolicy', 'automatic')
+    return value === 'manual' || value === 'suggestUpdates' ? value : 'automatic'
+  }
+
+  private requestedVersion(): string {
+    return this.updatePolicy() === 'automatic' ? 'latest' : this.configuredVersion()
   }
 
   private async bootstrap(): Promise<void> {
@@ -261,7 +264,7 @@ export class ServerController implements ProxyConnection {
       context: this.context,
       output: this.output,
       requestedVersion: () => this.requestedVersion(),
-      verifyOwnership: async baseUrl => this.isOwnServer(baseUrl),
+      inspectServer: async baseUrl => this.inspectServer(baseUrl),
     })
     this.paths = state.paths
     this.server = state.server
@@ -273,12 +276,11 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  private async isOwnServer(baseUrl: string): Promise<boolean> {
+  private async inspectServer(baseUrl: string): Promise<string | undefined | false> {
     if (this.managementKey === undefined)
       return false
     try {
-      await new ManagementClient(baseUrl, this.managementKey).listAuthFiles()
-      return true
+      return await new ManagementClient(baseUrl, this.managementKey).serverVersion()
     }
     catch {
       return false

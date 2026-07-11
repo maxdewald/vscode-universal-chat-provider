@@ -55,6 +55,26 @@ describe('server controller lifecycle', () => {
     expect(shutdown).not.toHaveBeenCalled()
   })
 
+  it('prompts before a startup update when suggestUpdates is selected', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'suggestUpdates')
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.5')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.ensureReady(false)
+    await vi.waitFor(() => {
+      expect(vscodeMock.output.appendLine).not.toHaveBeenCalledWith(expect.stringContaining('update check failed'))
+      expect(vscodeMock.settings.get('universalChatProvider.server.updatePolicy')).toBe('suggestUpdates')
+    })
+
+    const { window } = await import('../support/vscode')
+    await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledWith(
+      'CLIProxyAPI 8.0.0 is available (you\'re on 7.2.5).',
+      'Update',
+      'Not Now',
+    ))
+  })
+
   function liveProcess(): ChildProcess {
     const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
     spawned.push(child)

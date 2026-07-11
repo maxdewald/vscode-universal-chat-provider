@@ -52,7 +52,7 @@ export async function manageProvider(controller: ServerController | undefined): 
           },
           {
             label: '$(cloud-download) Update Proxy Binary',
-            description: 'Install the configured version',
+            description: 'Check and apply the selected update policy',
             command: 'universalChatProvider.updateBinary',
           },
           {
