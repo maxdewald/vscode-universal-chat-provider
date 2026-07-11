@@ -26,25 +26,16 @@
 
 </div>
 
----
-
 ## Features
 
-<table align="center">
-  <tr>
-    <td><b>🚀 Ready in minutes</b><br>Install, sign in, and start chatting.</td>
-    <td><b>🔀 Native model picker</b><br>Choose your models directly in Copilot Chat.</td>
-  </tr>
-  <tr>
-    <td><b>🧠 Reasoning built in</b><br>Pick the thinking effort and follow reasoning live.</td>
-    <td><b>📊 Quota at a glance</b><br>See remaining usage before reaching a limit.</td>
-  </tr>
-  <tr>
-    <td><b>✨ More than chat</b><br>Generate commit messages, titles, and summaries.</td>
-    <td><b>👥 Multiple accounts</b><br>Add and manage several provider accounts.</td>
-  </tr>
-</table>
-
+- **🚀 Ready in minutes** — install, sign in, and start chatting.
+- **🔀 Native model picker** — choose your models directly in Copilot Chat.
+- **🧠 Reasoning built in** — pick the thinking effort and follow reasoning live.
+- **📊 Quota at a glance** — see remaining usage before reaching a limit.
+- **✨ More than chat** — generate commit messages, titles, and summaries.
+- **👥 Multiple accounts** — add and manage several provider accounts.
+<br>
+<br>
 > [!WARNING]
 > **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI subscription accounts over OAuth. Accessing subscriptions outside their official apps may violate provider terms and could result in rate limiting or account suspension.
 
