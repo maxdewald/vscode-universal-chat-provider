@@ -24,31 +24,20 @@
   <img src="https://img.shields.io/badge/Kimi-000000?logo=moonshotai&logoColor=white" alt="Kimi" />
 </p>
 
-<p>
-  <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
-  <a href="#features"><b>Features</b></a> &nbsp;·&nbsp;
-  <a href="#advanced"><b>Advanced</b></a>
-</p>
-
-<p>
-  <sub>Powered by <a href="https://github.com/router-for-me/CLIProxyAPI"><b>CLIProxyAPI</b></a></sub>
-</p>
-
 </div>
 
 ---
 
 ## Features
 
-- **Works out of the box** — install, sign in with your browser, done. No servers, terminals, API keys, or config files.
-- **Right in the model picker** — your models show up in the Copilot Chat dropdown next to the built-in ones, with full tool, image, and reasoning support.
-- **Watch the model think** — reasoning models stream their thoughts into a collapsible thinking block, and you pick the reasoning effort with VS Code's built-in selector.
-- **Quota at a glance** — the status bar shows how much usage your accounts have left and warns you before you hit a limit.
-- **Your models everywhere** — one command points Copilot's commit messages, chat titles, and summaries at your models too. No Copilot subscription required.
-- **Multiple accounts** — add several accounts, even for the same provider, and manage them all from the status bar.
+| | |
+| --- | --- |
+| **🚀 Ready in minutes**<br>Install, sign in, and start chatting. | **🔀 Native model picker**<br>Choose your models directly in Copilot Chat. |
+| **🧠 Reasoning built in**<br>Pick the thinking effort and follow reasoning live. | **📊 Quota at a glance**<br>See remaining usage before reaching a limit. |
+| **✨ More than chat**<br>Generate commit messages, titles, and summaries. | **👥 Multiple accounts**<br>Add and manage several provider accounts. |
 
 > [!WARNING]
-> **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI **subscription** accounts (Claude, ChatGPT / Codex, Antigravity, …) over OAuth. Accessing these subscriptions outside their official apps may violate the providers' **Terms of Service** and could result in rate limiting or account suspension. You alone are responsible for how you use it.
+> **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI subscription accounts over OAuth. Accessing subscriptions outside their official apps may violate provider terms and could result in rate limiting or account suspension.
 
 ## Quick start
 
@@ -60,14 +49,12 @@
 
 Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — list/remove accounts, restart, update, or reset the managed server.
 
-## Utility model
+## Commit messages, titles, and summaries
 
 Let your models write Copilot's commit messages, chat titles, and summaries. Run *Universal Chat Provider: Set Utility Model* (or use the status bar menu), pick a model (and thinking effort), done. Clear it to undo.
 
 <details>
-<summary>Details</summary>
-
-<br>
+<summary>How it works</summary>
 
 The command points Copilot's `chat.utilityModel` and `chat.utilitySmallModel` settings at your selected model, so those background flows run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
 
@@ -75,7 +62,7 @@ The command points Copilot's `chat.utilityModel` and `chat.utilitySmallModel` se
 
 ## How it works
 
-GitHub Copilot Chat normally only talks to Copilot's own models. This extension bridges that gap: it runs a local [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) server, logs you into your AI subscriptions via OAuth, and registers their models as a **native chat provider** in VS Code. Pick them straight from the Copilot model dropdown.
+The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) locally and registers its models with VS Code. Your subscriptions then appear directly in the Copilot Chat model picker.
 
 ```
    Your subscriptions          Local proxy             VS Code
@@ -89,12 +76,10 @@ GitHub Copilot Chat normally only talks to Copilot's own models. This extension 
 
 ## Advanced
 
-Managed-server updates are automatic by default; set `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` to change that.
+Managed-server updates are automatic by default. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if preferred.
 
 <details>
-<summary><b>Bring your own CLIProxyAPI server</b></summary>
-
-<br>
+<summary>Bring your own CLIProxyAPI server</summary>
 
 Prefer to run CLIProxyAPI yourself, such as on a remote or shared machine?
 
@@ -107,7 +92,7 @@ The API key is stored in VS Code `SecretStorage`. In external mode, the extensio
 </details>
 
 <details>
-<summary>All settings</summary>
+<summary>Settings</summary>
 
 <!-- configs -->
 
@@ -132,7 +117,7 @@ The API key is stored in VS Code `SecretStorage`. In external mode, the extensio
 </details>
 
 <details>
-<summary>All commands</summary>
+<summary>Commands</summary>
 
 <!-- commands -->
 
