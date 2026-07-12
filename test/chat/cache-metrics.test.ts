@@ -76,7 +76,7 @@ describe('normalizeUsage', () => {
 })
 
 describe('formatUsageLine', () => {
-  it('tags a recognized shape and rounds the hit rate', () => {
+  it('rounds the hit rate for a recognized shape', () => {
     const summary = normalizeUsage({
       input_tokens: 300,
       cache_read_input_tokens: 700,
@@ -84,25 +84,25 @@ describe('formatUsageLine', () => {
       output_tokens: 50,
     })
     expect(formatUsageLine('claude', summary)).toBe(
-      '[usage] claude: input=1200 cached=700 write=200 output=50 hit=58% (anthropic)',
+      '[usage] claude: input=1200 cached=700 write=200 output=50 hit=58%',
     )
   })
 
   it('appends the raw object for an unrecognized shape so fields can be inspected', () => {
     const raw = { output_tokens: 3 }
-    expect(formatUsageLine('model-a', normalizeUsage(raw), undefined, raw)).toBe(
+    expect(formatUsageLine('model-a', normalizeUsage(raw), raw)).toBe(
       '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
-  it('marks an unknown shape without raw fields and includes the label', () => {
-    expect(formatUsageLine('model-a', normalizeUsage(undefined), 'commit message')).toBe(
-      '[usage] model-a (commit message): input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+  it('marks an unknown shape without raw fields', () => {
+    expect(formatUsageLine('model-a', normalizeUsage(undefined))).toBe(
+      '[usage] model-a: input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
     )
   })
 
   it('includes the reasoning effort sent to the proxy', () => {
-    expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, undefined, 'xhigh')).toBe(
+    expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, 'xhigh')).toBe(
       '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
     )
   })
@@ -142,7 +142,7 @@ describe('cacheMetricsTracker', () => {
     const metrics = tracker()
     metrics.record(
       { input_tokens: 300, cache_read_input_tokens: 700, cache_creation_input_tokens: 0, output_tokens: 50 },
-      { model: 'claude-opus', promptCacheKey: 'session-1', requestInitiator: 'chat' },
+      { model: 'claude-opus', promptCacheKey: 'session-1' },
     )
     await metrics.flush()
 
@@ -154,7 +154,6 @@ describe('cacheMetricsTracker', () => {
     expect(JSON.parse(lines[0]!)).toMatchObject({
       model: 'claude-opus',
       promptCacheKey: 'session-1',
-      requestInitiator: 'chat',
       shape: 'anthropic',
       inputTokens: 1000,
       cacheReadTokens: 700,

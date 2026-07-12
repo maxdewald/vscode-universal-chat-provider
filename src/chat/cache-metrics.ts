@@ -25,9 +25,7 @@ export interface UsageSummary {
 
 export interface UsageContext {
   model: string
-  label?: string | undefined
   promptCacheKey?: string | undefined
-  requestInitiator?: string | undefined
   reasoningEffort?: string | undefined
   inputItems?: readonly unknown[] | undefined
 }
@@ -152,16 +150,14 @@ function formatHitRate(hitRate: number | undefined): string {
 export function formatUsageLine(
   model: string,
   summary: UsageSummary,
-  label?: string,
   raw?: unknown,
   reasoningEffort?: string,
 ): string {
-  const tag = label !== undefined && label.length > 0 ? ` (${label})` : ''
   const effort = reasoningEffort !== undefined && reasoningEffort.length > 0 ? ` effort=${reasoningEffort}` : ''
-  const base = `[usage] ${model}${tag}:${effort} input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
+  const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
-    return `${base} (${summary.shape})`
+    return base
   const rawRecord = asRecord(raw)
   return rawRecord !== undefined && Object.keys(rawRecord).length > 0
     ? `${base} raw=${JSON.stringify(rawRecord)}`
@@ -188,7 +184,7 @@ export class CacheMetricsTracker {
 
   record(usage: unknown, context: UsageContext): void {
     const summary = normalizeUsage(usage)
-    this.output.appendLine(formatUsageLine(context.model, summary, context.label, usage, context.reasoningEffort))
+    this.output.appendLine(formatUsageLine(context.model, summary, usage, context.reasoningEffort))
     if (!this.enabled()) {
       this.statusBar.hide()
       return
@@ -238,8 +234,6 @@ export class CacheMetricsTracker {
     const entry = {
       ts: new Date().toISOString(),
       model: context.model,
-      label: context.label,
-      requestInitiator: context.requestInitiator,
       promptCacheKey: context.promptCacheKey,
       reasoningEffort: context.reasoningEffort ?? null,
       shape: summary.shape,
