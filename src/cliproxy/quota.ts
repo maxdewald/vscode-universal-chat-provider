@@ -22,6 +22,10 @@ const CLAUDE_USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 // window to its model family by name, so a new one like seven_day_fable works without code changes.
 const SEVEN_DAY_FAMILY = /^seven_day_(.+)$/
 
+function sevenDayFamily(key: string | undefined): string | undefined {
+  return SEVEN_DAY_FAMILY.exec(key ?? '')?.[1]
+}
+
 export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
@@ -61,7 +65,7 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
     const applicable = (report?.windows ?? []).filter((w) => {
       if (w.key === 'extra_usage')
         return false
-      const family = SEVEN_DAY_FAMILY.exec(w.key ?? '')?.[1]
+      const family = sevenDayFamily(w.key)
       return family === undefined || id.includes(family)
     })
     const percents = applicable.map(w => w.remainingPercent).filter((p): p is number => p !== undefined)
@@ -166,7 +170,7 @@ function claudeWindowLabel(key: string): string | undefined {
     return '5h Quota'
   if (key === 'seven_day')
     return '7d Quota'
-  const family = SEVEN_DAY_FAMILY.exec(key)?.[1]
+  const family = sevenDayFamily(key)
   return family === undefined ? undefined : `7d ${family.charAt(0).toUpperCase()}${family.slice(1)}`
 }
 
