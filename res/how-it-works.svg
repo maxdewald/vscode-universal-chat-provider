@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 198" width="750" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" role="img" aria-labelledby="title desc">
+  <title id="title">How it works</title>
+  <desc id="desc">Your subscriptions run through a local CLIProxyAPI proxy over OAuth and appear in VS Code Copilot Chat as models and as the utility model.</desc>
+  <style>
+    :root {
+      --text: #1f2328;
+      --muted: #656d76;
+      --stroke: #d0d7de;
+      --fill: #ffffff;
+      --arrow: #8b95a1;
+      --accent: #654ff0;
+      --accent-fill: #f5f3ff;
+      --accent-text: #4c3bcf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --stroke: #30363d;
+        --fill: #161b22;
+        --arrow: #6e7781;
+        --accent: #a371f7;
+        --accent-fill: #1d1b2e;
+        --accent-text: #d2c5ff;
+      }
+    }
+    .hdr { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+    .box { fill: var(--fill); stroke: var(--stroke); stroke-width: 1.5; }
+    .accent { fill: var(--accent-fill); stroke: var(--accent); stroke-width: 1.75; }
+    .item { fill: var(--text); font-size: 14px; }
+    .title { fill: var(--text); font-size: 14px; font-weight: 600; }
+    .accent-title { fill: var(--accent-text); font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+    .sub { fill: var(--muted); font-size: 11.5px; }
+    .divider { stroke: var(--stroke); stroke-width: 1.5; }
+    .flow { stroke: var(--arrow); stroke-width: 1.75; fill: none; }
+    .arrowhead { fill: var(--arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="arrowhead" />
+    </marker>
+  </defs>
+
+  <text class="hdr" x="114" y="24" text-anchor="middle">Your subscriptions</text>
+  <text class="hdr" x="374" y="24" text-anchor="middle">Local proxy</text>
+  <text class="hdr" x="636" y="24" text-anchor="middle">VS Code</text>
+
+  <rect class="box" x="3" y="42" width="222" height="150" rx="12" />
+  <circle cx="27" cy="68" r="4.5" fill="#d97757" />
+  <text class="item" x="44" y="73">Claude</text>
+  <circle cx="27" cy="101" r="4.5" fill="#10a37f" />
+  <text class="item" x="44" y="106">ChatGPT / Codex</text>
+  <circle cx="27" cy="134" r="4.5" fill="#4285f4" />
+  <text class="item" x="44" y="139">Antigravity</text>
+  <circle cx="27" cy="167" r="4.5" fill="var(--muted)" />
+  <text class="item" x="44" y="172">Grok · Kimi · …</text>
+
+  <rect class="accent" x="289" y="79" width="170" height="76" rx="12" />
+  <text class="accent-title" x="374" y="113" text-anchor="middle">CLIProxyAPI</text>
+  <text class="sub" x="374" y="133" text-anchor="middle">OAuth</text>
+
+  <rect class="box" x="525" y="42" width="222" height="150" rx="12" />
+  <line class="divider" x1="525" y1="117" x2="747" y2="117" />
+  <text class="title" x="636" y="76" text-anchor="middle">Copilot Chat</text>
+  <text class="sub" x="636" y="96" text-anchor="middle">model picker</text>
+  <text class="title" x="636" y="151" text-anchor="middle">Utility model</text>
+  <text class="sub" x="636" y="171" text-anchor="middle">commit messages · titles</text>
+
+  <path class="flow" d="M225,117 H287" marker-end="url(#arrow)" />
+  <path class="flow" d="M459,117 C494,117 494,79 523,79" marker-end="url(#arrow)" />
+  <path class="flow" d="M459,117 C494,117 494,155 523,155" marker-end="url(#arrow)" />
+</svg>

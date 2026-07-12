@@ -65,32 +65,15 @@ The command points Copilot's `chat.utilityModel` and `chat.utilitySmallModel` se
 
 The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) locally and registers its models with VS Code. Your subscriptions then appear directly in the Copilot Chat model picker.
 
-```
-   Your subscriptions          Local proxy             VS Code
-  ┌────────────────────┐     ┌──────────────┐     ┌──────────────────┐
-  │ Claude             │     │              │     │  Copilot Chat    │
-  │ ChatGPT / Codex    │──┐  │              │  ┌─▶│   model picker   │
-  │ Antigravity        │  ├─▶│  CLIProxyAPI │──┤  ├──────────────────┤
-  │ Grok · Kimi · …    │──┘  │   (OAuth)    │  └─▶│  Utility model   │
-  └────────────────────┘     └──────────────┘     └──────────────────┘
-```
+<p align="center">
+  <picture>
+    <source srcset="res/how-it-works.svg" type="image/svg+xml" />
+    <source media="(prefers-color-scheme: dark)" srcset="res/how-it-works-dark.png" />
+    <img src="res/how-it-works-light.png" alt="Your subscriptions run through a local CLIProxyAPI proxy over OAuth and appear in VS Code Copilot Chat as models and as the utility model." width="750" />
+  </picture>
+</p>
 
-## Advanced
-
-Managed-server updates are automatic by default. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if preferred.
-
-<details>
-<summary>Bring your own CLIProxyAPI server</summary>
-
-Prefer to run CLIProxyAPI yourself, such as on a remote or shared machine?
-
-1. Set `universalChatProvider.server.mode` to `external`.
-2. Start CLIProxyAPI and complete the provider login there.
-3. Use the **Import API Key** notification action when a local config is found, or run *Configure Connection* to enter the URL and key manually.
-
-The API key is stored in VS Code `SecretStorage`. In external mode, the extension never starts or stops the server. If the server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
-
-</details>
+## Reference
 
 <details>
 <summary>Settings</summary>
@@ -141,6 +124,28 @@ The API key is stored in VS Code `SecretStorage`. In external mode, the extensio
 | `universalChatProvider.openSettings`     | Universal Chat Provider: Open Settings                                               |
 
 <!-- commands -->
+
+</details>
+
+## Advanced
+
+<details>
+<summary>Managed-server updates</summary>
+
+Updates are automatic by default. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself.
+
+</details>
+
+<details>
+<summary>Bring your own CLIProxyAPI server</summary>
+
+Prefer to run CLIProxyAPI yourself, such as on a remote or shared machine?
+
+1. Set `universalChatProvider.server.mode` to `external`.
+2. Start CLIProxyAPI and complete the provider login there.
+3. Use the **Import API Key** notification action when a local config is found, or run *Configure Connection* to enter the URL and key manually.
+
+The API key is stored in VS Code `SecretStorage`. In external mode, the extension never starts or stops the server. If the server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
 
 </details>
 
