@@ -217,8 +217,36 @@
       },
       {
         "type": "object",
-        "title": "Advanced",
+        "title": "Reasoning",
         "order": 4,
+        "properties": {
+          "universalChatProvider.reasoningSummary": {
+            "type": "string",
+            "enum": [
+              "detailed",
+              "concise",
+              "auto"
+            ],
+            "enumItemLabels": [
+              "Detailed",
+              "Concise",
+              "Auto"
+            ],
+            "enumDescriptions": [
+              "Request the fullest reasoning the model exposes.",
+              "Request a shorter reasoning summary.",
+              "Let the model decide how much reasoning to reveal."
+            ],
+            "default": "detailed",
+            "order": 1,
+            "description": "How much of the model's reasoning to stream when a model supports thinking."
+          }
+        }
+      },
+      {
+        "type": "object",
+        "title": "Advanced",
+        "order": 5,
         "properties": {
           "universalChatProvider.debug": {
             "type": "boolean",

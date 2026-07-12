@@ -133,7 +133,7 @@ describe('response request conversion', () => {
         content: [new LanguageModelTextPart('hello')],
         name: undefined,
       }]),
-      reasoning: { effort: 'high', summary: 'auto' },
+      reasoning: { effort: 'high', summary: 'detailed' },
       tools: [{
         type: 'function',
         name: 'lookup',
@@ -179,13 +179,13 @@ describe('response request conversion', () => {
     }).prompt_cache_key).toBe(key)
   })
 
-  it('omits unsupported reasoning and supplies a default tool schema', () => {
+  it('falls back to a supported reasoning level and supplies a default tool schema', () => {
     const request = buildRequest(model, [], {
       toolMode: LanguageModelChatToolMode.Auto,
       tools: [{ name: 'empty', description: 'No input' }],
     }, 'medium')
 
-    expect(request).not.toHaveProperty('reasoning')
+    expect(request).toHaveProperty('reasoning', { effort: 'low', summary: 'detailed' })
     expect(request).not.toHaveProperty('prompt_cache_key')
     expect(request).toMatchObject({
       tools: [{
@@ -194,5 +194,12 @@ describe('response request conversion', () => {
       }],
       tool_choice: 'auto',
     })
+  })
+
+  it('omits reasoning for models without reasoning levels', () => {
+    const plainModel = { ...model, reasoningLevels: [] } as unknown as ProviderModel
+    const request = buildRequest(plainModel, [], { toolMode: LanguageModelChatToolMode.Auto })
+
+    expect(request).not.toHaveProperty('reasoning')
   })
 })

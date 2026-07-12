@@ -81,7 +81,7 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'model-a',
-        reasoning: { effort: 'high', summary: 'auto' },
+        reasoning: { effort: 'high', summary: 'detailed' },
       }),
       expect.any(Object),
       expect.any(AbortSignal),
@@ -156,7 +156,7 @@ describe('language model provider', () => {
     )
 
     expect(clientMocks.streamResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'auto' } }),
+      expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
     )
@@ -187,10 +187,10 @@ describe('language model provider', () => {
     )
 
     expect(clientMocks.streamResponse.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({ reasoning: { effort: 'high', summary: 'auto' } }),
+      expect.objectContaining({ reasoning: { effort: 'high', summary: 'detailed' } }),
     )
     expect(clientMocks.streamResponse.mock.calls[1]?.[0]).toEqual(
-      expect.objectContaining({ reasoning: { effort: 'low', summary: 'auto' } }),
+      expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
     )
   })
 
@@ -208,7 +208,7 @@ describe('language model provider', () => {
     )
 
     expect(clientMocks.streamResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning: { effort: 'low', summary: 'auto' } }),
+      expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
     )
