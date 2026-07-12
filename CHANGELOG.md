@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.16.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.15.0...v0.16.0) (2026-07-12)
+
+
+### Features
+
+* add Grok quota support with resetsAt countdowns ([3a9ac0c](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3a9ac0ccbe2a886a284b77cd8f058284762cf69e))
+* add reasoningSummary setting and default to detailed ([3d51715](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3d517152efab48297d0b33b9b954651140fb477d))
+
+
+### Refactoring
+
+* drop unused ProxyStreamError structured error ([26e849b](https://github.com/maxdewald/vscode-universal-chat-provider/commit/26e849b3a5dc594cf8739bd1df10e74b8b03e607))
+* extract sevenDayFamily helper in quota ([c706431](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c706431b5176fc47ab46aac6ee19d2e0d9bcbec4))
+* remove dead UsageContext label and requestInitiator fields ([afe10c7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/afe10c7f421098a8874d476ea144d97b472de308))
+
+
+### Documentation
+
+* replace ascii diagram with visual assets ([d709eee](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d709eee1fbda5985d6379e30999e3ea7be487d1a))
+
 ## [0.15.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.14.0...v0.15.0) (2026-07-12)
 
 
