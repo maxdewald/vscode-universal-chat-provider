@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.14.0...v0.15.0) (2026-07-12)
+
+
+### Features
+
+* improve quota resilience with retry logic and deduplication ([37f258a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/37f258aa74bdc28712ad7122fb3022507d0ec13e))
+
+
+### Documentation
+
+* adjust spacing in readme ([9716d25](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9716d25365d9ffd8ee645dd290b8675e1151d546))
+* format features table in readme ([5e6e783](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5e6e78366471e0699b5afa520d310ce727e405ae))
+* restructure and simplify readme ([558aa45](https://github.com/maxdewald/vscode-universal-chat-provider/commit/558aa450a0b6540101c3f2a11fdaac53dea51fcc))
+
 ## [0.14.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.13.0...v0.14.0) (2026-07-11)
 
 
