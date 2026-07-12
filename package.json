@@ -28,11 +28,11 @@
     "Chat"
   ],
   "main": "./dist/index.cjs",
-  "icon": "res/logo.png",
+  "icon": "images/logo.png",
   "files": [
     "LICENSE.md",
     "dist/*",
-    "res/*"
+    "images/*"
   ],
   "engines": {
     "node": ">=22.18.0",

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="res/logo.png" width="132" alt="Universal Chat Provider logo" />
+<img src="images/logo.png" width="132" alt="Universal Chat Provider logo" />
 
 <h1>Universal Chat Provider</h1>
 
@@ -67,9 +67,9 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 <p align="center">
   <picture>
-    <source srcset="res/how-it-works.svg" type="image/svg+xml" />
-    <source media="(prefers-color-scheme: dark)" srcset="res/how-it-works-dark.png" />
-    <img src="res/how-it-works-light.png" alt="Your subscriptions run through a local CLIProxyAPI proxy over OAuth and appear in VS Code Copilot Chat as models and as the utility model." width="750" />
+    <source srcset="images/how-it-works.svg" type="image/svg+xml" />
+    <source media="(prefers-color-scheme: dark)" srcset="images/how-it-works-dark.png" />
+    <img src="images/how-it-works-light.png" alt="Your subscriptions run through a local CLIProxyAPI proxy over OAuth and appear in VS Code Copilot Chat as models and as the utility model." width="750" />
   </picture>
 </p>
 
