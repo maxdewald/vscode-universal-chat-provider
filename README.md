@@ -34,8 +34,9 @@
 - **📊 Quota at a glance** — see remaining usage before reaching a limit.
 - **✨ More than chat** — generate commit messages, titles, and summaries.
 - **👥 Multiple accounts** — add and manage several provider accounts.
+
 <br>
-<br>
+
 > [!WARNING]
 > **Use entirely at your own risk and discretion.** This extension routes chat through your personal AI subscription accounts over OAuth. Accessing subscriptions outside their official apps may violate provider terms and could result in rate limiting or account suspension.
 
