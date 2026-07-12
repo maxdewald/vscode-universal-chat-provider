@@ -95,13 +95,14 @@ describe('fetchQuotas', () => {
   })
 
   it('reports an HTTP error instead of throwing', async () => {
-    const { client } = fakeClient(
+    const { client, apiCall } = fakeClient(
       [{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }],
       () => ({ statusCode: 401, body: 'unauthorized' }),
     )
 
     const report = (await fetchQuotas(client))[0]!
     expect(report).toMatchObject({ provider: 'codex', error: 'HTTP 401', windows: [] })
+    expect(apiCall).toHaveBeenCalledTimes(1)
   })
 
   it('reports missing project_id without calling the upstream', async () => {

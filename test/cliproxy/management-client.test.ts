@@ -65,6 +65,24 @@ describe('management client', () => {
     await expect(client.listAuthFiles()).rejects.toBeInstanceOf(ManagementError)
   })
 
+  it('retries transient local api-call failures with ky', async () => {
+    let attempts = 0
+    const fetchMock = vi.fn(async () => {
+      attempts++
+      return attempts < 3
+        ? Response.json({ error: 'busy' }, { status: 503 })
+        : Response.json({ status_code: 200, body: '{}' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+
+    await expect(client.apiCall({ method: 'GET', url: 'https://example.com' })).resolves.toEqual({
+      statusCode: 200,
+      body: '{}',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
   it('exposes the supported login providers in picker order', () => {
     expect(LOGIN_PROVIDERS.map(provider => provider.endpoint)).toEqual([
       'codex-auth-url',

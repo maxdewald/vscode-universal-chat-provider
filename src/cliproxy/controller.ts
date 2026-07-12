@@ -45,6 +45,7 @@ export class ServerController implements ProxyConnection {
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
+  private quotaRefresh: Promise<void> | undefined
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
 
@@ -297,11 +298,18 @@ export class ServerController implements ProxyConnection {
   async refreshQuotas(): Promise<void> {
     if (this.quotaListener === undefined)
       return
+    this.quotaRefresh ??= this.performQuotaRefresh().finally(() => {
+      this.quotaRefresh = undefined
+    })
+    return this.quotaRefresh
+  }
+
+  private async performQuotaRefresh(): Promise<void> {
     const management = await this.managementForStatus()
     if (management === undefined)
       return
     try {
-      this.quotaListener(await fetchQuotas(new ManagementClient(management.baseUrl, management.key)))
+      this.quotaListener?.(await fetchQuotas(new ManagementClient(management.baseUrl, management.key)))
     }
     catch {}
   }

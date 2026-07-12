@@ -260,6 +260,27 @@ describe('language model provider', () => {
     )).resolves.toBe(estimateTokens('hello'))
     expect(clientMocks.streamResponse).not.toHaveBeenCalled()
   })
+
+  it('keeps the last successful Claude quota until newer values arrive', () => {
+    const provider = createProvider()
+    provider.setQuotas([{
+      provider: 'claude',
+      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }],
+    }])
+
+    provider.setQuotas([{ provider: 'claude', windows: [], error: 'HTTP 401' }])
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 80 }] },
+    ])
+    provider.setQuotas([{
+      provider: 'claude',
+      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 65 }],
+    }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 65 }] },
+    ])
+  })
 })
 
 function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {

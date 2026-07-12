@@ -87,7 +87,11 @@ export class ManagementClient {
   // Proxies an upstream request through CLIProxyAPI using a stored credential.
   // CPA substitutes the literal "$TOKEN$" in headers with the account's token.
   async apiCall(payload: Record<string, unknown>, signal?: AbortSignal): Promise<{ statusCode: number, body: unknown }> {
-    const json = await this.fetcher.post('/api-call', { json: payload, signal: signal ?? null })
+    const json = await this.fetcher.post('/api-call', {
+      json: payload,
+      signal: signal ?? null,
+      retry: { limit: 2, methods: ['post'], statusCodes: [408, 429, 500, 502, 503, 504] },
+    })
       .json<{ status_code?: number, statusCode?: number, body?: unknown }>()
     return { statusCode: json.status_code ?? json.statusCode ?? 0, body: json.body }
   }

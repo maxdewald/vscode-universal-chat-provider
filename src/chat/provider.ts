@@ -70,7 +70,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   setQuotas(reports: QuotaReport[]): void {
-    this.quotaReports = reports
+    const freshClaude = reports.find(report => report.provider === 'claude' && hasQuota(report))
+    const previousClaude = this.quotaReports.find(report => report.provider === 'claude' && hasQuota(report))
+    this.quotaReports = reports.filter(report => report.provider !== 'claude')
+    const claude = freshClaude ?? previousClaude ?? reports.find(report => report.provider === 'claude')
+    if (claude !== undefined)
+      this.quotaReports.push(claude)
   }
 
   // Remaining quota for the model in the most recent request, or undefined when no model has run
@@ -234,4 +239,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       onCredentialsRejected: () => void this.credentialFlows.showCredentialRecovery(),
     }
   }
+}
+
+function hasQuota(report: QuotaReport): boolean {
+  return report.error === undefined && (report.windows.length > 0 || Object.keys(report.models ?? {}).length > 0)
 }
