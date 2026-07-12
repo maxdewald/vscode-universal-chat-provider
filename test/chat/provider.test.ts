@@ -281,6 +281,31 @@ describe('language model provider', () => {
       { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 65 }] },
     ])
   })
+
+  it('exposes grok credit usage as a quota section', () => {
+    const provider = createProvider()
+    provider.setQuotas([{ provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75 }] },
+    ])
+  })
+
+  it('threads resetsAt through quotaSections for account-window providers', () => {
+    const provider = createProvider()
+    provider.setQuotas([{
+      provider: 'grok',
+      windows: [{ label: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }],
+    }, {
+      provider: 'claude',
+      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }],
+    }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 80 }] },
+      { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }] },
+    ])
+  })
 })
 
 function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {

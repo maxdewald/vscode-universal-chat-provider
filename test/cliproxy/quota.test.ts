@@ -1,6 +1,6 @@
 import type { ManagementClient } from '../../src/cliproxy/management-client'
 import type { QuotaReport } from '../../src/cliproxy/quota'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuotas, formatPercent, remainingForModel } from '../../src/cliproxy/quota'
 
 interface ApiCallResult { statusCode: number, body: unknown }
@@ -38,6 +38,15 @@ const CLAUDE_BODY = JSON.stringify({
   extra_usage: { is_enabled: true, utilization: 25, used_credits: 5, monthly_limit: 20 },
 })
 
+const GROK_BODY = JSON.stringify({
+  config: {
+    used: { val: 30 },
+    monthlyLimit: { val: 120 },
+    onDemandCap: { val: 0 },
+    billingPeriodEnd: '2026-08-01T00:00:00Z',
+  },
+})
+
 function respondOk(url: string): ApiCallResult {
   if (url.includes('wham/usage'))
     return { statusCode: 200, body: CODEX_BODY }
@@ -45,10 +54,19 @@ function respondOk(url: string): ApiCallResult {
     return { statusCode: 200, body: ANTIGRAVITY_BODY }
   if (url.includes('oauth/usage'))
     return { statusCode: 200, body: CLAUDE_BODY }
+  if (url.includes('grok.com/v1/billing'))
+    return { statusCode: 200, body: GROK_BODY }
   return { statusCode: 404, body: '' }
 }
 
 describe('fetchQuotas', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date('2026-06-01T00:00:00Z') })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('parses codex 5h/7d windows from a string body', async () => {
     const { client } = fakeClient([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], respondOk)
 
@@ -59,6 +77,39 @@ describe('fetchQuotas', () => {
       { label: '5h Quota', remainingPercent: 99 },
       { label: '7d Quota', remainingPercent: 51 },
     ])
+  })
+
+  it('parses codex reset_at as epoch seconds, falling back to reset_after_seconds', async () => {
+    const now = Date.now()
+    const body = JSON.stringify({
+      rate_limit: {
+        primary_window: { used_percent: 10, limit_window_seconds: 18_000, reset_at: Math.floor(now / 1000) + 3600 },
+        secondary_window: { used_percent: 20, limit_window_seconds: 604_800, reset_after_seconds: 86_400 },
+      },
+    })
+    const { client } = fakeClient([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({
+      statusCode: 200,
+      body,
+    }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows[0]?.resetsAt).toBe(now + 3600 * 1000)
+    expect(report.windows[1]?.resetsAt).toBe(now + 86_400 * 1000)
+  })
+
+  it('drops reset times that are already in the past', async () => {
+    const body = JSON.stringify({
+      config: { used: { val: 10 }, monthlyLimit: { val: 100 }, billingPeriodEnd: '2025-01-01T00:00:00Z' },
+    })
+    const { client } = fakeClient([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({
+      statusCode: 200,
+      body,
+    }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 90 }])
   })
 
   it('maps antigravity quota by model id, skipping entries without a fraction', async () => {
@@ -79,12 +130,35 @@ describe('fetchQuotas', () => {
 
     expect(report.provider).toBe('claude')
     expect(report.windows).toEqual([
-      { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
-      { key: 'seven_day', label: '7d Quota', remainingPercent: 95 },
-      { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40 },
-      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10 },
+      { key: 'five_hour', label: '5h Quota', remainingPercent: 80, resetsAt: Date.parse('2026-06-25T12:00:00Z') },
+      { key: 'seven_day', label: '7d Quota', remainingPercent: 95, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
+      { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
+      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
       { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75 },
     ])
+  })
+
+  it('parses grok monthly credit usage as a single window', async () => {
+    const { client, apiCall } = fakeClient([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.provider).toBe('grok')
+    expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-08-01T00:00:00Z') }])
+    expect(apiCall.mock.calls[0]![0]).toMatchObject({
+      url: 'https://cli-chat-proxy.grok.com/v1/billing',
+      header: { 'X-XAI-Token-Auth': 'xai-grok-cli' },
+    })
+  })
+
+  it('reports a grok HTTP error instead of throwing', async () => {
+    const { client } = fakeClient(
+      [{ name: 'grok.json', type: 'xai', auth_index: 'x1' }],
+      () => ({ statusCode: 401, body: 'unauthorized' }),
+    )
+
+    const report = (await fetchQuotas(client))[0]!
+    expect(report).toMatchObject({ provider: 'grok', error: 'HTTP 401', windows: [] })
   })
 
   it('skips providers without a known quota endpoint', async () => {
@@ -118,6 +192,7 @@ describe('remainingForModel', () => {
   const reports: QuotaReport[] = [
     { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 80 }, { label: '7d Quota', remainingPercent: 8 }] },
     { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': 35 } },
+    { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] },
     { provider: 'claude', windows: [
       { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
       { key: 'seven_day', label: '7d Quota', remainingPercent: 50 },
@@ -133,6 +208,10 @@ describe('remainingForModel', () => {
 
   it('returns the tightest codex window for any openai model', () => {
     expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
+  })
+
+  it('returns the grok credit window for any xai model', () => {
+    expect(remainingForModel(reports, { proxyOwner: 'xai', proxyModelId: 'grok-code' })).toBe(75)
   })
 
   it('binds an unknown weekly family by name without code changes', () => {

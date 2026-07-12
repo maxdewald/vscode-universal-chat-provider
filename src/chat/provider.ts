@@ -87,13 +87,13 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return remaining === undefined ? undefined : { name: this.lastUsedModel.name, remainingPercent: remaining }
   }
 
-  // Structured quota for the menu: Codex/Claude as account windows (5h/7d), Antigravity per model.
-  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined }> }> {
-    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined }> }> = []
-    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude']] as const) {
+  // Structured quota for the menu: Codex/Claude/Grok as account windows (5h/7d/credits), Antigravity per model.
+  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, resetsAt?: number }> }> {
+    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, resetsAt?: number }> }> = []
+    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
       const report = this.quotaReports.find(r => r.provider === provider && r.error === undefined)
       if (report !== undefined && report.windows.length > 0)
-        sections.push({ title, entries: report.windows.map(window => ({ name: window.label, remainingPercent: window.remainingPercent })) })
+        sections.push({ title, entries: report.windows.map(window => ({ name: window.label, remainingPercent: window.remainingPercent, ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }) })) })
     }
 
     const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)

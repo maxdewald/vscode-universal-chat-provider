@@ -6,11 +6,12 @@ export interface QuotaWindow {
   label: string
   remainingPercent?: number
   key?: string // claude: window id; remainingForModel scopes family caps by it
+  resetsAt?: number // epoch ms when the window refreshes; omitted when unknown or already past
 }
 
 export interface QuotaReport {
-  provider: 'codex' | 'antigravity' | 'claude'
-  windows: QuotaWindow[] // codex/claude: account-level windows (5h / 7d / …)
+  provider: 'codex' | 'antigravity' | 'claude' | 'grok'
+  windows: QuotaWindow[] // codex/claude/grok: account-level windows (5h / 7d / …)
   models?: Record<string, number> // antigravity: remaining percent keyed by proxy model id
   error?: string
 }
@@ -18,6 +19,7 @@ export interface QuotaReport {
 const WHAM_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 const ANTIGRAVITY_MODELS_URL = 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels'
 const CLAUDE_USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const GROK_BILLING_URL = 'https://cli-chat-proxy.grok.com/v1/billing'
 // Claude weekly caps are keyed "seven_day_<family>" (e.g. seven_day_opus); the family binds the
 // window to its model family by name, so a new one like seven_day_fable works without code changes.
 const SEVEN_DAY_FAMILY = /^seven_day_(.+)$/
@@ -36,6 +38,8 @@ export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal
       return [fetchAntigravityQuota(client, entry, signal)]
     if (provider === 'claude')
       return [fetchClaudeQuota(client, entry, signal)]
+    if (provider === 'xai' || provider === 'grok')
+      return [fetchGrokQuota(client, entry, signal)]
     return []
   })
   return Promise.all(tasks)
@@ -70,6 +74,10 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
     })
     const percents = applicable.map(w => w.remainingPercent).filter((p): p is number => p !== undefined)
     return percents.length > 0 ? Math.min(...percents) : undefined
+  }
+  if (owner === 'xai') {
+    const report = reports.find(r => r.provider === 'grok' && r.error === undefined)
+    return report?.windows[0]?.remainingPercent
   }
   return undefined
 }
@@ -146,6 +154,33 @@ async function fetchClaudeQuota(client: ManagementClient, entry: Record<string, 
   }, signal)
 }
 
+async function fetchGrokQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
+  const report: QuotaReport = { provider: 'grok', windows: [] }
+  const authIndex = str(entry.auth_index)
+  if (authIndex === '')
+    return { ...report, error: 'missing auth_index' }
+  return fetchQuotaReport(client, report, {
+    auth_index: authIndex,
+    method: 'GET',
+    url: GROK_BILLING_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'X-XAI-Token-Auth': 'xai-grok-cli', 'Accept': 'application/json' },
+  }, (r, data) => {
+    r.windows = parseGrokWindows(data)
+  }, signal)
+}
+
+// Grok Build/SuperGrok bills in monthly credits; report the single account-level window as
+// remaining percent of the monthly credit allowance.
+function parseGrokWindows(data: Record<string, unknown>): QuotaWindow[] {
+  const config = isPlainObject(data.config) ? data.config : undefined
+  const used = num(isPlainObject(config?.used) ? config.used.val : undefined)
+  const limit = num(isPlainObject(config?.monthlyLimit) ? config.monthlyLimit.val : undefined)
+  if (used === undefined || limit === undefined || limit <= 0)
+    return []
+  const resetsAt = parseReset(config?.billingPeriodEnd)
+  return [{ label: 'Credits', remainingPercent: clamp(100 - (used / limit) * 100, 0, 100), ...(resetsAt === undefined ? {} : { resetsAt }) }]
+}
+
 // Account-level utilization (percent used) per window, plus optional extra-usage credits.
 function parseClaudeWindows(data: Record<string, unknown>): QuotaWindow[] {
   const windows: QuotaWindow[] = []
@@ -156,7 +191,8 @@ function parseClaudeWindows(data: Record<string, unknown>): QuotaWindow[] {
     if (label === undefined)
       continue
     const used = num(raw.utilization)
-    windows.push({ key, label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }) })
+    const resetsAt = parseReset(raw.resets_at)
+    windows.push({ key, label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
   }
   const extra = isPlainObject(data.extra_usage) ? data.extra_usage : undefined
   const extraUsed = num(extra?.utilization)
@@ -184,10 +220,20 @@ function parseCodexWindows(data: Record<string, unknown>): QuotaWindow[] {
       continue
     const used = num(raw.used_percent)
     const label = codexWindowLabel(num(raw.limit_window_seconds))
+    const resetsAt = parseCodexReset(raw)
     // exactOptionalPropertyTypes forbids assigning explicit undefined, so omit when unknown.
-    windows.push({ label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }) })
+    windows.push({ label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
   }
   return windows
+}
+
+// Codex gives an absolute reset_at (epoch seconds); when absent, reset_after_seconds is relative to now.
+function parseCodexReset(window: Record<string, unknown>): number | undefined {
+  const absolute = parseReset(window.reset_at)
+  if (absolute !== undefined)
+    return absolute
+  const after = num(window.reset_after_seconds)
+  return after === undefined ? undefined : Date.now() + after * 1000
 }
 
 function codexWindowLabel(windowSeconds?: number): string {
@@ -222,6 +268,12 @@ function parseBody(body: unknown): Record<string, unknown> | undefined {
   catch {
     return undefined
   }
+}
+
+// Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.
+function parseReset(value: unknown): number | undefined {
+  const ms = typeof value === 'string' ? Date.parse(value) : (num(value) ?? Number.NaN) * 1000
+  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
 }
 
 function num(value: unknown): number | undefined {
