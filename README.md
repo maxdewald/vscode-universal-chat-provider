@@ -33,7 +33,7 @@
 - **🧠 Reasoning built in** — pick the thinking effort and follow reasoning live.
 - **📊 Quota at a glance** — see remaining usage before reaching a limit.
 - **✨ More than chat** — generate commit messages, titles, and summaries.
-- **👥 Multiple accounts** — add and manage several provider accounts.
+- **👥 Account load balancing** — add multiple accounts for the same provider; CLIProxyAPI distributes requests round-robin across available accounts and skips those in cooldown.
 
 <br>
 
