@@ -2,7 +2,7 @@ import type { StatusBarItem } from 'vscode'
 import type { ServerStatus } from '../cliproxy/controller'
 import type { QuotaSection } from './quota-menu'
 import { MarkdownString, StatusBarAlignment, ThemeColor, window, workspace } from 'vscode'
-import { formatPercent } from '../cliproxy/quota'
+import { formatPercent, formatResetCountdown } from '../cliproxy/quota'
 
 // Default remaining-quota percent below which the status bar warns; overridable per setting.
 const DEFAULT_LOW_PERCENT = 10
@@ -16,10 +16,10 @@ function warnBelow(): number | undefined {
 }
 
 const PRESENTATION: Record<ServerStatus, { icon: string, tooltip: string }> = {
-  external: { icon: '$(server)', tooltip: 'Universal Chat Provider: using an external server' },
-  starting: { icon: '$(loading~spin)', tooltip: 'Universal Chat Provider: starting the managed server…' },
-  running: { icon: '$(server-process)', tooltip: 'Universal Chat Provider: managed server running' },
-  error: { icon: '$(error)', tooltip: 'Universal Chat Provider: managed server failed to start' },
+  external: { icon: '$(server)', tooltip: 'using an external server' },
+  starting: { icon: '$(loading~spin)', tooltip: 'starting the managed server…' },
+  running: { icon: '$(server-process)', tooltip: 'managed server running' },
+  error: { icon: '$(error)', tooltip: 'managed server failed to start' },
 }
 
 export function createStatusBar(): StatusBarItem {
@@ -47,16 +47,26 @@ export function updateStatusBar(
 function buildTooltip(icon: string, header: string, sections: QuotaSection[], threshold: number | undefined): MarkdownString {
   const md = new MarkdownString()
   md.supportThemeIcons = true
-  md.appendMarkdown(`${icon} **${header}**\n\n`)
-  for (const section of sections) {
-    md.appendMarkdown(`| **${section.title}** | | |\n| :-- | :-- | --: |\n`)
+  md.appendMarkdown(`${icon} **Universal Chat Provider**\n\n${header}\n\n`)
+  if (!sections.some(section => section.entries.length > 0))
+    return md
+
+  md.appendMarkdown('| Quota | Available | Left | | Resets |\n| :-- | :-- | --: | :-- | :-- |\n')
+  for (const [index, section] of sections.entries()) {
+    if (index > 0)
+      md.appendMarkdown('| | | | | |\n')
+    md.appendMarkdown(`| **${escapeTableCell(section.title)}** | | | | |\n`)
     for (const entry of section.entries) {
       const warn = threshold !== undefined && entry.remainingPercent !== undefined && entry.remainingPercent < threshold ? '$(warning) ' : ''
-      md.appendMarkdown(`| ${entry.name} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatPercent(entry.remainingPercent)} |\n`)
+      const reset = formatResetCountdown(entry.resetsAt) ?? '—'
+      md.appendMarkdown(`| ${escapeTableCell(entry.name)} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatPercent(entry.remainingPercent)} | | ${reset} |\n`)
     }
-    md.appendMarkdown('\n')
   }
   return md
+}
+
+function escapeTableCell(value: string): string {
+  return value.replaceAll('|', '\\|').replaceAll('\n', ' ')
 }
 
 // Filled blocks only, in their own table column: with no empty-track glyph the bar can never

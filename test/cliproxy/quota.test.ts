@@ -1,7 +1,7 @@
 import type { ManagementClient } from '../../src/cliproxy/management-client'
 import type { QuotaReport } from '../../src/cliproxy/quota'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchQuotas, formatPercent, remainingForModel } from '../../src/cliproxy/quota'
+import { fetchQuotas, formatPercent, formatResetCountdown, remainingForModel } from '../../src/cliproxy/quota'
 
 interface ApiCallResult { statusCode: number, body: unknown }
 
@@ -243,5 +243,19 @@ describe('formatPercent', () => {
   it('rounds percentages and marks missing values', () => {
     expect(formatPercent(42.6)).toBe('43%')
     expect(formatPercent(undefined)).toBe('?')
+  })
+})
+
+describe('formatResetCountdown', () => {
+  it('formats future resets and omits unavailable ones', () => {
+    vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
+
+    expect(formatResetCountdown(Date.parse('2026-07-15T04:00:00Z'))).toBe('3d 4h')
+    expect(formatResetCountdown(Date.parse('2026-07-12T03:25:00Z'))).toBe('3h 25m')
+    expect(formatResetCountdown(Date.parse('2026-07-12T00:00:20Z'))).toBe('soon')
+    expect(formatResetCountdown(undefined)).toBeUndefined()
+    expect(formatResetCountdown(Date.parse('2026-07-11T00:00:00Z'))).toBeUndefined()
+
+    vi.useRealTimers()
   })
 })

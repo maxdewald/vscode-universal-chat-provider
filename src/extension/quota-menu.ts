@@ -1,6 +1,6 @@
 import type { QuickPickItem } from 'vscode'
 import { window } from 'vscode'
-import { formatPercent } from '../cliproxy/quota'
+import { formatPercent, formatResetCountdown } from '../cliproxy/quota'
 
 export interface QuotaEntry {
   name: string
@@ -54,21 +54,6 @@ function formatRemaining(percent: number | undefined): string {
 }
 
 function formatResetSuffix(resetsAt: number | undefined): string {
-  const delta = (resetsAt ?? 0) - Date.now()
-  return delta > 0 ? ` · resets in ${formatDuration(delta)}` : ''
-}
-
-// Compact countdown: the two largest non-zero units up to days, e.g. "3d 4h", "3h 25m", "12m", "soon".
-function formatDuration(ms: number): string {
-  const minutes = Math.round(ms / 60_000)
-  if (minutes < 1)
-    return 'soon'
-  const days = Math.floor(minutes / 1440)
-  const hours = Math.floor((minutes % 1440) / 60)
-  const mins = minutes % 60
-  if (days > 0)
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
-  if (hours > 0)
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
-  return `${mins}m`
+  const countdown = formatResetCountdown(resetsAt)
+  return countdown === undefined ? '' : ` · resets in ${countdown}`
 }

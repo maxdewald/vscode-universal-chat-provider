@@ -1,5 +1,5 @@
 import type { MarkdownString, ThemeColor } from 'vscode'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
 import { createStatusBar, updateStatusBar } from '../../src/extension/status-bar'
 import { resetVSCodeMock, statusBarItem, vscodeMock, window } from '../support/vscode'
@@ -10,6 +10,10 @@ function tooltipValue(): string {
 
 beforeEach(() => {
   resetVSCodeMock()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('status bar', () => {
@@ -64,17 +68,24 @@ describe('status bar', () => {
     expect(statusBarItem.text).toBe('$(warning) Gemini 3 Pro · 40% left')
   })
 
-  it('renders quota sections with bars and command links', () => {
+  it('renders all quota sections in one aligned table with resets', () => {
+    vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
     updateStatusBar(statusBarItem as never, 'running', [
-      { title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 80 }, { name: '7d Quota', remainingPercent: 8 }] },
+      { title: 'Codex', entries: [
+        { name: '5h Quota', remainingPercent: 80, resetsAt: Date.parse('2026-07-12T03:25:00Z') },
+        { name: '7d Quota', remainingPercent: 8 },
+      ] },
       { title: 'Antigravity', entries: [{ name: 'Gemini 3 Pro', remainingPercent: undefined }] },
     ])
 
     const value = tooltipValue()
-    expect(value).toContain('**Codex**')
-    expect(value).toContain('80%')
-    expect(value).toContain('$(warning)') // 7d Quota at 8% is below the low-quota threshold
-    expect(value).toContain('Gemini 3 Pro')
+    expect(value).toContain('| Quota | Available | Left | | Resets |')
+    expect(value).toContain('| **Codex** | | | | |')
+    expect(value).toContain('| 5h Quota | `████████` | 80% | | 3h 25m |')
+    expect(value).toContain('| 7d Quota | `█` | $(warning) 8% | | — |')
+    expect(value).toContain('| | | | | |\n| **Antigravity** | | | | |')
+    expect(value).toContain('| Gemini 3 Pro |  | ? | | — |')
+    expect(value.match(/\*\*Codex\*\*/g)).toHaveLength(1)
     const tooltip = statusBarItem.tooltip as MarkdownString
     expect(tooltip.supportThemeIcons).toBe(true)
   })

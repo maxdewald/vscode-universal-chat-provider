@@ -49,6 +49,24 @@ export function formatPercent(value?: number): string {
   return value === undefined ? '?' : `${Math.round(value)}%`
 }
 
+// Compact countdown using the two largest non-zero units, e.g. "3d 4h", "3h 25m", "12m".
+export function formatResetCountdown(resetsAt: number | undefined): string | undefined {
+  const delta = (resetsAt ?? 0) - Date.now()
+  if (delta <= 0)
+    return undefined
+  const minutes = Math.round(delta / 60_000)
+  if (minutes < 1)
+    return 'soon'
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const mins = minutes % 60
+  if (days > 0)
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  if (hours > 0)
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+  return `${mins}m`
+}
+
 // Maps a model to its remaining-quota percent. Antigravity is keyed per model; Codex quota is
 // account-level (5h/7d windows), so we report the tighter of the two windows for any Codex model.
 export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: string, proxyModelId: string }): number | undefined {
