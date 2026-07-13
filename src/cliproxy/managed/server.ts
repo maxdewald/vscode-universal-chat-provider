@@ -134,6 +134,9 @@ export class ManagedServer {
         this.adopted = true
         this.port = preferred
         this.version = inspected ?? await readInstalledVersion(this.deps.paths.binDir)
+        // Keep the config port in sync with the adopted server: CPA derives OAuth
+        // callback URLs from the config, and a stale port breaks login flows.
+        await setConfigPort(this.deps.paths.configPath, preferred)
         this.deps.output.appendLine(`Adopted a healthy CLIProxyAPI server on port ${preferred}.`)
         return { baseUrl: preferredBase, port: preferred, ...(this.version !== undefined ? { version: this.version } : {}) }
       }
