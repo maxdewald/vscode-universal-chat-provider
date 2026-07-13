@@ -112,7 +112,7 @@ describe('model mapping', () => {
     }])))
   })
 
-  it('dedups reasoning aliases into a single survivor with a selector', () => {
+  it('keeps reasoning aliases and shows their full ids when names conflict', () => {
     const levels = [
       { effort: 'low' },
       { effort: 'high' },
@@ -149,17 +149,22 @@ describe('model mapping', () => {
     )
 
     expect(models.map(model => model.name)).toEqual([
-      'Atlas 3 Pro',
+      'atlas-3-pro-high',
+      'atlas-3-pro-low',
       'Claude Opus',
     ])
     expect(models.map(model => model.reasoningLevels)).toEqual([
       ['low', 'high'],
+      ['low', 'high'],
       ['low', 'medium', 'high'],
     ])
-    expect(models.find(model => model.name === 'Atlas 3 Pro')?.proxyModelId).toBe('atlas-3-pro-high')
+    expect(models.filter(model => model.name.startsWith('atlas-3-pro')).map(model => model.proxyModelId)).toEqual([
+      'atlas-3-pro-high',
+      'atlas-3-pro-low',
+    ])
   })
 
-  it('dedups a suffixed alias against an already-unsuffixed sibling', () => {
+  it('keeps a suffixed alias alongside an unsuffixed sibling', () => {
     const levels = [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }]
     const models = mapProxyModels(
       [
@@ -174,15 +179,15 @@ describe('model mapping', () => {
       {},
     )
 
-    expect(models.map(model => model.name)).toEqual(['Atlas 3.5 Flash'])
-    expect(models[0]).toMatchObject({
-      proxyModelId: 'atlas-3-flash-agent',
-      reasoningEffort: 'medium',
-      reasoningLevels: ['low', 'medium', 'high'],
-    })
+    expect(models.map(model => model.name)).toEqual(['atlas-3-flash-agent', 'atlas-3.5-flash-low'])
+    expect(models).toHaveLength(2)
+    expect(models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ proxyModelId: 'atlas-3-flash-agent' }),
+      expect.objectContaining({ proxyModelId: 'atlas-3.5-flash-low' }),
+    ]))
   })
 
-  it('logs unresolved display-name collisions with every candidate id', () => {
+  it('logs display-name collisions and keeps every candidate', () => {
     const collisions: string[] = []
     const levels = [{ effort: 'low' }, { effort: 'high' }]
     const models = mapProxyModels(
@@ -198,9 +203,10 @@ describe('model mapping', () => {
       { onCollision: message => collisions.push(message) },
     )
 
-    expect(models.map(model => model.proxyModelId)).toEqual(['model-a'])
+    expect(models.map(model => model.proxyModelId)).toEqual(['model-a', 'model-b'])
+    expect(models.map(model => model.name)).toEqual(['model-a', 'model-b'])
     expect(collisions).toEqual([
-      'Model display collision for Proxy "Model": model-a, model-b; keeping model-a.',
+      'Model display collision for Proxy "Model": model-a, model-b; showing full IDs.',
     ])
   })
 
@@ -244,7 +250,7 @@ describe('model mapping', () => {
 
     expect(models).toHaveLength(2)
     expect(new Set(models.map(model => model.proxyModelId))).toEqual(new Set(['model-high', 'model-low']))
-    expect(new Set(models.map(model => model.name))).toEqual(new Set(['Model (High)', 'Model (Low)']))
+    expect(new Set(models.map(model => model.name))).toEqual(new Set(['model-high', 'model-low']))
   })
 
   it('humanizes ids only when no display name is available', () => {

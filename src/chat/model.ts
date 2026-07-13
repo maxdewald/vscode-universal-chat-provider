@@ -60,7 +60,6 @@ interface ModelCandidate {
   advertisedName: string
   baseName: string
   levels: string[]
-  levelSignature: string
   totalContext: number
   outputTokens: number
 }
@@ -117,15 +116,13 @@ export function mapProxyModels(
       advertisedName,
       baseName,
       levels,
-      levelSignature: [...levels].sort().join('\0'),
       totalContext,
       outputTokens,
     })
   }
 
-  const winners = chooseDisplayModelWinners(candidates, options)
-  const ambiguousNames = ambiguousDisplayNames(winners)
-  return winners.map(candidate => toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate)))).sort((a, b) => {
+  const ambiguousNames = ambiguousDisplayNames(candidates, options)
+  return candidates.map(candidate => toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate)))).sort((a, b) => {
     const baseA = a.name.replace(REASONING_NAME_SUFFIX, '')
     const baseB = b.name.replace(REASONING_NAME_SUFFIX, '')
     return baseA === baseB
@@ -134,20 +131,12 @@ export function mapProxyModels(
   })
 }
 
-function chooseDisplayModelWinners(candidates: readonly ModelCandidate[], options: ModelMappingOptions): ModelCandidate[] {
-  const byDisplay = Map.groupBy(candidates, displayDedupeKey)
-  return Array.from(byDisplay.values(), (group) => {
+function ambiguousDisplayNames(candidates: readonly ModelCandidate[], options: ModelMappingOptions): Set<string> {
+  for (const group of Map.groupBy(candidates, displayBaseKey).values()) {
     if (group.length > 1)
-      options.onCollision?.(formatCollision(group[0]!, group))
-    return group[0]!
-  })
-}
+      options.onCollision?.(`Model display collision for ${formatProviderName(group[0]!.providerName)} "${group[0]!.baseName}": ${group.map(candidate => candidate.entry.id).join(', ')}; showing full IDs.`)
+  }
 
-function formatCollision(kept: ModelCandidate, candidates: readonly ModelCandidate[]): string {
-  return `Model display collision for ${formatProviderName(kept.providerName)} "${kept.baseName}": ${candidates.map(candidate => candidate.entry.id).join(', ')}; keeping ${kept.entry.id}.`
-}
-
-function ambiguousDisplayNames(candidates: readonly ModelCandidate[]): Set<string> {
   const seen = new Set<string>()
   const ambiguous = new Set<string>()
   for (const candidate of candidates) {
@@ -160,17 +149,13 @@ function ambiguousDisplayNames(candidates: readonly ModelCandidate[]): Set<strin
   return ambiguous
 }
 
-function displayDedupeKey(candidate: ModelCandidate): string {
-  return `${displayBaseKey(candidate)}\0${candidate.levelSignature}`
-}
-
 function displayBaseKey(candidate: ModelCandidate): string {
   return `${candidate.providerName}\0${candidate.baseName}`.toLowerCase()
 }
 
-function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean): ProviderModel {
+function toProviderModel(candidate: ModelCandidate, useFullId: boolean): ProviderModel {
   const { entry, detail, catalogModel, providerName, levels, totalContext, outputTokens } = candidate
-  const name = useAdvertisedName ? candidate.advertisedName : candidate.baseName
+  const name = useFullId ? entry.id : candidate.baseName
   const displayProviderName = formatProviderName(providerName)
   const imageInput = detail?.input_modalities?.includes('image')
     ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
