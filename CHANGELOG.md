@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.17.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.16.0...v0.17.0) (2026-07-13)
+
+
+### Features
+
+* show quota resets in status tooltip ([4edd509](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4edd509d2860aeaea1974ec689f55936c66650a3))
+
+
+### Bug Fixes
+
+* separate reasoning summary parts ([e2175dc](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e2175dc6cae27267b4201e89cebe93f492a48607))
+
+
+### Documentation
+
+* update account load balancing description ([5657c6a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5657c6a944de22dc7b5d29f7ab0f48af13d30483))
+
 ## [0.16.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.15.0...v0.16.0) (2026-07-12)
 
 
