@@ -18,6 +18,21 @@ const model = {
 } as unknown as ProviderModel
 
 describe('response request conversion', () => {
+  it('preserves Copilot system messages as Responses API system input', () => {
+    const systemRole = 3 as LanguageModelChatMessageRole
+    const messages = [{
+      role: systemRole,
+      content: [new LanguageModelTextPart('You are a coding agent.')],
+      name: undefined,
+    }]
+
+    expect(messages.flatMap(convertMessage)).toEqual([{
+      role: 'system',
+      content: [{ type: 'input_text', text: 'You are a coding agent.' }],
+    }])
+    expect(buildPromptCacheKey(model, messages)).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
+  })
+
   it('serializes text, image, data, tool calls, and tool results in order', () => {
     const messages = [
       {

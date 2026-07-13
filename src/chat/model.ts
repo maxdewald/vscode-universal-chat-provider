@@ -179,14 +179,13 @@ function toProviderModel(candidate: ModelCandidate, useAdvertisedName: boolean):
   const supportsParallelToolCalls = parallelToolCalls ?? true
   const toolCalling = parallelToolCalls !== undefined
     || (catalogModel?.supported_parameters?.includes('tools') ?? true)
-  const family = catalogModel?.type ?? inferFamily(entry.id)
   const description = detail?.description ?? catalogModel?.description
   const tooltip = buildTooltip(name, description, displayProviderName, outputTokens, imageInput, toolCalling)
 
   const baseModel = {
     proxyModelId: entry.id,
     proxyOwner: providerName,
-    family,
+    family: entry.id,
     version: catalogModel?.version ?? entry.id,
     maxInputTokens: totalContext,
     maxOutputTokens: outputTokens,
@@ -337,11 +336,6 @@ function normalizeReasoningModelName(name: string, levels: readonly string[]): s
   if (levels.length < 2)
     return name
   return name.replace(REASONING_NAME_SUFFIX, '')
-}
-
-function inferFamily(id: string): string {
-  const family = id.split(/[/:]/, 1)[0]
-  return family !== undefined && family.length > 0 ? family : id
 }
 
 function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {

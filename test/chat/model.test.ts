@@ -30,6 +30,7 @@ describe('model mapping', () => {
       id: 'gpt-5.4',
       name: 'GPT-5.4',
       proxyModelId: 'gpt-5.4',
+      family: 'gpt-5.4',
       maxInputTokens: 400_000,
       maxOutputTokens: 128_000,
       capabilities: { imageInput: true, toolCalling: true },
@@ -80,6 +81,35 @@ describe('model mapping', () => {
     )
 
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'grok-code'])
+  })
+
+  it('advertises exact model identities independently of provider categories', () => {
+    const entries = [
+      { id: 'gpt-5.6-sol', owned_by: 'openai', context_length: 372_000, max_completion_tokens: 128_000 },
+      { id: 'claude-fable-5', owned_by: 'anthropic', context_length: 1_000_000, max_completion_tokens: 128_000 },
+      { id: 'gemini-3.5-flash', owned_by: 'google', context_length: 1_048_576, max_completion_tokens: 65_536 },
+      { id: 'grok-code-fast-1', owned_by: 'xai', context_length: 256_000, max_completion_tokens: 65_536 },
+      { id: 'claude-opus-4-6-thinking', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 64_000 },
+      { id: 'vendor/model', owned_by: 'custom-proxy', context_length: 128_000, max_completion_tokens: 8192 },
+    ]
+    const catalog = new Map(entries.map(entry => [entry.id, {
+      id: entry.id,
+      type: entry.owned_by,
+      display_name: entry.id,
+      context_length: entry.context_length,
+      max_completion_tokens: entry.max_completion_tokens,
+    }]))
+
+    const models = mapProxyModels(entries, [], catalog, {})
+    const identities = Object.fromEntries(models.map(model => [model.id, {
+      family: model.family,
+      proxyOwner: model.proxyOwner,
+    }]))
+
+    expect(identities).toEqual(Object.fromEntries(entries.map(entry => [entry.id, {
+      family: entry.id,
+      proxyOwner: entry.owned_by,
+    }])))
   })
 
   it('dedups reasoning aliases into a single survivor with a selector', () => {
@@ -254,7 +284,7 @@ describe('model mapping', () => {
     expect(models).toHaveLength(1)
     expect(model).toMatchObject({
       name: 'Catalog Model',
-      family: 'vendor',
+      family: 'vendor/model',
       version: 'v1',
       maxInputTokens: 1_000_000,
       maxOutputTokens: 50_000,

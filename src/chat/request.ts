@@ -79,7 +79,10 @@ function isCacheControlPart(part: unknown): boolean {
 }
 
 export function convertMessage(message: LanguageModelChatRequestMessage): Record<string, unknown>[] {
-  const role = message.role === LanguageModelChatMessageRole.Assistant ? 'assistant' : 'user'
+  const messageRole: number = message.role
+  const role = messageRole === LanguageModelChatMessageRole.Assistant
+    ? 'assistant'
+    : messageRole === 3 ? 'system' : 'user'
   const content: Record<string, unknown>[] = []
   const items: Record<string, unknown>[] = []
 
