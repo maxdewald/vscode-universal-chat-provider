@@ -273,7 +273,6 @@
     "test:watch": "vitest --project test:unit",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
-    "showcase": "node scripts/showcase.mjs",
     "vscode:prepublish": "pnpm build",
     "ext:package": "vsce package --no-dependencies",
     "ext:publish": "vsce publish --no-dependencies"
