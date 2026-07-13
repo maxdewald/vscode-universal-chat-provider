@@ -42,8 +42,6 @@
 
 ## Demo
 
-Connect subscription accounts, select models and reasoning effort, inspect live quota, configure a utility model, and generate a Git commit message — all without leaving VS Code.
-
 <p align="center">
   <img src="https://raw.githubusercontent.com/maxdewald/vscode-universal-chat-provider/main/images/showcase.webp" width="960" alt="Universal Chat Provider showcase: connect subscription accounts, choose chat models and reasoning effort, inspect quota, configure a utility model, and generate a Git commit message" />
 </p>
