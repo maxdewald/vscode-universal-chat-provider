@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.1...v0.17.2) (2026-07-13)
+
+
+### Refactoring
+
+* **status-bar:** show warning on crash and remove running tooltip ([bb9ec35](https://github.com/maxdewald/vscode-universal-chat-provider/commit/bb9ec3570aa8388abc02e3de3531e55f1345156d))
+
 ## [0.17.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.0...v0.17.1) (2026-07-13)
 
 
