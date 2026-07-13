@@ -89,7 +89,7 @@ describe('language model provider', () => {
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
     expect(thinkingPart.value).toBe('thinking')
-    expect(thinkingPart.id).toEqual(expect.any(String))
+    expect(thinkingPart.id).toBeUndefined()
     expect(report.mock.calls[1]?.[0]).toEqual(new LanguageModelTextPart('text'))
     expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelToolCallPart('call', 'lookup', { q: 'x' }))
     const usagePart = report.mock.calls[3]?.[0] as LanguageModelDataPart
@@ -106,7 +106,7 @@ describe('language model provider', () => {
     )
   })
 
-  it('streams reasoning deltas as thinking parts sharing one id', async () => {
+  it('streams reasoning deltas as thinking parts without synthetic ids', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
       callbacks.onThinking?.('first\nsecond')
@@ -133,7 +133,8 @@ describe('language model provider', () => {
     expect(first.value).toBe('first\nsecond')
     expect(second).toBeInstanceOf(LanguageModelThinkingPart)
     expect(second.value).toBe(' tail')
-    expect(first.id).toBe(second.id)
+    expect(first.id).toBeUndefined()
+    expect(second.id).toBeUndefined()
     expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelTextPart('answer'))
   })
 

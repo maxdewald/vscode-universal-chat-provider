@@ -163,9 +163,12 @@ export class CLIProxyClient {
 function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta: string) => void, end: () => void } {
   const sentinel = '<!-- -->'
   let tail = ''
+  let flushedSinceBoundary = false
   const flush = (value: string): void => {
-    if (value.length > 0)
+    if (value.length > 0) {
       emit?.(value)
+      flushedSinceBoundary = true
+    }
   }
 
   return {
@@ -186,6 +189,12 @@ function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta:
       if (tail !== sentinel && !(tail.startsWith(sentinel) && tail.slice(sentinel.length).trim() === ''))
         flush(tail)
       tail = ''
+      // An empty thinking part tells VS Code the section ended, so the next
+      // reasoning summary renders as its own block instead of being appended.
+      if (flushedSinceBoundary) {
+        emit?.('')
+        flushedSinceBoundary = false
+      }
     },
   }
 }

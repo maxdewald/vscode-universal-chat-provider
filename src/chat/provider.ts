@@ -35,7 +35,7 @@ import { lowestReasoningEffort } from './utility-model-nudge'
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 
 const LanguageModelThinkingPart = (vscode as unknown as {
-  LanguageModelThinkingPart: new (value: string, id?: string) => LanguageModelResponsePart
+  LanguageModelThinkingPart: new (value: string) => LanguageModelResponsePart
 }).LanguageModelThinkingPart
 
 export class UniversalChatProvider implements LanguageModelChatProvider<ProviderModel> {
@@ -164,7 +164,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
             progress.report(new LanguageModelTextPart(delta))
           },
           onThinking: (delta) => {
-            progress.report(new LanguageModelThinkingPart(delta, 'thinking'))
+            progress.report(new LanguageModelThinkingPart(delta))
           },
           onToolCall: (callId, name, input) =>
             progress.report(new LanguageModelToolCallPart(callId, name, input)),

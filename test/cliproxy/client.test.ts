@@ -163,6 +163,29 @@ describe('cLIProxyClient', () => {
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe('**First**\n\n**Second**\n\n')
   })
 
+  it('separates reasoning sections with an empty thinking boundary', async () => {
+    const body = [
+      event({ type: 'response.reasoning_summary_text.delta', delta: 'Planning status line restructuring' }),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: 'Refining status header formatting' }),
+      event({ type: 'response.reasoning_summary_part.done' }),
+      event({ type: 'response.completed' }),
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    const { CLIProxyClient } = await import('../../src/cliproxy/client')
+    const handlers = callbacks()
+
+    await new CLIProxyClient('http://proxy', 'key')
+      .streamResponse({}, handlers, new AbortController().signal)
+
+    expect(handlers.onThinking.mock.calls.flat()).toEqual([
+      'Planning status line restructuring',
+      '',
+      'Refining status header formatting',
+      '',
+    ])
+  })
+
   it('does not emit an empty thinking block for a sentinel-only part', async () => {
     const body = [
       event({ type: 'response.reasoning_summary_text.delta', delta: '<!-- -->' }),
