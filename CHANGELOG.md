@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.0...v0.17.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* preserve model identity and system prompts ([d1c39b7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d1c39b73f774b327c1332de34d7463a57cf5c2fd))
+
 ## [0.17.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.16.0...v0.17.0) (2026-07-13)
 
 
