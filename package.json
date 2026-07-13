@@ -32,7 +32,10 @@
   "files": [
     "LICENSE.md",
     "dist/*",
-    "images/*"
+    "images/how-it-works-dark.png",
+    "images/how-it-works-light.png",
+    "images/how-it-works.svg",
+    "images/logo.png"
   ],
   "engines": {
     "node": ">=22.18.0",
@@ -270,6 +273,7 @@
     "test:watch": "vitest --project test:unit",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
+    "showcase": "node scripts/showcase.mjs",
     "vscode:prepublish": "pnpm build",
     "ext:package": "vsce package --no-dependencies",
     "ext:publish": "vsce publish --no-dependencies"
