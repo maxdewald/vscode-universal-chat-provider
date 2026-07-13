@@ -15,11 +15,11 @@ function warnBelow(): number | undefined {
     : undefined
 }
 
-const PRESENTATION: Record<ServerStatus, { icon: string, tooltip: string }> = {
+const PRESENTATION: Record<ServerStatus, { icon: string, tooltip?: string }> = {
   external: { icon: '$(server)', tooltip: 'using an external server' },
   starting: { icon: '$(loading~spin)', tooltip: 'starting the managed server…' },
-  running: { icon: '$(server-process)', tooltip: 'managed server running' },
-  error: { icon: '$(error)', tooltip: 'managed server failed to start' },
+  running: { icon: '$(server-process)' },
+  error: { icon: '$(warning)', tooltip: 'managed server is not running' },
 }
 
 export function createStatusBar(): StatusBarItem {
@@ -37,21 +37,26 @@ export function updateStatusBar(
   const { icon, tooltip } = PRESENTATION[status]
   const threshold = warnBelow()
   const low = threshold !== undefined && current !== undefined && current.remainingPercent < threshold
-  statusBar.text = low
-    ? `$(warning) ${current.name} · ${formatPercent(current.remainingPercent)} left`
-    : `${icon} Universal Chat Provider`
-  statusBar.backgroundColor = low ? new ThemeColor('statusBarItem.warningBackground') : undefined
+  const unavailable = status === 'error'
+  statusBar.text = unavailable
+    ? '$(warning) Universal Chat Provider'
+    : low
+      ? `$(warning) ${current.name} · ${formatPercent(current.remainingPercent)} left`
+      : `${icon} Universal Chat Provider`
+  statusBar.backgroundColor = unavailable || low ? new ThemeColor('statusBarItem.warningBackground') : undefined
   statusBar.tooltip = buildTooltip(icon, tooltip, sections, threshold)
 }
 
-function buildTooltip(icon: string, header: string, sections: QuotaSection[], threshold: number | undefined): MarkdownString {
+function buildTooltip(icon: string, header: string | undefined, sections: QuotaSection[], threshold: number | undefined): MarkdownString {
   const md = new MarkdownString()
   md.supportThemeIcons = true
-  md.appendMarkdown(`${icon} **Universal Chat Provider**\n\n${header}\n\n`)
+  md.appendMarkdown(`${icon} **Universal Chat Provider**`)
+  if (header !== undefined)
+    md.appendMarkdown(`\n\n${header}`)
   if (!sections.some(section => section.entries.length > 0))
     return md
 
-  md.appendMarkdown('| Quota | Available | Left | | Resets |\n| :-- | :-- | --: | :-- | :-- |\n')
+  md.appendMarkdown('\n\n| Quota | Available | Left | | Resets |\n| :-- | :-- | --: | :-- | :-- |\n')
   for (const [index, section] of sections.entries()) {
     if (index > 0)
       md.appendMarkdown('| | | | | |\n')

@@ -24,6 +24,7 @@ export interface ServerDeps {
   getPort: () => number | undefined
   setPort: (port: number) => void | Thenable<void>
   inspectServer?: (baseUrl: string) => Promise<string | undefined | false>
+  onUnexpectedExit?: () => void
 }
 
 export interface RunningServer {
@@ -176,6 +177,7 @@ export class ManagedServer {
           this.child = undefined
           this.port = undefined
           this.deps.output.appendLine(`CLIProxyAPI exited unexpectedly (code=${code ?? 'null'}, signal=${sig ?? 'null'}); it will restart on next use.`)
+          this.deps.onUnexpectedExit?.()
         }
       })
       child.on('error', (error) => {

@@ -108,6 +108,17 @@ describe('server controller status snapshot', () => {
     expect(snapshot.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
   })
 
+  it('reports an unexpected managed server exit', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    await controller.ensureReady(false)
+    const server = (controller as unknown as { server: ManagedServer }).server
+    const onUnexpectedExit = (server as unknown as { deps: { onUnexpectedExit: () => void } }).deps.onUnexpectedExit
+
+    onUnexpectedExit()
+
+    expect(await controller.statusSnapshot()).toMatchObject({ mode: 'managed', status: 'error' })
+  })
+
   it('reports external mode and skips the account probe when no server answers', async () => {
     vscodeMock.settings.set('universalChatProvider.server.mode', 'external')
     vscodeMock.settings.set('universalChatProvider.baseUrl', 'http://127.0.0.1:9')

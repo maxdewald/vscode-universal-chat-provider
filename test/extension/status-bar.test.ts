@@ -27,13 +27,25 @@ describe('status bar', () => {
   it.each([
     ['external', '$(server) Universal Chat Provider', 'using an external server'],
     ['starting', '$(loading~spin) Universal Chat Provider', 'starting the managed server'],
-    ['running', '$(server-process) Universal Chat Provider', 'managed server running'],
-    ['error', '$(error) Universal Chat Provider', 'managed server failed to start'],
+    ['error', '$(warning) Universal Chat Provider', 'managed server is not running'],
   ] as const)('shows %s status', (status, text, tooltip) => {
     updateStatusBar(statusBarItem as never, status)
 
     expect(statusBarItem.text).toBe(text)
     expect(tooltipValue()).toContain(tooltip)
+  })
+
+  it('omits the healthy managed server state from the tooltip', () => {
+    updateStatusBar(statusBarItem as never, 'running')
+
+    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(tooltipValue()).not.toContain('managed server running')
+  })
+
+  it('warns in the bar when the managed server is unavailable', () => {
+    updateStatusBar(statusBarItem as never, 'error')
+
+    expect((statusBarItem.backgroundColor as ThemeColor).id).toBe('statusBarItem.warningBackground')
   })
 
   it('warns in the bar when the active model is low on quota', () => {

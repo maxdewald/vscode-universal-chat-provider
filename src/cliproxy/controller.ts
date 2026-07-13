@@ -266,6 +266,7 @@ export class ServerController implements ProxyConnection {
       output: this.output,
       requestedVersion: () => this.requestedVersion(),
       inspectServer: async baseUrl => this.inspectServer(baseUrl),
+      onUnexpectedExit: () => this.setStatus('error'),
     })
     this.paths = state.paths
     this.server = state.server

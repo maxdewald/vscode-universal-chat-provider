@@ -27,6 +27,7 @@ export interface ProvisionOptions {
   output: OutputChannel
   requestedVersion: () => string
   inspectServer: (baseUrl: string) => Promise<string | undefined | false>
+  onUnexpectedExit: () => void
 }
 
 export async function provisionManagedState(options: ProvisionOptions): Promise<ManagedState> {
@@ -59,6 +60,7 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
     getPort: () => context.globalState.get<number>(PORT_STATE_KEY),
     setPort: port => context.globalState.update(PORT_STATE_KEY, port),
     inspectServer: options.inspectServer,
+    onUnexpectedExit: options.onUnexpectedExit,
   })
   return { paths, server, managementKey }
 }
