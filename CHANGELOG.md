@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.2...v0.17.3) (2026-07-13)
+
+
+### Bug Fixes
+
+* **cliproxy:** sync config port when adopting server to prevent broken OAuth callbacks ([186406d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/186406d9a664d5c289b209c8a90900dd14e4e740))
+* preserve conflicting model aliases ([1946bd8](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1946bd834e38f06a280c275960a98f463c5a33fd))
+
+
+### Documentation
+
+* add demo section with showcase image ([38f0d70](https://github.com/maxdewald/vscode-universal-chat-provider/commit/38f0d701177382d1b1c04240e10504d61c8d27cd))
+* remove demo section description ([dda11cc](https://github.com/maxdewald/vscode-universal-chat-provider/commit/dda11cc60e77a9788fefd893e7158a110f9a4dec))
+
 ## [0.17.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.1...v0.17.2) (2026-07-13)
 
 
