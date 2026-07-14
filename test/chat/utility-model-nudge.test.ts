@@ -32,9 +32,10 @@ describe('setUtilityModel', () => {
 
     expect(vscodeMock.settings.get('chat.utilityModel')).toBe('universal-chat-provider/model-a')
     expect(vscodeMock.settings.get('chat.utilitySmallModel')).toBe('universal-chat-provider/model-a')
+    expect(vscodeMock.settings.get('github.copilot.chat.exploreAgent.model')).toBe('universal-chat-provider/model-a')
     expect(provider.updateUtilityEffort).toHaveBeenCalledWith('model-a', 'high')
     expect(window.showInformationMessage).toHaveBeenCalledWith(
-      'Copilot\'s commit messages, chat titles and summaries now use Model A (High).',
+      'Copilot\'s utility tasks and Explore agent now use Model A (High).',
     )
   })
 
@@ -47,6 +48,7 @@ describe('setUtilityModel', () => {
     await setUtilityModel(provider as never)
 
     expect(vscodeMock.settings.get('chat.utilityModel')).toBeUndefined()
+    expect(vscodeMock.settings.get('github.copilot.chat.exploreAgent.model')).toBeUndefined()
     expect(provider.updateUtilityEffort).not.toHaveBeenCalled()
   })
 })

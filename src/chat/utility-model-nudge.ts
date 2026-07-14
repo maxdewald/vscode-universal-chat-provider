@@ -73,8 +73,9 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
   await provider.updateUtilityEffort(selected.model.id, effort)
   await chat.update('utilityModel', value, ConfigurationTarget.Global)
   await chat.update('utilitySmallModel', value, ConfigurationTarget.Global)
+  await workspace.getConfiguration('github.copilot.chat').update('exploreAgent.model', value, ConfigurationTarget.Global)
   void window.showInformationMessage(
-    `Copilot's commit messages, chat titles and summaries now use ${selected.model.name}${effort !== undefined ? ` (${formatEffort(effort)})` : ''}.`,
+    `Copilot's utility tasks and Explore agent now use ${selected.model.name}${effort !== undefined ? ` (${formatEffort(effort)})` : ''}.`,
   )
 }
 
