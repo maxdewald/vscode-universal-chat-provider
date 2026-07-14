@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.19.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.18.1...v0.19.0) (2026-07-14)
+
+
+### Features
+
+* publish releases to Open VSX ([777c7e8](https://github.com/maxdewald/vscode-universal-chat-provider/commit/777c7e84b2280372787d385494e7d14e91e90d9e))
+* sync Explore with utility model ([b8b65fa](https://github.com/maxdewald/vscode-universal-chat-provider/commit/b8b65faf87ec70fb1f033c74320f889edd4daca8))
+
+
+### Bug Fixes
+
+* deduplicate model collision logs ([7c8c692](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7c8c69242edd761177dde0d4a41e9672e9082c90))
+* delay model refresh after server restart ([9f496ab](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9f496abfde5d456016734ec84f09ed5bffb8d0b8))
+* isolate cache prefix diagnostics ([ec9b25f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/ec9b25f0c63997b77c5342228d93d2710feef1b8))
+* make managed server restarts reliable ([7446ae4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7446ae47431cdbac5a32d8ea6bc31bad50459a07))
+
 ## [0.18.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.18.0...v0.18.1) (2026-07-14)
 
 
