@@ -4,7 +4,7 @@ import type { CredentialStore } from '../cliproxy/credentials'
 import type { ProviderModel } from './model'
 import { EventEmitter, window } from 'vscode'
 import { CLIProxyClient } from '../cliproxy/client'
-import { ProxyHttpError } from '../cliproxy/errors'
+import { isProxyCredentialRejection } from '../cliproxy/errors'
 import { errorMessage } from '../shared/errors'
 import { fetchCatalog } from './catalog'
 import { mapProxyModels } from './model'
@@ -113,8 +113,7 @@ export class ModelRegistry {
     }
     catch (error) {
       this.output.appendLine(`Model discovery failed: ${errorMessage(error)}`)
-      const rejectedCredentials = error instanceof ProxyHttpError && (error.status === 401 || error.status === 403)
-      if (rejectedCredentials)
+      if (isProxyCredentialRejection(error))
         this.hooks.onCredentialsRejected()
       else if (interactive)
         void window.showErrorMessage(`CLIProxyAPI model discovery failed: ${errorMessage(error)}`)

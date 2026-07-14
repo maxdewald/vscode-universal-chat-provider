@@ -39,17 +39,17 @@ describe('streamCompletion', () => {
   })
 
   it.each([
-    [401, 'NoPermissions', true],
-    [403, 'NoPermissions', true],
-    [404, 'NotFound', false],
-    [429, 'Blocked', false],
-  ])('maps HTTP %s errors', async (status, code, recovers) => {
+    [401, 'bad key', 'NoPermissions', true],
+    [403, 'The model grok-4.5 is not available in your region.', 'NoPermissions', false],
+    [404, 'failed', 'NotFound', false],
+    [429, 'failed', 'Blocked', false],
+  ])('maps HTTP %s errors', async (status, message, code, recovers) => {
     const rejected = vi.fn()
-    clientMocks.streamResponse.mockRejectedValueOnce(new ProxyHttpError('failed', status))
+    clientMocks.streamResponse.mockRejectedValueOnce(new ProxyHttpError(message, status))
 
     await expect(
       streamCompletion(deps('key', rejected), {}, callbacks()),
-    ).rejects.toMatchObject({ code, message: 'failed' })
+    ).rejects.toMatchObject({ code, message })
     expect(rejected).toHaveBeenCalledTimes(recovers ? 1 : 0)
   })
 })

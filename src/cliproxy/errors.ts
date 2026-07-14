@@ -6,3 +6,7 @@ export class ProxyHttpError extends Error {
     super(message)
   }
 }
+
+export function isProxyCredentialRejection(error: unknown): error is ProxyHttpError {
+  return error instanceof ProxyHttpError && error.status === 401
+}

@@ -91,11 +91,24 @@ describe('model registry', () => {
   it('handles rejected credentials without a generic error prompt', async () => {
     const rejected = vi.fn()
     const registry = createRegistry('secret', { onCredentialsRejected: rejected })
-    clientMocks.discover.mockRejectedValueOnce(new ProxyHttpError('bad key', 403))
+    clientMocks.discover.mockRejectedValueOnce(new ProxyHttpError('bad key', 401))
 
     await expect(registry.forceRefresh(true)).resolves.toEqual([])
     expect(rejected).toHaveBeenCalledTimes(1)
     expect(window.showErrorMessage).not.toHaveBeenCalled()
+  })
+
+  it('reports regional restrictions without starting credential recovery', async () => {
+    const rejected = vi.fn()
+    const registry = createRegistry('secret', { onCredentialsRejected: rejected })
+    const message = 'The model grok-4.5 is not available in your region.'
+    clientMocks.discover.mockRejectedValueOnce(new ProxyHttpError(message, 403))
+
+    await expect(registry.forceRefresh(true)).resolves.toEqual([])
+    expect(rejected).not.toHaveBeenCalled()
+    expect(window.showErrorMessage).toHaveBeenCalledWith(
+      `CLIProxyAPI model discovery failed: ${message}`,
+    )
   })
 })
 

@@ -4,7 +4,7 @@ import type { ProxyConnection } from '../cliproxy/connection'
 import type { CredentialStore } from '../cliproxy/credentials'
 import { LanguageModelError } from 'vscode'
 import { CLIProxyClient } from '../cliproxy/client'
-import { ProxyHttpError } from '../cliproxy/errors'
+import { isProxyCredentialRejection, ProxyHttpError } from '../cliproxy/errors'
 
 export interface CompletionDeps {
   connection: ProxyConnection
@@ -33,7 +33,7 @@ export async function streamCompletion(
   catch (error) {
     if (token?.isCancellationRequested)
       return
-    if (error instanceof ProxyHttpError && (error.status === 401 || error.status === 403))
+    if (isProxyCredentialRejection(error))
       deps.onCredentialsRejected()
     throw mapProviderError(error)
   }
