@@ -152,6 +152,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       ? utilityEffort ?? requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
       : requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
     const request = buildRequest(model, messages, options, chosenEffort)
+    const recordUsage = this.cacheMetrics.start({
+      model: model.proxyModelId,
+      promptCacheKey: asString(request.prompt_cache_key),
+      reasoningEffort: asString(asRecord(request.reasoning)?.effort),
+      inputItems: request.input as readonly unknown[],
+    })
     try {
       await streamCompletion(
         this.completionDeps(),
@@ -166,12 +172,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           onToolCall: (callId, name, input) =>
             progress.report(new LanguageModelToolCallPart(callId, name, input)),
           onUsage: (usage) => {
-            this.cacheMetrics.record(usage, {
-              model: model.proxyModelId,
-              promptCacheKey: asString(request.prompt_cache_key),
-              reasoningEffort: asString(asRecord(request.reasoning)?.effort),
-              inputItems: request.input as readonly unknown[],
-            })
+            recordUsage(usage)
             const part = createContextUsagePart(usage)
             if (part !== undefined)
               progress.report(part)

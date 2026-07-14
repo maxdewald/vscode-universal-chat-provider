@@ -124,9 +124,33 @@ describe('cacheMetricsTracker', () => {
     return new CacheMetricsTracker(context, vscodeMock.output as unknown as OutputChannel)
   }
 
+  function record(metrics: CacheMetricsTracker, usage: unknown, context: Parameters<CacheMetricsTracker['start']>[0]): void {
+    metrics.start(context)(usage)
+  }
+
+  interface Entry {
+    model: string
+    promptCacheKey?: string
+    shape: string
+    inputTokens: number
+    cacheReadTokens: number
+    hitRate: number | null
+    inputPrefix: string[] | null
+    crossTurn: {
+      stablePrefixLen: number
+      totalItems: number
+      diverged: { index: number, before: string, after: string }[]
+    } | null
+  }
+
+  async function entries(): Promise<Entry[]> {
+    const lines = (await readFile(join(directory, 'debug.jsonl'), 'utf8')).trim().split('\n')
+    return lines.map(line => JSON.parse(line) as Entry)
+  }
+
   it('logs the summary but writes nothing and hides the status bar while disabled', async () => {
     const metrics = tracker()
-    metrics.record({ output_tokens: 3 }, { model: 'model-a' })
+    record(metrics, { output_tokens: 3 }, { model: 'model-a' })
     await metrics.flush()
 
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
@@ -140,18 +164,20 @@ describe('cacheMetricsTracker', () => {
   it('records a JSONL line and a status-bar hit rate when enabled', async () => {
     vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
-    metrics.record(
-      { input_tokens: 300, cache_read_input_tokens: 700, cache_creation_input_tokens: 0, output_tokens: 50 },
-      { model: 'claude-opus', promptCacheKey: 'session-1' },
-    )
+    record(metrics, {
+      input_tokens: 300,
+      cache_read_input_tokens: 700,
+      cache_creation_input_tokens: 0,
+      output_tokens: 50,
+    }, { model: 'claude-opus', promptCacheKey: 'session-1' })
     await metrics.flush()
 
     expect(statusBarItem.show).toHaveBeenCalled()
     expect(statusBarItem.text).toBe('$(database) 70% cached')
 
-    const lines = (await readFile(join(directory, 'debug.jsonl'), 'utf8')).trim().split('\n')
-    expect(lines).toHaveLength(1)
-    expect(JSON.parse(lines[0]!)).toMatchObject({
+    const logged = await entries()
+    expect(logged).toHaveLength(1)
+    expect(logged[0]).toMatchObject({
       model: 'claude-opus',
       promptCacheKey: 'session-1',
       shape: 'anthropic',
@@ -165,25 +191,23 @@ describe('cacheMetricsTracker', () => {
     vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const system = { role: 'system', content: 'you are a helper' }
-    metrics.record({ input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
+    record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
       model: 'm',
+      promptCacheKey: 'session-1',
       inputItems: [system, { role: 'user', content: 'first' }],
     })
-    metrics.record({ input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
+    record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
       model: 'm',
+      promptCacheKey: 'session-1',
       inputItems: [system, { role: 'user', content: 'second' }],
     })
     await metrics.flush()
 
-    const lines = (await readFile(join(directory, 'debug.jsonl'), 'utf8')).trim().split('\n')
-    interface Entry {
-      inputPrefix: string[]
-      crossTurn: { stablePrefixLen: number, diverged: { index: number, before: string, after: string }[] } | null
-    }
-    const first = JSON.parse(lines[0]!) as Entry
-    const second = JSON.parse(lines[1]!) as Entry
-    expect(first.inputPrefix[0]).toBe(second.inputPrefix[0]) // identical system message → identical fingerprint (cacheable prefix)
-    expect(first.inputPrefix[1]).not.toBe(second.inputPrefix[1]) // different user turn → divergent fingerprint
+    const logged = await entries()
+    const first = logged[0]!
+    const second = logged[1]!
+    expect(first.inputPrefix![0]).toBe(second.inputPrefix![0]) // identical system message → identical fingerprint (cacheable prefix)
+    expect(first.inputPrefix![1]).not.toBe(second.inputPrefix![1]) // different user turn → divergent fingerprint
 
     expect(second.crossTurn!.stablePrefixLen).toBe(1)
     expect(second.crossTurn!.diverged[0]!.index).toBe(1)
@@ -196,24 +220,71 @@ describe('cacheMetricsTracker', () => {
     vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const head = 'x'.repeat(20_000)
-    metrics.record({ input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
+    record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
       model: 'm',
+      promptCacheKey: 'session-1',
       inputItems: [{ role: 'user', content: `${head}BEFORE_MARKER` }],
     })
-    metrics.record({ input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
+    record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
       model: 'm',
+      promptCacheKey: 'session-1',
       inputItems: [{ role: 'user', content: `${head}AFTER_MARKER` }],
     })
     await metrics.flush()
 
-    const lines = (await readFile(join(directory, 'debug.jsonl'), 'utf8')).trim().split('\n')
-    const second = JSON.parse(lines[1]!) as {
-      crossTurn: { diverged: { before: string, after: string }[] }
-    }
-    const { before, after } = second.crossTurn.diverged[0]!
+    const logged = await entries()
+    const { before, after } = logged[1]!.crossTurn!.diverged[0]!
     expect(before).toContain('BEFORE_MARKER')
     expect(after).toContain('AFTER_MARKER')
     expect(before).toMatch(/^…\(\+\d+\)/)
     expect(before.length).toBeLessThan(head.length)
+  })
+
+  it('isolates prefix comparisons by prompt cache key', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
+    const systemA = { role: 'system', content: 'session a' }
+    const systemB = { role: 'system', content: 'session b' }
+
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [systemA] })
+    record(metrics, usage, { model: 'm', promptCacheKey: 'b', inputItems: [systemB] })
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [systemA, { role: 'user', content: 'next' }] })
+    await metrics.flush()
+
+    const logged = await entries()
+    expect(logged[0]!.crossTurn).toBeNull()
+    expect(logged[1]!.crossTurn).toBeNull()
+    expect(logged[2]!.crossTurn).toMatchObject({ stablePrefixLen: 1, totalItems: 2 })
+  })
+
+  it('keeps invocation order when same-key requests complete in reverse order', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
+    const system = { role: 'system', content: 'stable' }
+    const first = metrics.start({ model: 'm', promptCacheKey: 'session-1', inputItems: [system] })
+    const second = metrics.start({ model: 'm', promptCacheKey: 'session-1', inputItems: [system, { role: 'user', content: 'next' }] })
+
+    second(usage)
+    first(usage)
+    await metrics.flush()
+
+    const logged = await entries()
+    expect(logged[0]!.crossTurn).toMatchObject({ stablePrefixLen: 1, totalItems: 2 })
+    expect(logged[1]!.crossTurn).toBeNull()
+  })
+
+  it('does not compare requests without a prompt cache key', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
+
+    record(metrics, usage, { model: 'm', inputItems: [{ role: 'system', content: 'first' }] })
+    record(metrics, usage, { model: 'm', inputItems: [{ role: 'system', content: 'second' }] })
+    await metrics.flush()
+
+    const logged = await entries()
+    expect(logged.map(entry => entry.crossTurn)).toEqual([null, null])
   })
 })

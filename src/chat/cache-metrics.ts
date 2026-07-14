@@ -179,8 +179,8 @@ export function formatUsageLine(
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
   private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0 }
+  private readonly lastItemsByCacheKey = new Map<string, readonly unknown[]>()
   private writes: Promise<void> = Promise.resolve()
-  private lastItems: readonly unknown[] | undefined
 
   constructor(
     private readonly context: ExtensionContext,
@@ -194,16 +194,22 @@ export class CacheMetricsTracker {
       this.statusBar.hide()
   }
 
-  record(usage: unknown, context: UsageContext): void {
+  start(context: UsageContext): (usage: unknown) => void {
+    let diff: CrossTurnDiff | undefined
+    if (this.enabled() && context.promptCacheKey !== undefined && context.inputItems !== undefined) {
+      diff = crossTurnDiff(this.lastItemsByCacheKey.get(context.promptCacheKey), context.inputItems)
+      this.lastItemsByCacheKey.set(context.promptCacheKey, context.inputItems)
+    }
+    return usage => this.record(usage, context, diff)
+  }
+
+  private record(usage: unknown, context: UsageContext, diff: CrossTurnDiff | undefined): void {
     const summary = normalizeUsage(usage)
     this.output.appendLine(formatUsageLine(context.model, summary, usage, context.reasoningEffort))
     if (!this.enabled()) {
       this.statusBar.hide()
       return
     }
-    const diff = crossTurnDiff(this.lastItems, context.inputItems)
-    if (context.inputItems !== undefined)
-      this.lastItems = context.inputItems
     if (diff !== undefined)
       this.output.appendLine(formatPrefixLine(context.model, diff))
     this.accumulate(summary)
