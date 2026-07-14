@@ -18,11 +18,11 @@ function labels(): string[] {
   return (quickPick.items as QuickPickItem[]).map(item => item.label)
 }
 
-const RESET: CodexResetOption = {
+const RESET = {
   account: { authIndex: 'codex-1', label: 'one@example.com', accountId: 'acct-1' },
   credit: { id: 'credit-1', expiresAt: Date.parse('2026-07-20T00:00:00Z') },
   availableCount: 2,
-}
+} satisfies CodexResetOption
 
 async function clickReset(): Promise<void> {
   const item = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
@@ -115,7 +115,7 @@ describe('showQuotaMenu', () => {
     ])
     const resetItems = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).filter(item => item.reset !== undefined)
     expect(resetItems.map(item => item.description)).toEqual([
-      `Next reset expires ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt!)}`,
+      `Next reset expires ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt)}`,
       'Next reset does not expire',
     ])
     expect(resetItems.every(item => item.buttons?.[0]?.tooltip === 'Use next reset')).toBe(true)
@@ -142,10 +142,10 @@ describe('showQuotaMenu', () => {
 
   it('gives a stronger warning when the account still has usage remaining', async () => {
     const claim = vi.fn()
-    const resetWithUsage: CodexResetOption = {
+    const resetWithUsage = {
       ...RESET,
       hasRemainingUsage: true,
-    }
+    } satisfies CodexResetOption
     window.showWarningMessage.mockResolvedValueOnce(undefined)
     await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [resetWithUsage], claimCodexReset: claim })
 

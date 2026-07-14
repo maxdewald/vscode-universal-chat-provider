@@ -35,7 +35,7 @@ interface QuotaSource {
   apply: (report: QuotaReport, data: Record<string, unknown>) => void
 }
 
-const QUOTA_SOURCES: Record<QuotaReport['provider'], QuotaSource> = {
+const QUOTA_SOURCES = {
   codex: {
     // The credential identifies the account; no Chatgpt-Account-Id header needed.
     method: 'GET',
@@ -69,7 +69,7 @@ const QUOTA_SOURCES: Record<QuotaReport['provider'], QuotaSource> = {
       report.windows = parseGrokWindows(data)
     },
   },
-}
+} satisfies Record<QuotaReport['provider'], QuotaSource>
 
 export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)

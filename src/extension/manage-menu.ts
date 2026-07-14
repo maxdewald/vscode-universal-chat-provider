@@ -105,12 +105,12 @@ export async function manageProvider(controller: ServerController | undefined): 
 }
 
 function statusEntry(snapshot: ServerStatusSnapshot): QuickPickItem & { command: string } {
-  const presentation: Record<ServerStatus, { icon: string, label: string }> = {
+  const presentation = {
     external: { icon: '$(server)', label: 'External CLI Proxy API server' },
     starting: { icon: '$(loading~spin)', label: 'Managed CLI Proxy API server starting…' },
     running: { icon: '$(server-process)', label: 'Managed CLI Proxy API server running' },
     error: { icon: '$(error)', label: 'Managed CLI Proxy API server failed to start' },
-  }
+  } satisfies Record<ServerStatus, { icon: string, label: string }>
   const { icon, label } = presentation[snapshot.status]
   const accounts = snapshot.accounts === undefined
     ? undefined
