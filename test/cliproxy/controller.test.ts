@@ -75,6 +75,21 @@ describe('server controller lifecycle', () => {
     ))
   })
 
+  it('waits for model registration to settle before refreshing after restart', async () => {
+    vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
+    const refresh = vi.fn()
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    controller.setRefreshListener(refresh)
+
+    await controller.restartServer()
+    expect(refresh).not.toHaveBeenCalled()
+
+    const scheduleRefresh = (controller as unknown as { scheduleRefresh: { flush: () => void } }).scheduleRefresh
+    scheduleRefresh.flush()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    controller.dispose()
+  })
+
   it('logs restart failures and offers both server log channels', async () => {
     const error = new Error('process ID is unavailable')
     vi.spyOn(ManagedServer.prototype, 'restart').mockRejectedValue(error)

@@ -171,7 +171,7 @@ export class ServerController implements ProxyConnection {
       void window.showInformationMessage(previous === current
         ? `CLIProxyAPI ${current ?? 'binary'} is already installed.`
         : `CLIProxyAPI updated from ${previous ?? 'an unknown version'} to ${current ?? version}.`)
-      this.notifyAccountsChanged()
+      this.scheduleRefresh()
     }
     catch (error) {
       this.setStatus('error')
@@ -221,7 +221,7 @@ export class ServerController implements ProxyConnection {
       await this.server!.restart()
       this.setStatus('running')
       void window.showInformationMessage('Managed CLIProxyAPI restarted.')
-      this.notifyAccountsChanged()
+      this.scheduleRefresh()
     }
     catch (error) {
       this.setStatus('error')
