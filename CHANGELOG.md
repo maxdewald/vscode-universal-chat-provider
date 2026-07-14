@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.1...v0.19.2) (2026-07-14)
+
+
+### Bug Fixes
+
+* refresh models after server settles ([e382c4e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e382c4efbeb29c8851d4a7df8de117e16015c468))
+
+
+### Refactoring
+
+* preserve narrow type inference ([4c3bfa7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4c3bfa7c3c0733e44b50abe43e17ff4331bc097e))
+
 ## [0.19.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.0...v0.19.1) (2026-07-14)
 
 
