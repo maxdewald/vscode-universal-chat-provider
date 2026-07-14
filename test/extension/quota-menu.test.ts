@@ -4,7 +4,7 @@ import type { QuotaSection } from '../../src/extension/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuickPickItemKind } from 'vscode'
 import { showQuotaMenu } from '../../src/extension/quota-menu'
-import { quickPick, resetVSCodeMock, triggerQuickPickItemButton, window } from '../support/vscode'
+import { env, quickPick, resetVSCodeMock, triggerQuickPickItemButton, window } from '../support/vscode'
 
 beforeEach(() => {
   resetVSCodeMock()
@@ -99,6 +99,7 @@ describe('showQuotaMenu', () => {
   })
 
   it('shows one reset action per eligible account', async () => {
+    env.language = 'de-DE'
     await showQuotaMenu(source([]), async () => {}, {
       listCodexResets: async () => [RESET, {
         account: { authIndex: 'codex-2', label: 'two@example.com' },
@@ -113,6 +114,10 @@ describe('showQuotaMenu', () => {
       'Codex · two@example.com — 1 reset available',
     ])
     const resetItems = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).filter(item => item.reset !== undefined)
+    expect(resetItems.map(item => item.description)).toEqual([
+      `Next reset expires ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt!)}`,
+      'Next reset does not expire',
+    ])
     expect(resetItems.every(item => item.buttons?.[0]?.tooltip === 'Use next reset')).toBe(true)
   })
 

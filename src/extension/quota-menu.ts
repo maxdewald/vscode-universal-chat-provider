@@ -1,7 +1,7 @@
 import type { QuickInputButton, QuickPickItem } from 'vscode'
 import type { CodexResetOption, CodexResetOutcome } from '../cliproxy/codex-resets'
 import { randomUUID } from 'node:crypto'
-import { QuickPickItemKind, ThemeIcon, window } from 'vscode'
+import { env, QuickPickItemKind, ThemeIcon, window } from 'vscode'
 import { formatPercent, formatResetCountdown } from '../cliproxy/quota'
 
 export interface QuotaEntry {
@@ -126,7 +126,7 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   const codex = grouped.get('Codex') ?? []
   codex.push(...resets.map(option => ({
     label: `Codex · ${option.account.label} — ${option.availableCount} ${option.availableCount === 1 ? 'reset' : 'resets'} available`,
-    description: option.credit.expiresAt === undefined ? 'Next reset does not expire' : `Next reset expires ${new Date(option.credit.expiresAt).toLocaleString()}`,
+    description: option.credit.expiresAt === undefined ? 'Next reset does not expire' : `Next reset expires ${formatExpiration(option.credit.expiresAt)}`,
     buttons: [USE_RESET_BUTTON],
     reset: option,
   })))
@@ -137,4 +137,8 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
     ...entries,
   ])
   return items.length > 0 ? items : [{ label: 'No model quota information is available yet.' }]
+}
+
+function formatExpiration(expiresAt: number): string {
+  return new Intl.DateTimeFormat(env.language, { dateStyle: 'medium', timeStyle: 'short' }).format(expiresAt)
 }
