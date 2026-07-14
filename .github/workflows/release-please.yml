@@ -61,6 +61,6 @@ jobs:
 
       - name: Publish extension to VSC Marketplace
         if: ${{ steps.release.outputs.release_created }}
-        run: pnpm ext:publish
+        run: pnpm exec vsce publish --packagePath ./*.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
