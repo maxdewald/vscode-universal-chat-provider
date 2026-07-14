@@ -32,9 +32,6 @@
   "files": [
     "LICENSE.md",
     "dist/*",
-    "images/how-it-works-dark.png",
-    "images/how-it-works-light.png",
-    "images/how-it-works.svg",
     "images/logo.png"
   ],
   "engines": {
