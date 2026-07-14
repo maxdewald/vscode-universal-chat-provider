@@ -52,6 +52,29 @@ describe('model registry', () => {
     expect(changes).toHaveBeenCalledTimes(1)
   })
 
+  it('logs collisions only when they enter the current collision set', async () => {
+    const registry = createRegistry('secret')
+    const message = 'Model display collision for Test "Model": model-a, model-b; showing full IDs.'
+
+    clientMocks.discover.mockResolvedValue(collidingDiscovery())
+    await registry.forceRefresh(false)
+    expect(outputMessages(message)).toHaveLength(1)
+
+    await registry.forceRefresh(false)
+    expect(outputMessages(message)).toHaveLength(1)
+
+    registry.reset()
+    await registry.forceRefresh(false)
+    expect(outputMessages(message)).toHaveLength(2)
+
+    clientMocks.discover.mockResolvedValueOnce(discovery())
+    await registry.forceRefresh(false)
+    expect(outputMessages(message)).toHaveLength(2)
+
+    await registry.forceRefresh(false)
+    expect(outputMessages(message)).toHaveLength(3)
+  })
+
   it('retains cached models on discovery failure and reports interactive errors', async () => {
     const registry = createRegistry('secret')
     clientMocks.discover.mockResolvedValueOnce(discovery())
@@ -101,4 +124,21 @@ function discovery() {
     available: [{ id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 }],
     metadata: [],
   }
+}
+
+function collidingDiscovery() {
+  return {
+    available: [
+      { id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
+      { id: 'model-b', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
+    ],
+    metadata: [
+      { slug: 'model-a', display_name: 'Model (Low)', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
+      { slug: 'model-b', display_name: 'Model (High)', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
+    ],
+  }
+}
+
+function outputMessages(message: string): unknown[][] {
+  return vscodeMock.output.appendLine.mock.calls.filter(call => call[0] === message)
 }
