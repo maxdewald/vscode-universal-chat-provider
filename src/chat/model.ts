@@ -132,19 +132,12 @@ export function mapProxyModels(
 }
 
 function ambiguousDisplayNames(candidates: readonly ModelCandidate[], options: ModelMappingOptions): Set<string> {
-  for (const group of Map.groupBy(candidates, displayBaseKey).values()) {
-    if (group.length > 1)
-      options.onCollision?.(`Model display collision for ${formatProviderName(group[0]!.providerName)} "${group[0]!.baseName}": ${group.map(candidate => candidate.entry.id).join(', ')}; showing full IDs.`)
-  }
-
-  const seen = new Set<string>()
   const ambiguous = new Set<string>()
-  for (const candidate of candidates) {
-    const key = displayBaseKey(candidate)
-    if (seen.has(key))
+  for (const [key, group] of Map.groupBy(candidates, displayBaseKey)) {
+    if (group.length > 1) {
       ambiguous.add(key)
-    else
-      seen.add(key)
+      options.onCollision?.(`Model display collision for ${formatProviderName(group[0]!.providerName)} "${group[0]!.baseName}": ${group.map(candidate => candidate.entry.id).join(', ')}; showing full IDs.`)
+    }
   }
   return ambiguous
 }
@@ -289,12 +282,10 @@ function isNameEcho(description: string, name: string): boolean {
   return normalize(description) === normalize(name)
 }
 
+const tokenFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
 function formatTokens(value: number): string {
-  if (value >= 1_000_000)
-    return `${Number((value / 1_000_000).toFixed(1))}M`
-  if (value >= 1_000)
-    return `${Number((value / 1_000).toFixed(1))}K`
-  return String(value)
+  return tokenFormat.format(value)
 }
 
 function formatProviderName(value: string): string {

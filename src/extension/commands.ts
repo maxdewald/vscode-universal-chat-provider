@@ -7,15 +7,12 @@ import { extensionId } from '../generated/meta'
 import { manageProvider } from './manage-menu'
 import { showQuotaMenu } from './quota-menu'
 
-export interface CommandDeps {
-  provider: UniversalChatProvider
-  controller: ServerController
-  output: OutputChannel
-  serverOutput: OutputChannel
-}
-
-export function registerCommands(deps: CommandDeps): Disposable[] {
-  const { provider, controller, output, serverOutput } = deps
+export function registerCommands(
+  provider: UniversalChatProvider,
+  controller: ServerController,
+  output: OutputChannel,
+  serverOutput: OutputChannel,
+): Disposable[] {
   return [
     commands.registerCommand('universalChatProvider.manage', async () => manageProvider(controller)),
     commands.registerCommand('universalChatProvider.login', async () => {
@@ -25,7 +22,7 @@ export function registerCommands(deps: CommandDeps): Disposable[] {
       await controller.manageAccounts()
     }),
     commands.registerCommand('universalChatProvider.showQuota', async () => {
-      await showQuotaMenu(provider, async () => controller.refreshQuotas())
+      await showQuotaMenu(() => provider.quotaSections(), async () => controller.refreshQuotas())
     }),
     commands.registerCommand('universalChatProvider.configure', async () => {
       await provider.configure()

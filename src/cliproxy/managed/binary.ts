@@ -8,10 +8,10 @@ import ky from 'ky'
 import { parseTarGzip } from 'nanotar'
 import semver from 'semver'
 
-export const REPO = 'router-for-me/CLIProxyAPI'
+const REPO = 'router-for-me/CLIProxyAPI'
 export const DEFAULT_BINARY_VERSION = '7.2.5'
 
-export interface AssetInfo {
+interface AssetInfo {
   assetName: string
   binaryName: string
   isZip: boolean
@@ -38,16 +38,12 @@ export function parseChecksums(text: string): Map<string, string> {
   return result
 }
 
-export function sha256(data: Uint8Array): string {
-  return createHash('sha256').update(data).digest('hex')
-}
-
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, '')
 }
 
 // ky retries transient failures (5xx/429/network) and honors Retry-After on rate limits.
-export const fetcher = ky.create({
+const fetcher = ky.create({
   headers: { 'User-Agent': 'universal-chat-provider-vscode' },
   retry: { limit: 3 },
   timeout: false,
@@ -64,14 +60,14 @@ export async function resolveVersion(requested: string, signal?: AbortSignal): P
   return normalizeVersion(payload.tag_name)
 }
 
-export interface AcquireOptions {
+interface AcquireOptions {
   binDir: string
   requestedVersion: string
   output: OutputChannel
   signal?: AbortSignal
 }
 
-export interface AcquireResult {
+interface AcquireResult {
   binaryPath: string
   version: string
 }
@@ -98,7 +94,7 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   const expected = parseChecksums(await checksumResponse.text()).get(asset.assetName)
   if (expected === undefined)
     throw new Error(`No checksum found for ${asset.assetName}.`)
-  const actual = sha256(archive)
+  const actual = createHash('sha256').update(archive).digest('hex')
   if (actual !== expected)
     throw new Error(`Checksum mismatch for ${asset.assetName} (expected ${expected}, got ${actual}).`)
 

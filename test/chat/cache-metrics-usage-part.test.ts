@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LanguageModelDataPart } from 'vscode'
-import { createContextUsagePart } from '../../src/chat/context-usage'
+import { createContextUsagePart } from '../../src/chat/cache-metrics'
 
 describe('createContextUsagePart', () => {
   it('returns nothing when usage has no tokens', () => {

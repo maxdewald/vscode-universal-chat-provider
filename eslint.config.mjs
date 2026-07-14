@@ -12,9 +12,4 @@ export default antfu(
       'vscode*.d.ts',
     ],
   },
-  {
-    rules: {
-      // overrides
-    },
-  },
 )

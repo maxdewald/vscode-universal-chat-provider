@@ -28,19 +28,56 @@ function sevenDayFamily(key: string | undefined): string | undefined {
   return SEVEN_DAY_FAMILY.exec(key ?? '')?.[1]
 }
 
+interface QuotaSource {
+  method: 'GET' | 'POST'
+  url: string
+  header: Record<string, string>
+  apply: (report: QuotaReport, data: Record<string, unknown>) => void
+}
+
+const QUOTA_SOURCES: Record<QuotaReport['provider'], QuotaSource> = {
+  codex: {
+    // The credential identifies the account; no Chatgpt-Account-Id header needed.
+    method: 'GET',
+    url: WHAM_USAGE_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' },
+    apply: (report, data) => {
+      report.windows = parseCodexWindows(data)
+    },
+  },
+  antigravity: {
+    method: 'POST',
+    url: ANTIGRAVITY_MODELS_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json', 'User-Agent': 'antigravity/1.11.5 windows/amd64' },
+    apply: (report, data) => {
+      report.models = parseAntigravityModels(data)
+    },
+  },
+  claude: {
+    method: 'GET',
+    url: CLAUDE_USAGE_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' },
+    apply: (report, data) => {
+      report.windows = parseClaudeWindows(data)
+    },
+  },
+  grok: {
+    method: 'GET',
+    url: GROK_BILLING_URL,
+    header: { 'Authorization': 'Bearer $TOKEN$', 'X-XAI-Token-Auth': 'xai-grok-cli', 'Accept': 'application/json' },
+    apply: (report, data) => {
+      report.windows = parseGrokWindows(data)
+    },
+  },
+}
+
 export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
-    const provider = str(entry.provider ?? entry.type).toLowerCase()
-    if (provider === 'codex')
-      return [fetchCodexQuota(client, entry, signal)]
-    if (provider === 'antigravity')
-      return [fetchAntigravityQuota(client, entry, signal)]
-    if (provider === 'claude')
-      return [fetchClaudeQuota(client, entry, signal)]
-    if (provider === 'xai' || provider === 'grok')
-      return [fetchGrokQuota(client, entry, signal)]
-    return []
+    const raw = str(entry.provider ?? entry.type).toLowerCase()
+    const provider = raw === 'xai' ? 'grok' : raw
+    const source = QUOTA_SOURCES[provider as QuotaReport['provider']]
+    return source === undefined ? [] : [fetchProviderQuota(provider as QuotaReport['provider'], source, client, entry, signal)]
   })
   return Promise.all(tasks)
 }
@@ -100,91 +137,40 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
   return undefined
 }
 
-async function fetchQuotaReport(
+async function fetchProviderQuota(
+  provider: QuotaReport['provider'],
+  source: QuotaSource,
   client: ManagementClient,
-  report: QuotaReport,
-  request: Record<string, unknown>,
-  apply: (report: QuotaReport, data: Record<string, unknown>) => void,
+  entry: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<QuotaReport> {
+  const report: QuotaReport = { provider, windows: [] }
+  const authIndex = str(entry.auth_index)
+  if (authIndex === '')
+    return { ...report, error: 'missing auth_index' }
+  // Antigravity is the only source with a request payload: its models endpoint takes the project.
+  const projectId = str(entry.project_id)
+  if (provider === 'antigravity' && projectId === '')
+    return { ...report, error: 'missing project_id' }
   try {
-    const { statusCode, body } = await client.apiCall(request, signal)
+    const { statusCode, body } = await client.apiCall({
+      auth_index: authIndex,
+      method: source.method,
+      url: source.url,
+      header: source.header,
+      ...(provider === 'antigravity' ? { data: JSON.stringify({ project: projectId }) } : {}),
+    }, signal)
     if (statusCode < 200 || statusCode >= 300)
       return { ...report, error: `HTTP ${statusCode}` }
     const data = parseBody(body)
     if (data === undefined)
       return { ...report, error: 'invalid quota payload' }
-    apply(report, data)
+    source.apply(report, data)
     return report
   }
   catch (error) {
     return { ...report, error: errorMessage(error) }
   }
-}
-
-async function fetchCodexQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
-  const report: QuotaReport = { provider: 'codex', windows: [] }
-  const authIndex = str(entry.auth_index)
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
-  // The credential identifies the account; no Chatgpt-Account-Id header needed.
-  return fetchQuotaReport(client, report, {
-    auth_index: authIndex,
-    method: 'GET',
-    url: WHAM_USAGE_URL,
-    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' },
-  }, (r, data) => {
-    r.windows = parseCodexWindows(data)
-  }, signal)
-}
-
-async function fetchAntigravityQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
-  const report: QuotaReport = { provider: 'antigravity', windows: [] }
-  const authIndex = str(entry.auth_index)
-  const projectId = str(entry.project_id)
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
-  if (projectId === '')
-    return { ...report, error: 'missing project_id' }
-  return fetchQuotaReport(client, report, {
-    auth_index: authIndex,
-    method: 'POST',
-    url: ANTIGRAVITY_MODELS_URL,
-    header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json', 'User-Agent': 'antigravity/1.11.5 windows/amd64' },
-    data: JSON.stringify({ project: projectId }),
-  }, (r, data) => {
-    r.models = parseAntigravityModels(data)
-  }, signal)
-}
-
-async function fetchClaudeQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
-  const report: QuotaReport = { provider: 'claude', windows: [] }
-  const authIndex = str(entry.auth_index)
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
-  return fetchQuotaReport(client, report, {
-    auth_index: authIndex,
-    method: 'GET',
-    url: CLAUDE_USAGE_URL,
-    header: { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' },
-  }, (r, data) => {
-    r.windows = parseClaudeWindows(data)
-  }, signal)
-}
-
-async function fetchGrokQuota(client: ManagementClient, entry: Record<string, unknown>, signal?: AbortSignal): Promise<QuotaReport> {
-  const report: QuotaReport = { provider: 'grok', windows: [] }
-  const authIndex = str(entry.auth_index)
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
-  return fetchQuotaReport(client, report, {
-    auth_index: authIndex,
-    method: 'GET',
-    url: GROK_BILLING_URL,
-    header: { 'Authorization': 'Bearer $TOKEN$', 'X-XAI-Token-Auth': 'xai-grok-cli', 'Accept': 'application/json' },
-  }, (r, data) => {
-    r.windows = parseGrokWindows(data)
-  }, signal)
 }
 
 // Grok Build/SuperGrok bills in monthly credits; report the single account-level window as

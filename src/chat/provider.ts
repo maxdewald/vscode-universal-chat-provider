@@ -19,18 +19,15 @@ import {
   LanguageModelTextPart,
   LanguageModelToolCallPart,
 } from 'vscode'
-import { SettingsConnection } from '../cliproxy/connection'
 import { CredentialStore } from '../cliproxy/credentials'
 import { remainingForModel } from '../cliproxy/quota'
 import { asRecord, asString } from '../shared/json'
-import { CacheMetricsTracker } from './cache-metrics'
+import { CacheMetricsTracker, createContextUsagePart } from './cache-metrics'
 import { streamCompletion } from './completion'
-import { createContextUsagePart } from './context-usage'
 import { CredentialFlows } from './credential-flows'
 import { estimateTokens } from './estimate'
 import { ModelRegistry } from './model-registry'
 import { buildRequest } from './request'
-import { lowestReasoningEffort } from './utility-model-nudge'
 
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 
@@ -52,7 +49,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   constructor(
     private readonly context: ExtensionContext,
     private readonly output: OutputChannel,
-    private readonly connection: ProxyConnection = new SettingsConnection(),
+    private readonly connection: ProxyConnection,
     private readonly onSignIn?: () => Promise<void>,
   ) {
     this.credentials = new CredentialStore(context)
@@ -150,7 +147,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     const storedUtilityEffort = this.getUtilityEffort(model.id)
     const utilityEffort = storedUtilityEffort !== undefined && model.reasoningLevels.includes(storedUtilityEffort)
       ? storedUtilityEffort
-      : lowestReasoningEffort(model.reasoningLevels)
+      : model.reasoningLevels[0]
     const chosenEffort = requestOptions.requestInitiator === 'core'
       ? utilityEffort ?? requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
       : requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort

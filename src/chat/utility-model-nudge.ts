@@ -1,16 +1,10 @@
 import type { ExtensionContext } from 'vscode'
-import type { ProviderModel } from './model'
+import type { UniversalChatProvider } from './provider'
 import { commands, ConfigurationTarget, extensions, window, workspace } from 'vscode'
 
 const SHOWN_KEY = 'universalChatProvider.utilityModelNudgeShown'
 const SET_COMMAND = 'universalChatProvider.setUtilityModel'
 const UCP_PREFIX = 'universal-chat-provider/'
-
-interface UtilityModelProvider {
-  getModels: (interactive: boolean) => Promise<readonly ProviderModel[]>
-  getUtilityEffort: (modelId: string) => string | undefined
-  updateUtilityEffort: (modelId: string, effort: string | undefined) => Promise<void>
-}
 
 export function shouldNudge(opts: {
   alreadyShown: boolean
@@ -43,7 +37,7 @@ export async function maybeSuggestUtilityModel(context: ExtensionContext): Promi
     await commands.executeCommand(SET_COMMAND)
 }
 
-export async function setUtilityModel(provider: UtilityModelProvider): Promise<void> {
+export async function setUtilityModel(provider: UniversalChatProvider): Promise<void> {
   const models = await provider.getModels(true)
   if (models.length === 0) {
     void window.showWarningMessage(
@@ -84,17 +78,13 @@ export async function setUtilityModel(provider: UtilityModelProvider): Promise<v
   )
 }
 
-export function lowestReasoningEffort(levels: readonly string[]): string | undefined {
-  return levels[0]
-}
-
 async function pickUtilityEffort(model: { reasoningLevels: readonly string[] }, current: string | undefined): Promise<string | undefined> {
   if (model.reasoningLevels.length === 0)
     return undefined
   if (model.reasoningLevels.length === 1)
     return model.reasoningLevels[0]
 
-  const fallback = lowestReasoningEffort(model.reasoningLevels)
+  const fallback = model.reasoningLevels[0]
   const picked = current !== undefined && model.reasoningLevels.includes(current) ? current : fallback
   const selected = await window.showQuickPick(
     model.reasoningLevels.map(effort => ({

@@ -14,21 +14,9 @@ export default defineConfig({
       exclude: ['src/generated/**'],
       reporter: ['text', 'html'],
     },
-    projects: [
-      {
-        resolve: {
-          alias: {
-            vscode: fileURLToPath(new URL('./test/support/vscode.ts', import.meta.url)),
-          },
-        },
-        test: {
-          name: 'test:unit',
-          include: ['test/**/*.test.ts'],
-          clearMocks: true,
-          restoreMocks: true,
-          unstubGlobals: true,
-        },
-      },
-    ],
+    include: ['test/**/*.test.ts'],
+    clearMocks: true,
+    restoreMocks: true,
+    unstubGlobals: true,
   },
 })

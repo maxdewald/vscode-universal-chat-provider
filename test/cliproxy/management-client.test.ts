@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOGIN_PROVIDERS, ManagementClient, ManagementError } from '../../src/cliproxy/management-client'
+import { LOGIN_PROVIDERS, ManagementClient } from '../../src/cliproxy/management-client'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -57,12 +57,11 @@ describe('management client', () => {
     expect(request.method).toBe('DELETE')
   })
 
-  it('surfaces management errors with their status and message', async () => {
+  it('surfaces management errors with their message', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'invalid key' }, { status: 401 })))
     const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
 
     await expect(client.listAuthFiles()).rejects.toMatchObject({ message: 'invalid key' })
-    await expect(client.listAuthFiles()).rejects.toBeInstanceOf(ManagementError)
   })
 
   it('retries transient local api-call failures with ky', async () => {

@@ -14,38 +14,15 @@ export interface ServerStatusSnapshot {
   accounts?: number
 }
 
-export interface StatusInputs {
-  mode: ServerMode
-  lastStatus: ServerStatus
-  baseUrl: string
-  version: string | undefined
-  management: ManagementEndpoint | undefined
-}
-
-export async function buildStatusSnapshot(inputs: StatusInputs): Promise<ServerStatusSnapshot> {
-  const snapshot: ServerStatusSnapshot = {
-    mode: inputs.mode,
-    status: inputs.mode === 'external' ? 'external' : inputs.lastStatus,
-    baseUrl: inputs.baseUrl,
-    ...(inputs.version !== undefined ? { version: inputs.version } : {}),
-  }
-  const accounts = await countAccounts(inputs.management)
-  return accounts === undefined ? snapshot : { ...snapshot, accounts }
-}
-
-async function countAccounts(management: ManagementEndpoint | undefined): Promise<number | undefined> {
+export async function countAccounts(management: ManagementEndpoint | undefined): Promise<number | undefined> {
   if (management === undefined)
     return undefined
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), STATUS_PROBE_TIMEOUT_MS)
   try {
-    const files = await new ManagementClient(management.baseUrl, management.key).listAuthFiles(controller.signal)
+    const files = await new ManagementClient(management.baseUrl, management.key)
+      .listAuthFiles(AbortSignal.timeout(STATUS_PROBE_TIMEOUT_MS))
     return files.length
   }
   catch {
     return undefined
-  }
-  finally {
-    clearTimeout(timer)
   }
 }

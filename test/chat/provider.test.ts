@@ -334,7 +334,7 @@ function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): Univer
   return new UniversalChatProvider(
     context,
     vscodeMock.output as unknown as OutputChannel,
-    undefined,
+    { ensureReady: async () => {}, baseUrl: () => 'http://127.0.0.1:8317' },
     onSignIn,
   )
 }

@@ -13,13 +13,9 @@ export interface QuotaSection {
   entries: QuotaEntry[]
 }
 
-export interface QuotaSource {
-  quotaSections: () => QuotaSection[]
-}
-
 // Opens instantly with a loading spinner, then fills in once the refresh resolves — so the
 // menu never blocks on the per-account network round-trips and never shows stale numbers.
-export async function showQuotaMenu(source: QuotaSource, refresh: () => Promise<void>): Promise<void> {
+export async function showQuotaMenu(getSections: () => QuotaSection[], refresh: () => Promise<void>): Promise<void> {
   const picker = window.createQuickPick()
   picker.title = 'Model Quota'
   picker.placeholder = 'Loading quota…'
@@ -35,25 +31,18 @@ export async function showQuotaMenu(source: QuotaSource, refresh: () => Promise<
   await refresh().catch(() => {})
   if (!open)
     return
-  picker.items = buildItems(source.quotaSections())
+  picker.items = buildItems(getSections())
   picker.placeholder = 'Remaining quota'
   picker.busy = false
 }
 
 function buildItems(sections: QuotaSection[]): QuickPickItem[] {
   const items = sections.flatMap(section =>
-    section.entries.map(entry => ({
-      label: `${section.title} · ${entry.name} — ${formatRemaining(entry.remainingPercent)}${formatResetSuffix(entry.resetsAt)}`,
-    })),
+    section.entries.map((entry) => {
+      const remaining = entry.remainingPercent === undefined ? 'unknown' : `${formatPercent(entry.remainingPercent)} left`
+      const countdown = formatResetCountdown(entry.resetsAt)
+      return { label: `${section.title} · ${entry.name} — ${remaining}${countdown === undefined ? '' : ` · resets in ${countdown}`}` }
+    }),
   )
   return items.length > 0 ? items : [{ label: 'No model quota information is available yet.' }]
-}
-
-function formatRemaining(percent: number | undefined): string {
-  return percent === undefined ? 'unknown' : `${formatPercent(percent)} left`
-}
-
-function formatResetSuffix(resetsAt: number | undefined): string {
-  const countdown = formatResetCountdown(resetsAt)
-  return countdown === undefined ? '' : ` · resets in ${countdown}`
 }

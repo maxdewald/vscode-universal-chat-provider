@@ -2,13 +2,7 @@ import type { BeforeErrorHook, KyInstance } from 'ky'
 import ky, { isHTTPError } from 'ky'
 import { isPlainObject } from 'moderndash'
 
-export interface LoginProvider {
-  label: string
-  detail: string
-  endpoint: string
-}
-
-export const LOGIN_PROVIDERS: readonly LoginProvider[] = [
+export const LOGIN_PROVIDERS = [
   { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
   { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url' },
   { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url' },
@@ -26,18 +20,11 @@ export interface AuthFile {
   type?: string
 }
 
-export class ManagementError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message)
-  }
-}
-
 const toManagementError: BeforeErrorHook = ({ error }) => {
   if (!isHTTPError(error))
     return error
-  return new ManagementError(
+  return new Error(
     managementErrorMessage(error.data) ?? `Management request failed with HTTP ${error.response.status}.`,
-    error.response.status,
   )
 }
 
@@ -59,7 +46,7 @@ export class ManagementClient {
   async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<string> {
     const payload = await this.fetcher.get(`/${endpoint}?is_webui=true`, { signal: signal ?? null }).json<{ url?: unknown }>()
     if (typeof payload.url !== 'string')
-      throw new ManagementError('CLIProxyAPI returned an invalid auth URL response.', 502)
+      throw new Error('CLIProxyAPI returned an invalid auth URL response.')
     return payload.url
   }
 

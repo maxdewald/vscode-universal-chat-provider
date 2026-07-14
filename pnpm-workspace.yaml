@@ -12,9 +12,6 @@ trustPolicyExclude:
   # Required by @vscode/vsce through parse-semver@1.1.1.
   - semver@5.7.2
 
-packages:
-  - playground
-  - examples/*
 allowBuilds:
   '@vscode/vsce-sign': true
   esbuild: true

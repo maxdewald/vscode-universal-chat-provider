@@ -220,34 +220,6 @@
       },
       {
         "type": "object",
-        "title": "Reasoning",
-        "order": 4,
-        "properties": {
-          "universalChatProvider.reasoningSummary": {
-            "type": "string",
-            "enum": [
-              "detailed",
-              "concise",
-              "auto"
-            ],
-            "enumItemLabels": [
-              "Detailed",
-              "Concise",
-              "Auto"
-            ],
-            "enumDescriptions": [
-              "Request the fullest reasoning the model exposes.",
-              "Request a shorter reasoning summary.",
-              "Let the model decide how much reasoning to reveal."
-            ],
-            "default": "detailed",
-            "order": 1,
-            "description": "How much of the model's reasoning to stream when a model supports thinking."
-          }
-        }
-      },
-      {
-        "type": "object",
         "title": "Advanced",
         "order": 5,
         "properties": {
@@ -267,10 +239,9 @@
     "prepare": "pnpm generate",
     "generate": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
-    "test": "vitest run --project test:unit",
-    "test:unit": "vitest run --project test:unit",
-    "test:coverage": "vitest run --project test:unit --coverage",
-    "test:watch": "vitest --project test:unit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
     "vscode:prepublish": "pnpm build",
@@ -299,7 +270,6 @@
     "jest-mock-vscode": "^4.12.0",
     "tsdown": "^0.22.3",
     "typescript": "^6.0.3",
-    "vite": "^8.1.4",
     "vitest": "^4.1.10",
     "vscode-ext-gen": "^1.6.0"
   }

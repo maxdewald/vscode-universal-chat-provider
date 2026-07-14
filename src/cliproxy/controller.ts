@@ -18,15 +18,15 @@ import { errorMessage } from '../shared/errors'
 import { AccountsService } from './accounts'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
-import { acquireBinary, DEFAULT_BINARY_VERSION } from './managed/binary'
+import { acquireBinary, DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
-import { latestReleaseVersion, pickUpdate } from './managed/updates'
+import { pickUpdate } from './managed/updates'
 import { ManagementClient } from './management-client'
 import { fetchQuotas } from './quota'
-import { buildStatusSnapshot } from './status'
+import { countAccounts } from './status'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 
@@ -75,13 +75,16 @@ export class ServerController implements ProxyConnection {
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {
-    return buildStatusSnapshot({
-      mode: this.mode(),
-      lastStatus: this.lastStatus,
+    const mode = this.mode()
+    const version = this.server?.installedVersion()
+    const accounts = await countAccounts(await this.managementForStatus())
+    return {
+      mode,
+      status: mode === 'external' ? 'external' : this.lastStatus,
       baseUrl: this.baseUrl(),
-      version: this.server?.installedVersion(),
-      management: await this.managementForStatus(),
-    })
+      ...(version !== undefined ? { version } : {}),
+      ...(accounts !== undefined ? { accounts } : {}),
+    }
   }
 
   async ensureReady(_interactive: boolean): Promise<void> {
@@ -168,7 +171,7 @@ export class ServerController implements ProxyConnection {
 
     let target: string | null
     try {
-      target = pickUpdate(installed, await latestReleaseVersion())
+      target = pickUpdate(installed, await resolveVersion('latest'))
     }
     catch (error) {
       this.output.appendLine(`CLIProxyAPI update check failed: ${errorMessage(error)}`)

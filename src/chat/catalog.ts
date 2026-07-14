@@ -3,7 +3,7 @@ import { isPlainObject } from 'moderndash'
 const MODEL_CATALOG_URL = 'https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json'
 let catalogCache: Map<string, CatalogModel> | undefined
 
-export interface CatalogThinking {
+interface CatalogThinking {
   max?: number
   zero_allowed?: boolean
   dynamic_allowed?: boolean

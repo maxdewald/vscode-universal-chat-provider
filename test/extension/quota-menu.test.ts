@@ -1,5 +1,5 @@
 import type { QuickPickItem } from 'vscode'
-import type { QuotaSection, QuotaSource } from '../../src/extension/quota-menu'
+import type { QuotaSection } from '../../src/extension/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { showQuotaMenu } from '../../src/extension/quota-menu'
 import { quickPick, resetVSCodeMock } from '../support/vscode'
@@ -8,8 +8,8 @@ beforeEach(() => {
   resetVSCodeMock()
 })
 
-function source(sections: QuotaSection[]): QuotaSource {
-  return { quotaSections: () => sections }
+function source(sections: QuotaSection[]): () => QuotaSection[] {
+  return () => sections
 }
 
 function labels(): string[] {

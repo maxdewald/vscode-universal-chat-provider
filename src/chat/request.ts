@@ -14,14 +14,11 @@ import {
   LanguageModelToolResultPart,
 } from 'vscode'
 
-export type ReasoningSummary = 'auto' | 'concise' | 'detailed'
-
 export function buildRequest(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
   options: ProvideLanguageModelChatResponseOptions,
   reasoningEffort?: string,
-  reasoningSummary: ReasoningSummary = 'detailed',
 ): Record<string, unknown> {
   const promptCacheKey = buildPromptCacheKey(model, messages)
   const request: Record<string, unknown> = {
@@ -36,7 +33,7 @@ export function buildRequest(
     ? reasoningEffort
     : model.reasoningEffort ?? model.reasoningLevels[0]
   if (effort !== undefined)
-    request.reasoning = { effort, summary: reasoningSummary }
+    request.reasoning = { effort, summary: 'detailed' }
 
   if (options.tools !== undefined && options.tools.length > 0) {
     request.tools = options.tools.map((tool) => {

@@ -3,11 +3,11 @@ import type {
   ProxyModelListEntry,
   ProxyModelMetadata,
 } from '../chat/model'
+import { EventSourceParserStream } from 'eventsource-parser/stream'
 import ky, { isHTTPError } from 'ky'
 import { isPlainObject } from 'moderndash'
 import { asRecord, asString } from '../shared/json'
 import { ProxyHttpError } from './errors'
-import { parseServerSentEvents } from './sse'
 
 export interface DiscoveryResult {
   available: ProxyModelListEntry[]
@@ -37,7 +37,6 @@ const toProxyHttpError: BeforeErrorHook = ({ error }) => {
   return new ProxyHttpError(
     message ?? `CLIProxyAPI request failed with HTTP ${error.response.status}.`,
     error.response.status,
-    body,
   )
 }
 
@@ -85,7 +84,10 @@ export class CLIProxyClient {
     const emitted = new Set<string>()
     const thinking = thinkingSentinelFilter(callbacks.onThinking)
 
-    for await (const event of parseServerSentEvents(response.body)) {
+    const events = response.body
+      .pipeThrough(new TextDecoderStream())
+      .pipeThrough(new EventSourceParserStream())
+    for await (const event of events) {
       if (event.data === '[DONE]') {
         thinking.end()
         break

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { zipSync } from 'fflate'
 import { createTarGzip } from 'nanotar'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset, sha256 } from '../../../src/cliproxy/managed/binary'
+import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '../../../src/cliproxy/managed/binary'
 
 describe('binary asset resolution', () => {
   it.each([
@@ -29,11 +29,9 @@ describe('binary asset resolution', () => {
     expect(map.size).toBe(2)
   })
 
-  it('normalizes versions and hashes content', () => {
+  it('normalizes versions', () => {
     expect(normalizeVersion('v7.2.5')).toBe('7.2.5')
     expect(normalizeVersion('  7.2.5 ')).toBe('7.2.5')
-    expect(sha256(new TextEncoder().encode('abc')))
-      .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
   })
 })
 

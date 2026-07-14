@@ -2,7 +2,7 @@ import type { ExtensionContext, OutputChannel, StatusBarItem } from 'vscode'
 import { createHash } from 'node:crypto'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { StatusBarAlignment, window, workspace } from 'vscode'
+import { LanguageModelDataPart, StatusBarAlignment, window, workspace } from 'vscode'
 import { errorMessage } from '../shared/errors'
 import { asRecord, asString } from '../shared/json'
 
@@ -11,7 +11,7 @@ const LOG_FILE = 'debug.jsonl'
 const DIVERGED_CONTENT_CAP = 6000
 const DIVERGED_CONTENT_LEAD = 200
 
-export type UsageShape = 'anthropic' | 'openai' | 'unknown'
+type UsageShape = 'anthropic' | 'openai' | 'unknown'
 
 export interface UsageSummary {
   shape: UsageShape
@@ -23,7 +23,7 @@ export interface UsageSummary {
   hitRate: number | undefined
 }
 
-export interface UsageContext {
+interface UsageContext {
   model: string
   promptCacheKey?: string | undefined
   reasoningEffort?: string | undefined
@@ -40,7 +40,7 @@ function fingerprintInput(items: readonly unknown[] | undefined): string[] | und
   })
 }
 
-export interface CrossTurnDiff {
+interface CrossTurnDiff {
   stablePrefixLen: number
   totalItems: number
   diverged: { index: number, before: string, after: string }[]
@@ -141,6 +141,18 @@ export function normalizeUsage(usage: unknown): UsageSummary {
     outputTokens: output,
     hitRate: undefined,
   }
+}
+
+export function createContextUsagePart(usage: unknown): LanguageModelDataPart | undefined {
+  const { inputTokens, outputTokens, cacheReadTokens } = normalizeUsage(usage)
+  if (inputTokens <= 0 && outputTokens <= 0)
+    return undefined
+  return LanguageModelDataPart.json({
+    prompt_tokens: inputTokens,
+    completion_tokens: outputTokens,
+    total_tokens: inputTokens + outputTokens,
+    prompt_tokens_details: { cached_tokens: cacheReadTokens },
+  }, 'usage')
 }
 
 function formatHitRate(hitRate: number | undefined): string {

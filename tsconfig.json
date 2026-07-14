@@ -4,7 +4,6 @@
     "lib": ["ES2024"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
     "types": ["node", "vscode"],
     "strict": true,
     "exactOptionalPropertyTypes": true,

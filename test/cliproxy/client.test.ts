@@ -27,7 +27,7 @@ describe('cLIProxyClient', () => {
     expect(modelsRequest?.headers.get('content-type')).toBe('application/json')
   })
 
-  it('reports JSON and plain-text HTTP errors without losing the body', async () => {
+  it('reports JSON and plain-text HTTP errors', async () => {
     const fetchMock = vi.fn(async (request: Request) => {
       if (request.url.includes('client_version'))
         return Response.json({ models: [] })
@@ -41,13 +41,12 @@ describe('cLIProxyClient', () => {
     await expect(client.discover()).rejects.toMatchObject({
       message: 'bad key',
       status: 401,
-      body: { error: { message: 'bad key' } },
     })
 
     fetchMock.mockResolvedValueOnce(new Response('proxy unavailable', { status: 503 }))
     await expect(client.streamResponse({}, callbacks(), new AbortController().signal))
       .rejects
-      .toEqual(new ProxyHttpError('proxy unavailable', 503, 'proxy unavailable'))
+      .toEqual(new ProxyHttpError('proxy unavailable', 503))
   })
 
   it('streams text, thinking, usage, and assembled tool calls exactly once', async () => {
