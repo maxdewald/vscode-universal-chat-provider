@@ -41,6 +41,7 @@ export class ServerController implements ProxyConnection {
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
+  private readonly scheduleSettledRefresh = debounce(() => this.notifyAccountsChanged(), 5_000)
   // Refreshes immediately on the first prompt, then at most once per window during a long session,
   // so the quota warning stays current without hammering the upstream usage endpoints.
   readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 30_000)
@@ -172,6 +173,7 @@ export class ServerController implements ProxyConnection {
         ? `CLIProxyAPI ${current ?? 'binary'} is already installed.`
         : `CLIProxyAPI updated from ${previous ?? 'an unknown version'} to ${current ?? version}.`)
       this.scheduleRefresh()
+      this.scheduleSettledRefresh()
     }
     catch (error) {
       this.setStatus('error')
@@ -222,6 +224,7 @@ export class ServerController implements ProxyConnection {
       this.setStatus('running')
       void window.showInformationMessage('Managed CLIProxyAPI restarted.')
       this.scheduleRefresh()
+      this.scheduleSettledRefresh()
     }
     catch (error) {
       this.setStatus('error')
@@ -256,6 +259,7 @@ export class ServerController implements ProxyConnection {
 
   dispose(): void {
     this.scheduleRefresh.cancel()
+    this.scheduleSettledRefresh.cancel()
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
     if (this.paths !== undefined && releaseLease(this.paths.leaseDir))

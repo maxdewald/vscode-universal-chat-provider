@@ -23,6 +23,7 @@ describe('server controller lifecycle', () => {
   })
 
   afterEach(async () => {
+    vi.useRealTimers()
     for (const child of spawned.splice(0))
       child.kill()
     vi.restoreAllMocks()
@@ -75,7 +76,8 @@ describe('server controller lifecycle', () => {
     ))
   })
 
-  it('waits for model registration to settle before refreshing after restart', async () => {
+  it('refreshes models twice while registration settles after restart', async () => {
+    vi.useFakeTimers()
     vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
     const refresh = vi.fn()
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
@@ -84,9 +86,14 @@ describe('server controller lifecycle', () => {
     await controller.restartServer()
     expect(refresh).not.toHaveBeenCalled()
 
-    const scheduleRefresh = (controller as unknown as { scheduleRefresh: { flush: () => void } }).scheduleRefresh
-    scheduleRefresh.flush()
+    await vi.advanceTimersByTimeAsync(750)
     expect(refresh).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4_249)
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refresh).toHaveBeenCalledTimes(2)
     controller.dispose()
   })
 
