@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.18.0...v0.18.1) (2026-07-14)
+
+
+### Documentation
+
+* simplify package description ([9314d32](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9314d325165a97eedf497cc415fa3c4e5bf373dd))
+
 ## [0.18.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.3...v0.18.0) (2026-07-14)
 
 
