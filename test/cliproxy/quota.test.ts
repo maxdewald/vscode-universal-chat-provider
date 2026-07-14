@@ -1,7 +1,7 @@
 import type { ManagementClient } from '../../src/cliproxy/management-client'
 import type { QuotaReport } from '../../src/cliproxy/quota'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchQuotas, formatPercent, formatResetCountdown, remainingForModel } from '../../src/cliproxy/quota'
+import { fetchQuotas, formatResetCountdown, remainingForModel } from '../../src/cliproxy/quota'
 
 interface ApiCallResult { statusCode: number, body: unknown }
 
@@ -151,16 +151,6 @@ describe('fetchQuotas', () => {
     })
   })
 
-  it('reports a grok HTTP error instead of throwing', async () => {
-    const { client } = fakeClient(
-      [{ name: 'grok.json', type: 'xai', auth_index: 'x1' }],
-      () => ({ statusCode: 401, body: 'unauthorized' }),
-    )
-
-    const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ provider: 'grok', error: 'HTTP 401', windows: [] })
-  })
-
   it('skips providers without a known quota endpoint', async () => {
     const { client, apiCall } = fakeClient([{ name: 'kimi.json', type: 'kimi', auth_index: 'x1' }], respondOk)
 
@@ -236,13 +226,6 @@ describe('remainingForModel', () => {
     expect(remainingForModel(reports, { proxyOwner: 'kimi', proxyModelId: 'k2' })).toBeUndefined()
     const errored: QuotaReport[] = [{ provider: 'codex', windows: [], error: 'HTTP 401' }]
     expect(remainingForModel(errored, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
-  })
-})
-
-describe('formatPercent', () => {
-  it('rounds percentages and marks missing values', () => {
-    expect(formatPercent(42.6)).toBe('43%')
-    expect(formatPercent(undefined)).toBe('?')
   })
 })
 

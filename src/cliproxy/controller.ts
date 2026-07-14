@@ -1,4 +1,5 @@
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
+import type { CodexResetOption, CodexResetOutcome } from './codex-resets'
 import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
 import type { ManagedServer } from './managed/server'
@@ -16,6 +17,7 @@ import {
 } from 'vscode'
 import { errorMessage } from '../shared/errors'
 import { AccountsService } from './accounts'
+import { claimCodexReset, listCodexResets } from './codex-resets'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
 import { acquireBinary, DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
@@ -127,6 +129,23 @@ export class ServerController implements ProxyConnection {
 
   async manageAccounts(): Promise<void> {
     return this.accounts.manageAccounts()
+  }
+
+  async listCodexResets(): Promise<CodexResetOption[]> {
+    const management = await this.resolveManagement(false)
+    if (management === undefined)
+      return []
+    return listCodexResets(new ManagementClient(management.baseUrl, management.key))
+  }
+
+  async claimCodexReset(option: CodexResetOption, redeemRequestId: string): Promise<CodexResetOutcome> {
+    const management = await this.resolveManagement(false)
+    if (management === undefined)
+      return 'failed'
+    const outcome = await claimCodexReset(new ManagementClient(management.baseUrl, management.key), option, redeemRequestId)
+    if (outcome !== 'failed')
+      await this.refreshQuotas()
+    return outcome
   }
 
   async updateBinary(): Promise<void> {

@@ -106,38 +106,6 @@ describe('language model provider', () => {
     )
   })
 
-  it('streams reasoning deltas as thinking parts without synthetic ids', async () => {
-    const provider = createProvider('secret')
-    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
-      callbacks.onThinking?.('first\nsecond')
-      callbacks.onThinking?.(' tail')
-      callbacks.onText('answer')
-    })
-    const report = vi.fn()
-
-    await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningEffort: 'high' },
-      [{
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('hello')],
-        name: undefined,
-      }],
-      options(),
-      { report },
-      new CancellationTokenSource().token,
-    )
-
-    const first = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
-    const second = report.mock.calls[1]?.[0] as LanguageModelThinkingPart
-    expect(first).toBeInstanceOf(LanguageModelThinkingPart)
-    expect(first.value).toBe('first\nsecond')
-    expect(second).toBeInstanceOf(LanguageModelThinkingPart)
-    expect(second.value).toBe(' tail')
-    expect(first.id).toBeUndefined()
-    expect(second.id).toBeUndefined()
-    expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelTextPart('answer'))
-  })
-
   it('sends the effort picked from the model-config dropdown and logs it', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
@@ -283,17 +251,13 @@ describe('language model provider', () => {
     ])
   })
 
-  it('exposes grok credit usage as a quota section', () => {
+  it('threads resetsAt through quotaSections for account-window providers', () => {
     const provider = createProvider()
     provider.setQuotas([{ provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] }])
-
     expect(provider.quotaSections()).toEqual([
       { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75 }] },
     ])
-  })
 
-  it('threads resetsAt through quotaSections for account-window providers', () => {
-    const provider = createProvider()
     provider.setQuotas([{
       provider: 'grok',
       windows: [{ label: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }],

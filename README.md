@@ -31,7 +31,7 @@
 - **🚀 Ready in minutes** — install, sign in, and start chatting.
 - **🔀 Native model picker** — choose your models directly in Copilot Chat.
 - **🧠 Reasoning built in** — pick the thinking effort and follow reasoning live.
-- **📊 Quota at a glance** — see remaining usage before reaching a limit.
+- **📊 Quota at a glance** — see remaining usage and redeem available Codex resets with confirmation.
 - **✨ More than chat** — generate commit messages, titles, and summaries.
 - **👥 Account load balancing** — add multiple accounts for the same provider; CLIProxyAPI distributes requests round-robin across available accounts and skips those in cooldown.
 
@@ -54,7 +54,7 @@
 2. **Add an account** — accept the **Add Account** prompt (or run `Universal Chat Provider: Add Account`), pick a provider, and complete OAuth in your browser. Models refresh automatically.
 3. **Chat** — open Copilot Chat and select a model under **Universal Chat Provider**.
 
-Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — list/remove accounts, restart, update, or reset the managed server.
+Manage everything from the status bar item or the *Universal Chat Provider: Manage Provider* command — inspect quota, redeem OpenAI-provided Codex reset credits, list/remove accounts, restart, update, or reset the managed server.
 
 ## Commit messages, titles, and summaries
 

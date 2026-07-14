@@ -244,75 +244,28 @@ describe('cLIProxyClient', () => {
     expect(handlers.onToolCall).toHaveBeenCalledWith('raw', 'raw_tool', { raw: '{bad' })
   })
 
-  it('rejects failed events and empty streaming bodies', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(event({
-        type: 'response.failed',
-        response: { error: { message: 'generation failed' } },
-      })))
-      .mockResolvedValueOnce(new Response(null))
-    vi.stubGlobal('fetch', fetchMock)
+  it('rejects empty streaming bodies', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null)))
     const { CLIProxyClient } = await import('../../src/cliproxy/client')
     const client = new CLIProxyClient('http://proxy', 'key')
 
     await expect(client.streamResponse({}, callbacks(), new AbortController().signal))
       .rejects
-      .toThrow('generation failed')
-    await expect(client.streamResponse({}, callbacks(), new AbortController().signal))
-      .rejects
       .toThrow('empty streaming response')
   })
 
-  it('surfaces the nested error event message', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(event({
-      type: 'error',
-      error: {
-        type: 'invalid_request_error',
-        code: 'context_length_exceeded',
-        message: 'too long',
-        param: 'input',
-      },
-    }))))
+  it.each([
+    ['nested error', { type: 'error', error: { message: 'too long' } }, 'too long'],
+    ['failed response', { type: 'response.failed', response: { error: { message: 'generation failed' } } }, 'generation failed'],
+    ['top-level error', { type: 'error', message: 'upstream failed' }, 'upstream failed'],
+  ])('surfaces the %s message', async (_name, payload, message) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(event(payload))))
     const { CLIProxyClient } = await import('../../src/cliproxy/client')
 
     await expect(new CLIProxyClient('http://proxy', 'key')
       .streamResponse({}, callbacks(), new AbortController().signal))
       .rejects
-      .toThrow('too long')
-  })
-
-  it('surfaces the response failed message', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(event({
-      type: 'response.failed',
-      response: {
-        id: 'resp_1',
-        status: 'failed',
-        error: {
-          code: 'context_length_exceeded',
-          message: 'too long',
-        },
-      },
-    }))))
-    const { CLIProxyClient } = await import('../../src/cliproxy/client')
-
-    await expect(new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, callbacks(), new AbortController().signal))
-      .rejects
-      .toThrow('too long')
-  })
-
-  it('surfaces the top-level stream error message', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(event({
-      type: 'error',
-      code: 'upstream_error',
-      message: 'upstream failed',
-    }))))
-    const { CLIProxyClient } = await import('../../src/cliproxy/client')
-
-    await expect(new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, callbacks(), new AbortController().signal))
-      .rejects
-      .toThrow('upstream failed')
+      .toThrow(message)
   })
 })
 

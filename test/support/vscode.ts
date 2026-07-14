@@ -54,6 +54,10 @@ export enum QuickPickItemKind {
   Default = 0,
 }
 
+export class ThemeIcon {
+  constructor(readonly id: string) {}
+}
+
 export class RelativePattern {
   constructor(
     readonly base: unknown,
@@ -136,11 +140,20 @@ export const quickPick = {
   placeholder: '',
   busy: false,
   items: [] as unknown[],
+  activeItems: [] as unknown[],
   show: vi.fn(),
   hide: vi.fn(),
   dispose: vi.fn(),
   onDidAccept: vi.fn(),
+  onDidTriggerItemButton: vi.fn(),
   onDidHide: vi.fn(),
+}
+
+export async function triggerQuickPickItemButton(event: { item: unknown, button: unknown }): Promise<void> {
+  const listener: unknown = quickPick.onDidTriggerItemButton.mock.calls[0]?.[0]
+  if (typeof listener !== 'function')
+    throw new TypeError('No Quick Pick item-button listener was registered.')
+  await (listener as (event: { item: unknown, button: unknown }) => unknown)(event)
 }
 
 function createWatcher(): { onDidCreate: () => MockDisposable, onDidChange: () => MockDisposable, onDidDelete: () => MockDisposable, dispose: () => void } {
@@ -230,6 +243,7 @@ export function resetVSCodeMock(): void {
   quickPick.placeholder = ''
   quickPick.busy = false
   quickPick.items = []
+  quickPick.activeItems = []
   workspace.fs.stat.mockReset()
   workspace.fs.readFile.mockReset()
   workspace.fs.stat.mockResolvedValue({ size: 0 })

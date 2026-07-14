@@ -22,7 +22,11 @@ export function registerCommands(
       await controller.manageAccounts()
     }),
     commands.registerCommand('universalChatProvider.showQuota', async () => {
-      await showQuotaMenu(() => provider.quotaSections(), async () => controller.refreshQuotas())
+      await showQuotaMenu(
+        () => provider.quotaSections(),
+        async () => controller.refreshQuotas(),
+        controller,
+      )
     }),
     commands.registerCommand('universalChatProvider.configure', async () => {
       await provider.configure()
