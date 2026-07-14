@@ -53,7 +53,13 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: pnpm ext:package
 
-      - name: Publish extension
+      - name: Publish to Open VSX
+        if: ${{ steps.release.outputs.release_created }}
+        run: npx --yes ovsx@1.0.2 publish ./*.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Publish extension to VSC Marketplace
         if: ${{ steps.release.outputs.release_created }}
         run: pnpm ext:publish
         env:
