@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { claimLease, readServerPid, releaseLease, writeServerPid } from '../../../src/cliproxy/managed/leases'
+import { claimLease, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '../../../src/cliproxy/managed/leases'
 
 describe('window leases', () => {
   let dir: string
@@ -54,6 +54,47 @@ describe('window leases', () => {
 
     await writeFile(pidPath, 'not-a-pid')
     expect(readServerPid(pidPath)).toBeUndefined()
+  })
+
+  it('removes a server pid only when it still belongs to that process', () => {
+    const pidPath = join(dir, 'server.pid')
+    writeServerPid(pidPath, 4321)
+
+    removeServerPid(pidPath, 1234)
+    expect(readServerPid(pidPath)).toBe(4321)
+
+    removeServerPid(pidPath, 4321)
+    expect(readServerPid(pidPath)).toBeUndefined()
+  })
+
+  it('serializes operations that share a lock path', async () => {
+    const lockPath = join(dir, 'operation.lock')
+    let releaseFirst!: () => void
+    const first = withOperationLock(lockPath, async () => {
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+      return 'first'
+    })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    let secondStarted = false
+    const second = withOperationLock(lockPath, async () => {
+      secondStarted = true
+      return 'second'
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(secondStarted).toBe(false)
+    releaseFirst()
+    await expect(first).resolves.toBe('first')
+    await expect(second).resolves.toBe('second')
+  })
+
+  it('recovers an operation lock left by a dead process', async () => {
+    const lockPath = join(dir, 'operation.lock')
+    await writeFile(lockPath, '999999999:stale-owner')
+
+    await expect(withOperationLock(lockPath, async () => 'recovered')).resolves.toBe('recovered')
   })
 
   function liveProcess(): ChildProcess {

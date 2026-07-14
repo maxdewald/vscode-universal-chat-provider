@@ -20,7 +20,7 @@ import { AccountsService } from './accounts'
 import { claimCodexReset, listCodexResets } from './codex-resets'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
-import { acquireBinary, DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
+import { DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
@@ -163,7 +163,6 @@ export class ServerController implements ProxyConnection {
       await window.withProgress(
         { location: ProgressLocation.Notification, title: 'Updating CLIProxyAPI…' },
         async () => {
-          await acquireBinary({ binDir: this.paths!.binDir, requestedVersion: version, output: this.output })
           await this.server!.restart(undefined, version)
         },
       )
@@ -175,7 +174,8 @@ export class ServerController implements ProxyConnection {
       this.notifyAccountsChanged()
     }
     catch (error) {
-      void window.showErrorMessage(`Could not update CLIProxyAPI: ${errorMessage(error)}`)
+      this.setStatus('error')
+      this.surfaceOperationError('update', error)
     }
   }
 
@@ -225,7 +225,7 @@ export class ServerController implements ProxyConnection {
     }
     catch (error) {
       this.setStatus('error')
-      void window.showErrorMessage(`Could not restart CLIProxyAPI: ${errorMessage(error)}`)
+      this.surfaceOperationError('restart', error)
     }
   }
 
@@ -237,15 +237,21 @@ export class ServerController implements ProxyConnection {
     )
     if (confirm !== 'Reset')
       return
-    await this.server?.stop()
-    if (this.paths !== undefined)
-      await rm(this.paths.configPath, { force: true })
-    await this.context.secrets.delete(SECRET_KEY)
-    await this.context.secrets.delete(MGMT_KEY_SECRET)
-    this.bootstrapPromise = undefined
-    this.accounts.reset()
-    this.managementKey = undefined
-    await this.ensureReady(true)
+    try {
+      await this.server?.stop()
+      if (this.paths !== undefined)
+        await rm(this.paths.configPath, { force: true })
+      await this.context.secrets.delete(SECRET_KEY)
+      await this.context.secrets.delete(MGMT_KEY_SECRET)
+      this.bootstrapPromise = undefined
+      this.accounts.reset()
+      this.managementKey = undefined
+      await this.ensureReady(true)
+    }
+    catch (error) {
+      this.setStatus('error')
+      this.surfaceOperationError('reset', error)
+    }
   }
 
   dispose(): void {
@@ -419,6 +425,17 @@ export class ServerController implements ProxyConnection {
         this.serverOutput.show(true)
       else if (choice === 'Use External Server')
         await workspace.getConfiguration('universalChatProvider').update('server.mode', 'external', ConfigurationTarget.Global)
+    })
+  }
+
+  private surfaceOperationError(operation: 'restart' | 'reset' | 'update', error: unknown): void {
+    const message = `Could not ${operation} CLIProxyAPI: ${errorMessage(error)}`
+    this.output.appendLine(message)
+    void window.showErrorMessage(message, 'Show Logs', 'Show Server Output').then((choice) => {
+      if (choice === 'Show Logs')
+        this.output.show(true)
+      else if (choice === 'Show Server Output')
+        this.serverOutput.show(true)
     })
   }
 }

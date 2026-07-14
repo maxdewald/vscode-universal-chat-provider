@@ -10,7 +10,7 @@ import ky from 'ky'
 import { sleep } from 'moderndash'
 import { acquireBinary, readInstalledVersion } from './binary'
 import { DEFAULT_PORT, setConfigPort } from './config'
-import { readServerPid, writeServerPid } from './leases'
+import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from './leases'
 
 const HEALTH_TIMEOUT_MS = 1500
 const STARTUP_TIMEOUT_MS = 20_000
@@ -56,23 +56,35 @@ export class ManagedServer {
     if (this.port !== undefined && (this.adopted || (this.child !== undefined && this.child.exitCode === null)))
       return { baseUrl: this.baseUrl()!, port: this.port, ...(this.version !== undefined ? { version: this.version } : {}) }
 
-    this.startPromise = this.start(signal).finally(() => {
+    this.startPromise = withOperationLock(this.deps.paths.operationLockPath, async () => this.start(signal)).finally(() => {
       this.startPromise = undefined
     })
     return this.startPromise
   }
 
   async restart(signal?: AbortSignal, requestedVersion?: string): Promise<RunningServer> {
-    await this.stop()
-    if (requestedVersion === undefined)
-      return this.ensureRunning(signal)
-    this.startPromise = this.start(signal, requestedVersion).finally(() => {
+    const starting = this.startPromise
+    if (starting !== undefined) {
+      try {
+        await starting
+      }
+      catch {}
+    }
+    const version = requestedVersion ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
+    this.startPromise = withOperationLock(this.deps.paths.operationLockPath, async () => {
+      await this.stopUnlocked()
+      return this.start(signal, version ?? this.deps.requestedVersion())
+    }).finally(() => {
       this.startPromise = undefined
     })
     return this.startPromise
   }
 
   async stop(): Promise<void> {
+    await withOperationLock(this.deps.paths.operationLockPath, async () => this.stopUnlocked())
+  }
+
+  private async stopUnlocked(): Promise<void> {
     const child = this.child
     const adopted = this.adopted
     const port = this.port
@@ -81,6 +93,10 @@ export class ManagedServer {
     this.port = undefined
     if (child !== undefined && child.exitCode === null) {
       child.kill()
+      if (port !== undefined)
+        await waitForStop(this.deps.host, port)
+      if (child.pid !== undefined)
+        removeServerPid(this.deps.paths.pidPath, child.pid)
       this.deps.output.appendLine('Stopped the managed CLIProxyAPI server.')
     }
     else if (adopted) {
@@ -95,9 +111,9 @@ export class ManagedServer {
       }
       if (port !== undefined)
         await waitForStop(this.deps.host, port)
+      removeServerPid(this.deps.paths.pidPath, pid)
       this.deps.output.appendLine('Stopped the shared managed CLIProxyAPI server.')
     }
-    rmSync(this.deps.paths.pidPath, { force: true })
   }
 
   dispose(): void {

@@ -75,6 +75,27 @@ describe('server controller lifecycle', () => {
     ))
   })
 
+  it('logs restart failures and offers both server log channels', async () => {
+    const error = new Error('process ID is unavailable')
+    vi.spyOn(ManagedServer.prototype, 'restart').mockRejectedValue(error)
+    const { window } = await import('../support/vscode')
+    window.showErrorMessage.mockResolvedValueOnce('Show Server Output')
+    const providerOutput = { ...vscodeMock.output, appendLine: vi.fn(), show: vi.fn() }
+    const serverOutput = { ...vscodeMock.output, show: vi.fn() }
+    const controller = new ServerController(context(root), providerOutput as never, serverOutput as never)
+
+    await controller.restartServer()
+    await vi.waitFor(() => expect(serverOutput.show).toHaveBeenCalledWith(true))
+
+    expect(providerOutput.appendLine).toHaveBeenCalledWith('Could not restart CLIProxyAPI: process ID is unavailable')
+    expect(window.showErrorMessage).toHaveBeenCalledWith(
+      'Could not restart CLIProxyAPI: process ID is unavailable',
+      'Show Logs',
+      'Show Server Output',
+    )
+    expect(await controller.statusSnapshot()).toMatchObject({ status: 'error' })
+  })
+
   function liveProcess(): ChildProcess {
     const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
     spawned.push(child)
