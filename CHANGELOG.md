@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.3...v0.18.0) (2026-07-14)
+
+
+### Features
+
+* add Codex reset credit redemption in quota menu ([715b853](https://github.com/maxdewald/vscode-universal-chat-provider/commit/715b853f97ea0fe57e8806b4b4d649a937bc4464))
+
+
+### Refactoring
+
+* simplify configurations, quota fetching, and stream parsing ([a66a73f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/a66a73f6d832453f97b14171b1777d6e9d888aa7))
+
 ## [0.17.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.17.2...v0.17.3) (2026-07-13)
 
 
