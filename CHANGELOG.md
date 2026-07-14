@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.0...v0.19.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* do not trigger credential recovery on 403 errors ([acf8737](https://github.com/maxdewald/vscode-universal-chat-provider/commit/acf8737cc09418b8a6e8808384cc1616dd077b22))
+* localize reset expiration time ([24acca0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/24acca0ca291e87e648ab3a0b26bba05b98167fb))
+* publish VS Marketplace release from built vsix ([1df14c7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1df14c740cf947443f10408f3d00466eec07c299))
+
 ## [0.19.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.18.1...v0.19.0) (2026-07-14)
 
 
