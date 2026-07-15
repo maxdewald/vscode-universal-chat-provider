@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.2...v0.19.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* parse chatgpt_account_id from id_token ([b2f16ad](https://github.com/maxdewald/vscode-universal-chat-provider/commit/b2f16ad41ea0a8fd48075730a559ec55dc59b434))
+
 ## [0.19.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.1...v0.19.2) (2026-07-14)
 
 
