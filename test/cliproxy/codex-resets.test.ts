@@ -22,7 +22,7 @@ function fakeClient(files: Record<string, unknown>[], responses: ApiResponse[]):
 describe('codex reset credits', () => {
   it('lists the soonest available reset for each Codex account', async () => {
     const { client, apiCall } = fakeClient([
-      { provider: 'codex', auth_index: 'codex-1', email: 'one@example.com', chatgpt_account_id: 'acct-1' },
+      { provider: 'codex', auth_index: 'codex-1', email: 'one@example.com', id_token: { chatgpt_account_id: 'acct-1' } },
       { type: 'claude', auth_index: 'claude-1' },
     ], [{
       statusCode: 200,

@@ -111,7 +111,8 @@ function toCodexAccount(entry: Record<string, unknown>): Array<CodexResetOption[
   if (authIndex === '')
     return []
   const label = string(entry.email) || string(entry.label) || string(entry.name) || 'Codex account'
-  const accountId = string(entry.chatgpt_account_id) || string(entry.account_id)
+  const idToken = isPlainObject(entry.id_token) ? entry.id_token : undefined
+  const accountId = string(entry.chatgpt_account_id) || string(entry.account_id) || string(idToken?.chatgpt_account_id)
   return [{ authIndex, label, ...(accountId === '' ? {} : { accountId }) }]
 }
 
