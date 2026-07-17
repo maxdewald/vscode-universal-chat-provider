@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.4](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.3...v0.19.4) (2026-07-17)
+
+
+### Bug Fixes
+
+* claim quota reset after modal hides picker ([6d9571c](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6d9571c17b001cb064195707f2e041c14fb9514d))
+
 ## [0.19.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.2...v0.19.3) (2026-07-15)
 
 
