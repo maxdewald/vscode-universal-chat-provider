@@ -56,12 +56,13 @@ export async function showQuotaMenu(
       { modal: true },
       confirmAction,
     )
-    if (confirm !== confirmAction || !open) {
+    if (confirm !== confirmAction) {
       claiming = false
       return
     }
 
-    picker.busy = true
+    if (open)
+      picker.busy = true
     const previous = retries.get(option.account.authIndex)
     const attempt = previous?.creditId === option.credit.id
       ? previous
@@ -72,9 +73,10 @@ export async function showQuotaMenu(
       retries.delete(option.account.authIndex)
     if (outcome === 'success' || outcome === 'noCredit')
       resetOptions = await loadResets(resets)
-    if (open)
+    if (open) {
       picker.items = buildItems(getSections(), resetOptions)
-    picker.busy = false
+      picker.busy = false
+    }
     claiming = false
 
     if (outcome === 'success')

@@ -175,6 +175,27 @@ describe('showQuotaMenu', () => {
     expect(window.showInformationMessage).toHaveBeenCalledWith('Codex usage reset for one@example.com.')
   })
 
+  it('still claims when the modal confirmation hides the picker', async () => {
+    const claim = vi.fn(async () => 'success' as const)
+    const list = vi.fn()
+      .mockResolvedValueOnce([RESET])
+      .mockResolvedValueOnce([])
+    window.showWarningMessage.mockImplementationOnce(async () => {
+      const hide: unknown = quickPick.onDidHide.mock.calls[0]?.[0]
+      if (typeof hide === 'function')
+        (hide as () => void)()
+      return 'Use Reset'
+    })
+    await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 0 }] }]), async () => {}, { listCodexResets: list, claimCodexReset: claim })
+
+    await clickReset()
+
+    expect(claim).toHaveBeenCalledWith(RESET, expect.any(String))
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(window.showInformationMessage).toHaveBeenCalledWith('Codex usage reset for one@example.com.')
+    expect(quickPick.dispose).toHaveBeenCalled()
+  })
+
   it('requires confirmation again while reusing the same idempotency key on retry', async () => {
     const claim = vi.fn()
       .mockResolvedValueOnce('failed')
