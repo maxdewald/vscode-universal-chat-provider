@@ -4,10 +4,10 @@
   "displayName": "Universal Chat Provider",
   "type": "module",
   "version": "0.19.4",
-  "packageManager": "pnpm@11.13.1",
+  "packageManager": "pnpm@11.14.0",
   "volta": {
     "node": "24.18.0",
-    "pnpm": "11.13.1"
+    "pnpm": "11.14.0"
   },
   "description": "Claude, Codex, Antigravity & more in GitHub Copilot Chat. No API key, just OAuth.",
   "author": "Maximilian Dewald <maximilian@dewald.one>",
