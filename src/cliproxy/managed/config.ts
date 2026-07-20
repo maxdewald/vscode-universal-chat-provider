@@ -65,3 +65,29 @@ export async function setConfigPort(configPath: string, port: number): Promise<v
   config.port = port
   await writeFile(configPath, stringify(config))
 }
+
+export async function setProxyUrl(configPath: string, proxyUrl: string): Promise<void> {
+  const parsed: unknown = parse(await readFile(configPath, 'utf8'))
+  const config = isPlainObject(parsed) ? parsed : {}
+  const trimmed = proxyUrl.trim()
+  if (trimmed.length === 0)
+    return
+  if (config['proxy-url'] === trimmed)
+    return
+  config['proxy-url'] = trimmed
+  await writeFile(configPath, stringify(config))
+}
+
+export async function getProxyUrl(configPath: string): Promise<string | undefined> {
+  try {
+    const parsed: unknown = parse(await readFile(configPath, 'utf8'))
+    const config = isPlainObject(parsed) ? parsed : {}
+    const value = config['proxy-url']
+    if (typeof value === 'string')
+      return value.trim().length === 0 ? undefined : value.trim()
+    return undefined
+  }
+  catch {
+    return undefined
+  }
+}

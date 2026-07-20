@@ -46,6 +46,11 @@ export async function manageProvider(controller: ServerController | undefined): 
     managed
       ? [
           {
+            label: '$(settings-gear) Set Proxy',
+            description: 'Set the proxy URL and write to config.yaml',
+            command: 'universalChatProvider.setProxyConfig',
+          },
+          {
             label: '$(debug-restart) Restart Server',
             description: 'Restart the managed server',
             command: 'universalChatProvider.restartServer',

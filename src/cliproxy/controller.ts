@@ -23,6 +23,7 @@ import { readLocalProxyConfig } from './local-config'
 import { DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
+import { setProxyUrl as setProxyUrlInConfig, getProxyUrl as getProxyUrlFromConfig } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
 import { pickUpdate } from './managed/updates'
@@ -229,6 +230,39 @@ export class ServerController implements ProxyConnection {
     catch (error) {
       this.setStatus('error')
       this.surfaceOperationError('restart', error)
+    }
+  }
+
+  async setProxyUrl(url: string): Promise<void> {
+    if (this.mode() === 'external') {
+      void window.showWarningMessage('Setting proxy-url in config is only supported for the managed server.')
+      return
+    }
+    try {
+      const configPath = this.paths?.configPath ?? await findConfigPath()
+      if (configPath === undefined) {
+        void window.showWarningMessage('Could not locate CLIProxyAPI config.yaml to update proxy-url.')
+        return
+      }
+      await setProxyUrlInConfig(configPath, url)
+      void window.showInformationMessage(`Wrote proxy-url to ${configPath}`)
+    }
+    catch (error) {
+      void window.showErrorMessage(`Failed to write proxy-url: ${errorMessage(error)}`)
+    }
+  }
+
+  async getProxyUrl(): Promise<string | undefined> {
+    if (this.mode() === 'external')
+      return undefined
+    try {
+      const configPath = this.paths?.configPath ?? await findConfigPath()
+      if (configPath === undefined)
+        return undefined
+      return await getProxyUrlFromConfig(configPath)
+    }
+    catch {
+      return undefined
     }
   }
 
