@@ -93,13 +93,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
       const reports = this.quotaReports.filter(r => r.provider === provider && r.error === undefined && r.windows.length > 0)
       const multiple = reports.length > 1
-      const entries = reports.flatMap(report => report.windows.map(window => ({
-        name: multiple && report.account !== undefined ? `${report.account.label} · ${window.label}` : window.label,
-        remainingPercent: window.remainingPercent,
-        ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
-      })))
-      if (entries.length > 0)
-        sections.push({ title, entries })
+      for (const report of reports) {
+        sections.push({
+          title: multiple && report.account !== undefined ? `${title} (${report.account.label})` : title,
+          entries: report.windows.map(window => ({ name: window.label, remainingPercent: window.remainingPercent, ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }) })),
+        })
+      }
     }
 
     const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)

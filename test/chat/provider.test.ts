@@ -285,11 +285,13 @@ describe('language model provider', () => {
     }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Codex', entries: [
-        { name: 'a@example.com · 5h Quota', remainingPercent: 90 },
-        { name: 'a@example.com · 7d Quota', remainingPercent: 50 },
-        { name: 'b@example.com · 5h Quota', remainingPercent: 30 },
-        { name: 'b@example.com · 7d Quota', remainingPercent: 10 },
+      { title: 'Codex (a@example.com)', entries: [
+        { name: '5h Quota', remainingPercent: 90 },
+        { name: '7d Quota', remainingPercent: 50 },
+      ] },
+      { title: 'Codex (b@example.com)', entries: [
+        { name: '5h Quota', remainingPercent: 30 },
+        { name: '7d Quota', remainingPercent: 10 },
       ] },
     ])
   })
