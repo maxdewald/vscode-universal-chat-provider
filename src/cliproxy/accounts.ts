@@ -36,9 +36,11 @@ export class AccountsService {
 
     const client = new ManagementClient(management.baseUrl, management.key)
     let url: string
-    let before: number
+    let before: string
     try {
-      before = (await client.listAuthFiles()).length
+      // ponytail: whole-blob compare; catches same-email overwrite (count stays flat).
+      // Byte-identical re-login won't trip this; fresh logins always rotate the token.
+      before = JSON.stringify(await client.listAuthFilesRaw())
       url = await client.requestAuthUrl(picked.provider.endpoint)
     }
     catch (error) {
@@ -58,8 +60,8 @@ export class AccountsService {
         const deadline = Date.now() + LOGIN_TIMEOUT_MS
         while (Date.now() < deadline && !token.isCancellationRequested) {
           await sleep(LOGIN_POLL_MS)
-          const files = await client.listAuthFiles().catch(() => [])
-          if (files.length > before)
+          const files = await client.listAuthFilesRaw().catch(() => undefined)
+          if (files !== undefined && JSON.stringify(files) !== before)
             return true
         }
         return false

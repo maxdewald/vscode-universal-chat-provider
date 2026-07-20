@@ -13,6 +13,7 @@ export interface QuotaReport {
   provider: 'codex' | 'antigravity' | 'claude' | 'grok'
   windows: QuotaWindow[] // codex/claude/grok: account-level windows (5h / 7d / …)
   models?: Record<string, number> // antigravity: remaining percent keyed by proxy model id
+  account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
   error?: string
 }
 
@@ -144,7 +145,8 @@ async function fetchProviderQuota(
   entry: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<QuotaReport> {
-  const report: QuotaReport = { provider, windows: [] }
+  const account = accountOf(entry)
+  const report: QuotaReport = { provider, windows: [], ...(account === undefined ? {} : { account }) }
   const authIndex = str(entry.auth_index)
   if (authIndex === '')
     return { ...report, error: 'missing auth_index' }
@@ -286,6 +288,15 @@ function num(value: unknown): number | undefined {
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function accountOf(entry: Record<string, unknown>): QuotaReport['account'] | undefined {
+  const authIndex = str(entry.auth_index)
+  if (authIndex === '')
+    return undefined
+  const idToken = isPlainObject(entry.id_token) ? entry.id_token : undefined
+  const label = str(entry.email) || str(idToken?.email) || str(entry.label) || str(entry.name) || `Account ${authIndex}`
+  return { authIndex, label }
 }
 
 function clamp(value: number, low: number, high: number): number {

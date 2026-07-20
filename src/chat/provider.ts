@@ -67,12 +67,15 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   setQuotas(reports: QuotaReport[]): void {
-    const freshClaude = reports.find(report => report.provider === 'claude' && hasQuota(report))
-    const previousClaude = this.quotaReports.find(report => report.provider === 'claude' && hasQuota(report))
-    this.quotaReports = reports.filter(report => report.provider !== 'claude')
-    const claude = freshClaude ?? previousClaude ?? reports.find(report => report.provider === 'claude')
-    if (claude !== undefined)
-      this.quotaReports.push(claude)
+    // Claude's usage endpoint intermittently 401s; keep the last good value per account so a
+    // transient failure doesn't blank the menu. Other providers always take the fresh report.
+    const previousClaude = this.quotaReports.filter(report => report.provider === 'claude')
+    this.quotaReports = reports.map((report) => {
+      if (report.provider !== 'claude' || hasQuota(report))
+        return report
+      const previous = previousClaude.find(prev => prev.account?.authIndex === report.account?.authIndex && hasQuota(prev))
+      return previous ?? report
+    })
   }
 
   // Remaining quota for the model in the most recent request, or undefined when no model has run
@@ -88,9 +91,15 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, resetsAt?: number }> }> {
     const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, resetsAt?: number }> }> = []
     for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
-      const report = this.quotaReports.find(r => r.provider === provider && r.error === undefined)
-      if (report !== undefined && report.windows.length > 0)
-        sections.push({ title, entries: report.windows.map(window => ({ name: window.label, remainingPercent: window.remainingPercent, ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }) })) })
+      const reports = this.quotaReports.filter(r => r.provider === provider && r.error === undefined && r.windows.length > 0)
+      const multiple = reports.length > 1
+      const entries = reports.flatMap(report => report.windows.map(window => ({
+        name: multiple && report.account !== undefined ? `${report.account.label} · ${window.label}` : window.label,
+        remainingPercent: window.remainingPercent,
+        ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
+      })))
+      if (entries.length > 0)
+        sections.push({ title, entries })
     }
 
     const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)

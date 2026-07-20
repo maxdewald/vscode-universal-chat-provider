@@ -271,6 +271,41 @@ describe('language model provider', () => {
       { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }] },
     ])
   })
+
+  it('shows windows for every account when a provider has more than one', () => {
+    const provider = createProvider()
+    provider.setQuotas([{
+      provider: 'codex',
+      account: { authIndex: '0', label: 'a@example.com' },
+      windows: [{ label: '5h Quota', remainingPercent: 90 }, { label: '7d Quota', remainingPercent: 50 }],
+    }, {
+      provider: 'codex',
+      account: { authIndex: '1', label: 'b@example.com' },
+      windows: [{ label: '5h Quota', remainingPercent: 30 }, { label: '7d Quota', remainingPercent: 10 }],
+    }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Codex', entries: [
+        { name: 'a@example.com · 5h Quota', remainingPercent: 90 },
+        { name: 'a@example.com · 7d Quota', remainingPercent: 50 },
+        { name: 'b@example.com · 5h Quota', remainingPercent: 30 },
+        { name: 'b@example.com · 7d Quota', remainingPercent: 10 },
+      ] },
+    ])
+  })
+
+  it('omits the account label when a provider has a single account', () => {
+    const provider = createProvider()
+    provider.setQuotas([{
+      provider: 'codex',
+      account: { authIndex: '0', label: 'a@example.com' },
+      windows: [{ label: '5h Quota', remainingPercent: 90 }],
+    }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 90 }] },
+    ])
+  })
 })
 
 function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {
