@@ -3,7 +3,7 @@
   "name": "universal-chat-provider",
   "displayName": "Universal Chat Provider",
   "type": "module",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "packageManager": "pnpm@11.14.0",
   "volta": {
     "node": "24.18.0",
