@@ -70,8 +70,8 @@ const CodexWindowSchema = Type.Object({
 })
 
 const CodexRateLimitSchema = Type.Object({
-  primary_window: Type.Optional(CodexWindowSchema),
-  secondary_window: Type.Optional(CodexWindowSchema),
+  primary_window: Type.Optional(Type.Union([CodexWindowSchema, Type.Null()])),
+  secondary_window: Type.Optional(Type.Union([CodexWindowSchema, Type.Null()])),
 })
 
 const CodexBodySchema = Type.Object({
@@ -286,7 +286,7 @@ function parseCodexWindows(data: unknown): QuotaWindow[] {
     return []
   const windows: QuotaWindow[] = []
   for (const raw of [rateLimit.primary_window, rateLimit.secondary_window]) {
-    if (raw === undefined)
+    if (raw === undefined || raw === null)
       continue
     const used = raw.used_percent
     const label = codexWindowLabel(raw.limit_window_seconds)
