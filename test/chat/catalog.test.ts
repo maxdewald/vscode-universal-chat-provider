@@ -227,7 +227,7 @@ describe('catalog model mapping', () => {
       maxOutputTokens: 50_000,
       reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
       reasoningEffort: 'high',
-      detail: '1M context · Vendor',
+      detail: '1.1M context · Vendor',
       capabilities: {
         imageInput: true,
         toolCalling: false,
