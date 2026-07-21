@@ -64,6 +64,7 @@ const AuthUrlPayloadSchema = Type.Object({
 const ApiCallResponseSchema = Type.Object({
   status_code: Type.Optional(Type.Number()),
   statusCode: Type.Optional(Type.Number()),
+  header: Type.Optional(Type.Record(Type.String(), Type.Array(Type.String()))),
   body: Type.Optional(Type.Unknown()),
 })
 
@@ -138,13 +139,13 @@ export class ManagementClient {
     url: string
     header?: Record<string, string>
     data?: string
-  }, signal?: AbortSignal): Promise<{ statusCode: number, body: unknown }> {
+  }, signal?: AbortSignal): Promise<{ statusCode: number, header: Record<string, string[]>, body: unknown }> {
     const json = asValue(ApiCallResponseSchema, await this.fetcher.post('/api-call', {
       json: payload,
       signal: signal ?? null,
       retry: { limit: 2, methods: ['post'], statusCodes: [408, 429, 500, 502, 503, 504] },
     }).json())
-    return { statusCode: json?.status_code ?? json?.statusCode ?? 0, body: json?.body }
+    return { statusCode: json?.status_code ?? json?.statusCode ?? 0, header: json?.header ?? {}, body: json?.body }
   }
 
   async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {

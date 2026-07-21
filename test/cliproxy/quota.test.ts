@@ -3,13 +3,16 @@ import type { QuotaReport } from '../../src/cliproxy/quota'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuotas, formatResetCountdown, remainingForModel } from '../../src/cliproxy/quota'
 
-interface ApiCallResult { statusCode: number, body: unknown }
+interface ApiCallResult { statusCode: number, body: unknown, header?: Record<string, string[]> }
 
 function fakeClient(
   files: Record<string, unknown>[],
   respond: (url: string, payload: { url: string }) => ApiCallResult,
 ): { client: ManagementClient, apiCall: ReturnType<typeof vi.fn> } {
-  const apiCall = vi.fn(async (payload: { url: string }) => respond(payload.url, payload))
+  const apiCall = vi.fn(async (payload: { url: string }) => {
+    const result = respond(payload.url, payload)
+    return { header: {}, ...result }
+  })
   const client = { listAuthFilesRaw: async () => files, apiCall } as unknown as ManagementClient
   return { client, apiCall }
 }
@@ -166,6 +169,33 @@ describe('fetchQuotas', () => {
 
     const report = (await fetchQuotas(client))[0]!
     expect(report).toMatchObject({ provider: 'codex', error: 'HTTP 401', windows: [] })
+    expect(apiCall).toHaveBeenCalledTimes(1)
+  })
+
+  it('captures the upstream Retry-After from a 429 as an epoch deadline', async () => {
+    const { client } = fakeClient(
+      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
+      () => ({ statusCode: 429, body: '', header: { 'Retry-After': ['238'] } }),
+    )
+
+    const report = (await fetchQuotas(client))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: 'HTTP 429', retryAfter: Date.now() + 238_000 })
+  })
+
+  it('skips the upstream call while an account is inside its Retry-After window', async () => {
+    const { client, apiCall } = fakeClient([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const until = Date.now() + 60_000
+
+    const report = (await fetchQuotas(client, undefined, new Map([['x1', until]])))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: 'rate limited', retryAfter: until })
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('fetches normally once the Retry-After window has elapsed', async () => {
+    const { client, apiCall } = fakeClient([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+
+    const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() - 1]])))[0]!
+    expect(report.error).toBeUndefined()
     expect(apiCall).toHaveBeenCalledTimes(1)
   })
 

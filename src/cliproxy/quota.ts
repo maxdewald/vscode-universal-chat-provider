@@ -17,6 +17,7 @@ export interface QuotaReport {
   models?: Record<string, number> // antigravity: remaining percent keyed by proxy model id
   account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
   error?: string
+  retryAfter?: number // epoch ms the upstream asked us to wait until before retrying (from a 429 Retry-After)
 }
 
 const WHAM_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -132,13 +133,24 @@ function isQuotaProvider(value: string): value is QuotaReport['provider'] {
   return Object.hasOwn(QUOTA_SOURCES, value)
 }
 
-export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal): Promise<QuotaReport[]> {
+// backoff maps authIndex -> Retry-After deadline; an account still inside its window is echoed as an
+// error report (not fetched) so setQuotas keeps its last-good value without touching the upstream.
+export async function fetchQuotas(
+  client: ManagementClient,
+  signal?: AbortSignal,
+  backoff?: Map<string, number>,
+): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
     const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
     const provider = raw === 'xai' ? 'grok' : raw
     if (!isQuotaProvider(provider))
       return []
+    const retryAfter = backoff?.get(entry.auth_index?.trim() ?? '')
+    if (retryAfter !== undefined && retryAfter > Date.now()) {
+      const account = accountOf(entry)
+      return [Promise.resolve<QuotaReport>({ provider, windows: [], error: 'rate limited', retryAfter, ...(account === undefined ? {} : { account }) })]
+    }
     return [fetchProviderQuota(provider, QUOTA_SOURCES[provider], client, entry, signal)]
   })
   return Promise.all(tasks)
@@ -216,15 +228,17 @@ async function fetchProviderQuota(
   if (provider === 'antigravity' && projectId === '')
     return { ...report, error: 'missing project_id' }
   try {
-    const { statusCode, body } = await client.apiCall({
+    const { statusCode, header, body } = await client.apiCall({
       auth_index: authIndex,
       method: source.method,
       url: source.url,
       header: source.header,
       ...(provider === 'antigravity' ? { data: JSON.stringify({ project: projectId }) } : {}),
     }, signal)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode}` }
+    if (statusCode < 200 || statusCode >= 300) {
+      const retryAfter = parseRetryAfter(header)
+      return { ...report, error: `HTTP ${statusCode}`, ...(retryAfter === undefined ? {} : { retryAfter }) }
+    }
     const data = asJsonValue(ObjectSchema, body)
     if (data === undefined)
       return { ...report, error: 'invalid quota payload' }
@@ -323,6 +337,17 @@ function parseAntigravityModels(data: unknown): Record<string, number> {
       out[id] = clamp(fraction * 100, 0, 100)
   }
   return out
+}
+
+// Retry-After (RFC 7231) is either delta-seconds or an HTTP date. CLIProxyAPI forwards Go's
+// canonicalized http.Header, so the key is "Retry-After" and each value is a string array.
+function parseRetryAfter(header: Record<string, string[]> | undefined): number | undefined {
+  const raw = Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === 'retry-after')?.[1]?.[0]?.trim()
+  if (raw === undefined || raw === '')
+    return undefined
+  const seconds = Number(raw)
+  const ms = Number.isNaN(seconds) ? Date.parse(raw) : Date.now() + seconds * 1000
+  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
 }
 
 // Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.

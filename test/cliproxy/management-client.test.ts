@@ -77,6 +77,7 @@ describe('management client', () => {
 
     await expect(client.apiCall({ auth_index: 'a1', method: 'GET', url: 'https://example.com' })).resolves.toEqual({
       statusCode: 200,
+      header: {},
       body: '{}',
     })
     expect(fetchMock).toHaveBeenCalledTimes(3)

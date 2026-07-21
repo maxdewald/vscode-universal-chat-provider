@@ -42,13 +42,13 @@ export class ServerController implements ProxyConnection {
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
   private readonly scheduleSettledRefresh = debounce(() => this.notifyAccountsChanged(), 5_000)
-  // Refreshes immediately on the first prompt, then at most once per window during a long session,
-  // so the quota warning stays current without hammering the upstream usage endpoints.
-  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 30_000)
+  // Anthropic's oauth/usage rate-limits with a ~4min Retry-After, so stay well above that.
+  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 120_000)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private quotaRefresh: Promise<void> | undefined
+  private quotaBackoff = new Map<string, number>()
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
 
@@ -342,7 +342,21 @@ export class ServerController implements ProxyConnection {
     if (management === undefined)
       return
     try {
-      this.quotaListener?.(await fetchQuotas(new ManagementClient(management.baseUrl, management.key)))
+      const reports = await fetchQuotas(
+        new ManagementClient(management.baseUrl, management.key),
+        undefined,
+        this.quotaBackoff,
+      )
+      for (const report of reports) {
+        const authIndex = report.account?.authIndex
+        if (authIndex === undefined)
+          continue
+        if (report.retryAfter !== undefined)
+          this.quotaBackoff.set(authIndex, report.retryAfter)
+        else if (report.error === undefined)
+          this.quotaBackoff.delete(authIndex)
+      }
+      this.quotaListener?.(reports)
     }
     catch {}
   }
