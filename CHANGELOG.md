@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.21.0...v0.22.0) (2026-07-21)
+
+
+### Features
+
+* improve catalog model matching for model variants ([d7e531d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d7e531d5ab293282dd2446bacf7c49b3a17102f2))
+
+
+### Documentation
+
+* add OpenAI-compatible badge to README ([7d658ca](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7d658ca1d12d51c44ead9b589d55f65d751b06a0))
+
 ## [0.21.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.1...v0.21.0) (2026-07-21)
 
 
