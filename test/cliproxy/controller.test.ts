@@ -1,16 +1,17 @@
 import type { ChildProcess } from 'node:child_process'
 import type { ExtensionContext } from 'vscode'
 import { spawn } from 'node:child_process'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { parse } from 'yaml'
 import { ServerController } from '../../src/cliproxy/controller'
 import { managedPaths } from '../../src/cliproxy/managed/config'
 import { claimLease } from '../../src/cliproxy/managed/leases'
 import { ManagedServer } from '../../src/cliproxy/managed/server'
-import { resetVSCodeMock, vscodeMock } from '../support/vscode'
+import { resetVSCodeMock, vscodeMock, workspace } from '../support/vscode'
 
 describe('server controller lifecycle', () => {
   let root: string
@@ -74,6 +75,32 @@ describe('server controller lifecycle', () => {
       'Update',
       'Not Now',
     ))
+  })
+
+  it('writes the configured upstream proxy to managed config', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.ensureReady(false)
+
+    const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
+    expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
+    controller.dispose()
+  })
+
+  it('synchronizes proxy setting changes into managed config', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    await controller.ensureReady(false)
+    const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
+
+    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', '')
+    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl' })
+
+    await vi.waitFor(async () => {
+      expect(parse(await readFile(managedPaths(root).configPath, 'utf8'))).not.toHaveProperty('proxy-url')
+    })
+    controller.dispose()
   })
 
   it('refreshes models twice while registration settles after restart', async () => {

@@ -41,10 +41,11 @@ export interface ManagedConfigOptions {
   apiKey: string
   managementKey: string
   authDir: string
+  proxyUrl?: string
 }
 
 export function buildManagedConfig(options: ManagedConfigOptions): string {
-  return stringify({
+  const config: Record<string, unknown> = {
     'host': options.host,
     'port': options.port,
     'auth-dir': options.authDir,
@@ -54,7 +55,11 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
       'allow-remote': false,
       'secret-key': options.managementKey,
     },
-  })
+  }
+  const proxyUrl = options.proxyUrl?.trim()
+  if (proxyUrl !== undefined && proxyUrl.length > 0)
+    config['proxy-url'] = proxyUrl
+  return stringify(config)
 }
 
 export async function setConfigPort(configPath: string, port: number): Promise<void> {
@@ -66,28 +71,19 @@ export async function setConfigPort(configPath: string, port: number): Promise<v
   await writeFile(configPath, stringify(config))
 }
 
-export async function setProxyUrl(configPath: string, proxyUrl: string): Promise<void> {
+export async function setProxyUrl(configPath: string, proxyUrl: string | undefined): Promise<void> {
   const parsed: unknown = parse(await readFile(configPath, 'utf8'))
   const config = isPlainObject(parsed) ? parsed : {}
-  const trimmed = proxyUrl.trim()
-  if (trimmed.length === 0)
+  const trimmed = proxyUrl?.trim()
+  if (trimmed === undefined || trimmed.length === 0) {
+    if (!('proxy-url' in config))
+      return
+    delete config['proxy-url']
+    await writeFile(configPath, stringify(config))
     return
+  }
   if (config['proxy-url'] === trimmed)
     return
   config['proxy-url'] = trimmed
   await writeFile(configPath, stringify(config))
-}
-
-export async function getProxyUrl(configPath: string): Promise<string | undefined> {
-  try {
-    const parsed: unknown = parse(await readFile(configPath, 'utf8'))
-    const config = isPlainObject(parsed) ? parsed : {}
-    const value = config['proxy-url']
-    if (typeof value === 'string')
-      return value.trim().length === 0 ? undefined : value.trim()
-    return undefined
-  }
-  catch {
-    return undefined
-  }
 }

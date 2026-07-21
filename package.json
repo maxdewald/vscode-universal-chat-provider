@@ -191,6 +191,14 @@
             "order": 2,
             "description": "Exact CLIProxyAPI release used when update policy is Manual.",
             "markdownDescription": "Exact CLIProxyAPI release used when `#universalChatProvider.server.updatePolicy#` is `manual`."
+          },
+          "universalChatProvider.server.proxyUrl": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 3,
+            "description": "Optional upstream proxy URL for the managed CLIProxyAPI server. Restart the managed server after changing it.",
+            "markdownDescription": "Optional upstream proxy URL written to `proxy-url` in the managed CLIProxyAPI `config.yaml`. Restart the managed server after changing it."
           }
         }
       },

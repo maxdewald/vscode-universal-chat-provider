@@ -9,6 +9,7 @@ import {
   DEFAULT_PORT,
   generateSecret,
   managedPaths,
+  setProxyUrl,
 } from './config'
 import { claimLease } from './leases'
 import { ManagedServer } from './server'
@@ -26,6 +27,7 @@ export interface ProvisionOptions {
   context: ExtensionContext
   output: OutputChannel
   requestedVersion: () => string
+  proxyUrl: () => string | undefined
   inspectServer: (baseUrl: string) => Promise<string | undefined | false>
   onUnexpectedExit: () => void
 }
@@ -42,14 +44,19 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
 
   if (!(await access(paths.configPath).then(() => true, () => false))) {
     const port = context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT
+    const proxyUrl = options.proxyUrl()
     await writeFile(paths.configPath, buildManagedConfig({
       host: DEFAULT_HOST,
       port,
       apiKey,
       managementKey,
       authDir: paths.authDir,
+      ...(proxyUrl !== undefined ? { proxyUrl } : {}),
     }))
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)
+  }
+  else {
+    await setProxyUrl(paths.configPath, options.proxyUrl())
   }
 
   const server = new ManagedServer({

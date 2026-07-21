@@ -86,21 +86,22 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 <!-- configs -->
 
-| Key                                           | Description                                                                        | Type      | Default                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------------- | --------- | ------------------------- |
+| Key                                           | Description                                                                                                   | Type      | Default                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
 | ▿ <b>Connection</b>                           |
-| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                       | `string`  | `"managed"`               |
-| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                | `string`  | `"http://127.0.0.1:8317"` |
-| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery. | `string`  | `""`                      |
-| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.             | `boolean` | `true`                    |
+| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                  | `string`  | `"managed"`               |
+| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                           | `string`  | `"http://127.0.0.1:8317"` |
+| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                            | `string`  | `""`                      |
+| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                        | `boolean` | `true`                    |
 | ▿ <b>Managed Server</b>                       |
-| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                       | `string`  | `"automatic"`             |
-| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                       | `string`  | `"7.2.5"`                 |
+| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                  | `string`  | `"automatic"`             |
+| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                  | `string`  | `"7.2.5"`                 |
+| `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. Restart the managed server after changing it. | `string`  | `""`                      |
 | ▿ <b>Status Bar</b>                           |
-| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                      | `boolean` | `true`                    |
-| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                | `number`  | `10`                      |
+| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                 | `boolean` | `true`                    |
+| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                           | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
-| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage. | `boolean` | `false`                   |
+| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                            | `boolean` | `false`                   |
 
 <!-- configs -->
 

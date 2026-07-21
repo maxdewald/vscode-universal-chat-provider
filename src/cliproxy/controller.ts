@@ -22,8 +22,7 @@ import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
 import { DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
-import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
-import { setProxyUrl as setProxyUrlInConfig, getProxyUrl as getProxyUrlFromConfig } from './managed/config'
+import { DEFAULT_HOST, DEFAULT_PORT, setProxyUrl } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
 import { pickUpdate } from './managed/updates'
@@ -63,6 +62,10 @@ export class ServerController implements ProxyConnection {
       currentManagement: () => this.currentManagement(),
       onAccountsChanged: () => this.notifyAccountsChanged(),
     })
+    this.disposables.push(workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('universalChatProvider.server.proxyUrl'))
+        void this.syncManagedProxyUrl()
+    }))
   }
 
   mode(): ServerMode {
@@ -233,39 +236,6 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  async setProxyUrl(url: string): Promise<void> {
-    if (this.mode() === 'external') {
-      void window.showWarningMessage('Setting proxy-url in config is only supported for the managed server.')
-      return
-    }
-    try {
-      const configPath = this.paths?.configPath ?? await findConfigPath()
-      if (configPath === undefined) {
-        void window.showWarningMessage('Could not locate CLIProxyAPI config.yaml to update proxy-url.')
-        return
-      }
-      await setProxyUrlInConfig(configPath, url)
-      void window.showInformationMessage(`Wrote proxy-url to ${configPath}`)
-    }
-    catch (error) {
-      void window.showErrorMessage(`Failed to write proxy-url: ${errorMessage(error)}`)
-    }
-  }
-
-  async getProxyUrl(): Promise<string | undefined> {
-    if (this.mode() === 'external')
-      return undefined
-    try {
-      const configPath = this.paths?.configPath ?? await findConfigPath()
-      if (configPath === undefined)
-        return undefined
-      return await getProxyUrlFromConfig(configPath)
-    }
-    catch {
-      return undefined
-    }
-  }
-
   async resetServer(): Promise<void> {
     const confirm = await window.showWarningMessage(
       'Reset the managed CLIProxyAPI server? Generated config and keys are recreated; connected accounts are kept.',
@@ -316,6 +286,23 @@ export class ServerController implements ProxyConnection {
     return this.updatePolicy() === 'automatic' ? 'latest' : this.configuredVersion()
   }
 
+  private configuredProxyUrl(): string | undefined {
+    const proxyUrl = workspace.getConfiguration('universalChatProvider').get<string>('server.proxyUrl', '').trim()
+    return proxyUrl.length > 0 ? proxyUrl : undefined
+  }
+
+  private async syncManagedProxyUrl(): Promise<void> {
+    if (this.mode() === 'external' || this.paths === undefined)
+      return
+    try {
+      await setProxyUrl(this.paths.configPath, this.configuredProxyUrl())
+      void window.showInformationMessage('Managed proxy setting updated. Restart the managed server to apply it.')
+    }
+    catch (error) {
+      this.output.appendLine(`Could not update managed proxy setting: ${errorMessage(error)}`)
+    }
+  }
+
   private async bootstrap(): Promise<void> {
     if (this.bootstrapPromise === undefined) {
       this.bootstrapPromise = this.doBootstrap().catch((error: unknown) => {
@@ -331,6 +318,7 @@ export class ServerController implements ProxyConnection {
       context: this.context,
       output: this.output,
       requestedVersion: () => this.requestedVersion(),
+      proxyUrl: () => this.configuredProxyUrl(),
       inspectServer: async baseUrl => this.inspectServer(baseUrl),
       onUnexpectedExit: () => this.setStatus('error'),
     })
