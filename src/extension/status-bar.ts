@@ -74,9 +74,10 @@ function escapeTableCell(value: string): string {
   return value.replaceAll('|', '\\|').replaceAll('\n', ' ')
 }
 
-// Filled blocks only, in their own table column: with no empty-track glyph the bar can never
-// out-width itself, so the column borders stay straight. The percent sits in its own right-aligned column.
+// Fixed 10-block track so remaining capacity reads as empty space, not a shorter full bar.
 function gaugeBar(percent: number | undefined): string {
-  const filled = percent === undefined ? 0 : Math.round(percent / 10)
-  return filled === 0 ? '' : `\`${'█'.repeat(filled)}\``
+  if (percent === undefined)
+    return ''
+  const filled = Math.min(10, Math.max(0, Math.round(percent / 10)))
+  return `\`${'█'.repeat(filled)}${'░'.repeat(10 - filled)}\``
 }
