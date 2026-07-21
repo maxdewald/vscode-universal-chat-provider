@@ -3,7 +3,8 @@ import { LanguageModelDataPart } from 'vscode'
 import { createContextUsagePart } from '../../src/chat/cache-metrics'
 
 describe('createContextUsagePart', () => {
-  it('returns nothing when usage has no tokens', () => {
+  it('returns nothing when usage is unavailable', () => {
+    expect(createContextUsagePart(undefined)).toBeUndefined()
     expect(createContextUsagePart({})).toBeUndefined()
   })
 

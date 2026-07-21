@@ -133,6 +133,33 @@ describe('language model provider', () => {
     )
   })
 
+  it('reports missing Codex usage as unavailable without emitting a usage part', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onText('text')
+      callbacks.onUsage?.(undefined)
+    })
+    const report = vi.fn()
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningEffort: 'xhigh' },
+      [{
+        role: LanguageModelChatMessageRole.User,
+        content: [new LanguageModelTextPart('hello')],
+        name: undefined,
+      }],
+      options(),
+      { report },
+      new CancellationTokenSource().token,
+    )
+
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith(new LanguageModelTextPart('text'))
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      '[usage] model-a: effort=xhigh input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
+    )
+  })
+
   it('uses stored utility effort only for core utility requests', async () => {
     const provider = createProvider('secret')
     await provider.updateUtilityEffort('model-a', 'high')

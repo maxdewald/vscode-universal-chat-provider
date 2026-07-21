@@ -69,9 +69,10 @@ describe('normalizeUsage', () => {
   })
 
   it('tolerates a missing or non-object usage value', () => {
-    expect(normalizeUsage(undefined).shape).toBe('unknown')
+    expect(normalizeUsage(undefined).shape).toBe('unavailable')
     expect(normalizeUsage(undefined).outputTokens).toBe(0)
-    expect(normalizeUsage('nonsense').inputTokens).toBe(0)
+    expect(normalizeUsage('nonsense').shape).toBe('unavailable')
+    expect(normalizeUsage({}).shape).toBe('unavailable')
   })
 })
 
@@ -95,15 +96,15 @@ describe('formatUsageLine', () => {
     )
   })
 
-  it('marks an unknown shape without raw fields', () => {
+  it('marks missing usage as unavailable', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined))).toBe(
-      '[usage] model-a: input=0 cached=n/a write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
     )
   })
 
   it('includes the reasoning effort sent to the proxy', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, 'xhigh')).toBe(
-      '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: effort=xhigh input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
     )
   })
 })
@@ -209,6 +210,23 @@ describe('cacheMetricsTracker', () => {
     await metrics.flush()
 
     expect(statusBarItem.text).toBe('$(database) n/a cached')
+  })
+
+  it('counts unavailable requests without adding them to usage totals', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, undefined, { model: 'codex' })
+    record(metrics, {
+      input_tokens: 300,
+      cache_read_input_tokens: 700,
+      cache_creation_input_tokens: 0,
+      output_tokens: 50,
+    }, { model: 'claude' })
+    await metrics.flush()
+
+    expect(statusBarItem.text).toBe('$(database) 70% cached')
+    expect(statusBarItem.tooltip).toContain('cache read 700 · cache write 0 · uncached 300 · output 50')
+    expect(statusBarItem.tooltip).toContain('2 requests, 1 with usage')
   })
 
   it('fingerprints the request prefix so a stable lead and a divergent tail are distinguishable', async () => {

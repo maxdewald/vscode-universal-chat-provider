@@ -12,7 +12,7 @@ const LOG_FILE = 'debug.jsonl'
 const DIVERGED_CONTENT_CAP = 6000
 const DIVERGED_CONTENT_LEAD = 200
 
-type UsageShape = 'anthropic' | 'openai' | 'unknown'
+type UsageShape = 'anthropic' | 'openai' | 'unknown' | 'unavailable'
 
 export interface UsageSummary {
   shape: UsageShape
@@ -118,6 +118,18 @@ const UsageRecordSchema = Type.Object({
 const ObjectSchema = Type.Object({}, { additionalProperties: true })
 
 export function normalizeUsage(usage: unknown): UsageSummary {
+  const rawRecord = asValue(ObjectSchema, usage)
+  if (rawRecord === undefined || Object.keys(rawRecord).length === 0) {
+    return {
+      shape: 'unavailable',
+      inputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      uncachedInputTokens: 0,
+      outputTokens: 0,
+      hitRate: undefined,
+    }
+  }
   const record = asValue(UsageRecordSchema, usage) ?? {}
   const output = num(record.output_tokens ?? record.completion_tokens)
 
@@ -168,6 +180,8 @@ export function normalizeUsage(usage: unknown): UsageSummary {
 
 export function createContextUsagePart(usage: unknown): LanguageModelDataPart | undefined {
   const summary = normalizeUsage(usage)
+  if (summary.shape === 'unavailable')
+    return undefined
   const { inputTokens, outputTokens, cacheReadTokens } = summary
   if (inputTokens <= 0 && outputTokens <= 0)
     return undefined
@@ -190,6 +204,8 @@ export function formatUsageLine(
   reasoningEffort?: string,
 ): string {
   const effort = reasoningEffort !== undefined && reasoningEffort.length > 0 ? ` effort=${reasoningEffort}` : ''
+  if (summary.shape === 'unavailable')
+    return `[usage] ${model}:${effort} input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)`
   const cached = summary.shape === 'unknown' ? 'n/a' : summary.cacheReadTokens
   const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${cached}`
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
@@ -203,7 +219,7 @@ export function formatUsageLine(
 
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
-  private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0 }
+  private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0, requestsWithUsage: 0 }
   private readonly lastItemsByCacheKey = new Map<string, readonly unknown[]>()
   private writes: Promise<void> = Promise.resolve()
 
@@ -255,23 +271,26 @@ export class CacheMetricsTracker {
   }
 
   private accumulate(summary: UsageSummary): void {
+    this.totals.requests += 1
+    if (summary.shape === 'unavailable')
+      return
+    this.totals.requestsWithUsage += 1
     if (summary.shape !== 'unknown') {
       this.totals.read += summary.cacheReadTokens
       this.totals.write += summary.cacheWriteTokens
       this.totals.uncached += summary.uncachedInputTokens
     }
     this.totals.output += summary.outputTokens
-    this.totals.requests += 1
   }
 
   private updateStatusBar(): void {
-    const { read, write, uncached, output, requests } = this.totals
+    const { read, write, uncached, output, requests, requestsWithUsage } = this.totals
     const input = read + write + uncached
     const rate = input > 0 ? `${Math.round((read / input) * 100)}%` : 'n/a'
     this.statusBar.text = `$(database) ${rate} cached`
     this.statusBar.tooltip = `Prompt cache hit rate this session: ${rate}\n`
       + `cache read ${read} · cache write ${write} · uncached ${uncached} · output ${output}\n`
-      + `${requests} request${requests === 1 ? '' : 's'} — logged to ${LOG_FILE}`
+      + `${requests} request${requests === 1 ? '' : 's'}, ${requestsWithUsage} with usage — logged to ${LOG_FILE}`
     this.statusBar.show()
   }
 
