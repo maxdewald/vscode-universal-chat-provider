@@ -137,20 +137,18 @@ export class AccountsService {
         return
     }
 
-    const providerName = new URL(normalizedBaseUrl).hostname.replace(/^www\./, '')
-    const models = modelIds.map(name => ({ name, alias: `${providerName}/${name}` }))
-    const provider: OpenAICompatibilityProvider = {
-      'name': providerName,
-      'base-url': normalizedBaseUrl,
-      'api-key-entries': [{ 'api-key': apiKey.trim() }],
-      models,
-    }
-
     try {
       const existing = await client.listOpenAICompatibility()
-      const next = existing.filter(entry => entry.name !== provider.name)
-      next.push(provider)
-      await client.putOpenAICompatibility(next)
+      const baseName = new URL(normalizedBaseUrl).hostname.replace(/^www\./, '')
+      const providerName = uniqueProviderName(baseName, existing.map(entry => entry.name))
+      const models = modelIds.map(name => ({ name, alias: `${providerName}/${name}` }))
+      const provider: OpenAICompatibilityProvider = {
+        'name': providerName,
+        'base-url': normalizedBaseUrl,
+        'api-key-entries': [{ 'api-key': apiKey.trim() }],
+        models,
+      }
+      await client.putOpenAICompatibility([...existing, provider])
       void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${models.length} models).`)
       this.deps.onAccountsChanged()
     }
@@ -268,6 +266,17 @@ async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<
 
 function parseModelIds(value: string): string[] {
   return [...new Set(value.split(/[\n,]/).map(part => part.trim()).filter(Boolean))]
+}
+
+function uniqueProviderName(base: string, existing: readonly string[]): string {
+  const taken = new Set(existing.map(name => name.toLowerCase()))
+  if (!taken.has(base.toLowerCase()))
+    return base
+  for (let index = 2; ; index++) {
+    const candidate = `${base}-${index}`
+    if (!taken.has(candidate.toLowerCase()))
+      return candidate
+  }
 }
 
 function isHttpUrl(value: string): boolean {

@@ -155,6 +155,47 @@ describe('openai-compatible endpoint', () => {
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps same-url endpoints with different tokens under unique names', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://codegate.dev/v1')
+      .mockResolvedValueOnce('sk-second')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'claude-opus-4-8' }] })))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
+      {
+        'name': 'codegate.dev',
+        'base-url': 'https://codegate.dev/v1',
+        'api-key-entries': [{ 'api-key': 'sk-first' }],
+        'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev/claude-opus-4-8' }],
+      },
+    ])
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.login()
+
+    expect(put).toHaveBeenCalledWith([
+      {
+        'name': 'codegate.dev',
+        'base-url': 'https://codegate.dev/v1',
+        'api-key-entries': [{ 'api-key': 'sk-first' }],
+        'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev/claude-opus-4-8' }],
+      },
+      {
+        'name': 'codegate.dev-2',
+        'base-url': 'https://codegate.dev/v1',
+        'api-key-entries': [{ 'api-key': 'sk-second' }],
+        'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev-2/claude-opus-4-8' }],
+      },
+    ])
+    expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI-compatible endpoint “codegate.dev-2” added (1 models).')
+    expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+
   it('removes openai-compatibility providers from manage accounts', async () => {
     vi.spyOn(ManagementClient.prototype, 'listAuthFiles').mockResolvedValue([])
     vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
