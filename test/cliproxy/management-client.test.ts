@@ -75,7 +75,7 @@ describe('management client', () => {
     vi.stubGlobal('fetch', fetchMock)
     const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
 
-    await expect(client.apiCall({ method: 'GET', url: 'https://example.com' })).resolves.toEqual({
+    await expect(client.apiCall({ auth_index: 'a1', method: 'GET', url: 'https://example.com' })).resolves.toEqual({
       statusCode: 200,
       body: '{}',
     })

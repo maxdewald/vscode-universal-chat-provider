@@ -1,4 +1,7 @@
+import type { ProxyRequestBody } from '../../src/chat/request'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const emptyBody = {} as ProxyRequestBody
 
 beforeEach(() => {
   vi.resetModules()
@@ -44,7 +47,7 @@ describe('cLIProxyClient', () => {
     })
 
     fetchMock.mockResolvedValueOnce(new Response('proxy unavailable', { status: 503 }))
-    await expect(client.streamResponse({}, callbacks(), new AbortController().signal))
+    await expect(client.streamResponse(emptyBody, callbacks(), new AbortController().signal))
       .rejects
       .toEqual(new ProxyHttpError('proxy unavailable', 503))
   })
@@ -80,7 +83,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
     const signal = new AbortController().signal
 
-    await new CLIProxyClient('http://proxy', 'key').streamResponse({ model: 'x' }, handlers, signal)
+    await new CLIProxyClient('http://proxy', 'key').streamResponse({ model: 'x' } as ProxyRequestBody, handlers, signal)
 
     const request = fetchMock.mock.calls[0]![0]
     expect(request.url).toBe('http://proxy/v1/responses')
@@ -121,7 +124,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe(expected)
   })
@@ -138,7 +141,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe('step one step two')
   })
@@ -157,7 +160,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe('**First**\n\n**Second**\n\n')
   })
@@ -175,7 +178,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking.mock.calls.flat()).toEqual([
       'Planning status line restructuring',
@@ -196,7 +199,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking).not.toHaveBeenCalled()
   })
@@ -207,11 +210,7 @@ describe('cLIProxyClient', () => {
     vi.stubGlobal('fetch', fetchMock)
     const { CLIProxyClient } = await import('../../src/cliproxy/client')
 
-    await new CLIProxyClient('http://proxy', 'key').streamResponse(
-      { model: 'x', prompt_cache_key: 'universal-chat-provider-cache-key' },
-      callbacks(),
-      new AbortController().signal,
-    )
+    await new CLIProxyClient('http://proxy', 'key').streamResponse({ model: 'x', prompt_cache_key: 'universal-chat-provider-cache-key' } as ProxyRequestBody, callbacks(), new AbortController().signal)
 
     const { headers } = fetchMock.mock.calls[0]![0]
     expect(headers.get('authorization')).toBe('Bearer key')
@@ -238,7 +237,7 @@ describe('cLIProxyClient', () => {
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, handlers, new AbortController().signal)
+      .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onToolCall).toHaveBeenCalledWith('scalar', 'scalar_tool', { value: 42 })
     expect(handlers.onToolCall).toHaveBeenCalledWith('raw', 'raw_tool', { raw: '{bad' })
@@ -249,7 +248,7 @@ describe('cLIProxyClient', () => {
     const { CLIProxyClient } = await import('../../src/cliproxy/client')
     const client = new CLIProxyClient('http://proxy', 'key')
 
-    await expect(client.streamResponse({}, callbacks(), new AbortController().signal))
+    await expect(client.streamResponse(emptyBody, callbacks(), new AbortController().signal))
       .rejects
       .toThrow('empty streaming response')
   })
@@ -263,7 +262,7 @@ describe('cLIProxyClient', () => {
     const { CLIProxyClient } = await import('../../src/cliproxy/client')
 
     await expect(new CLIProxyClient('http://proxy', 'key')
-      .streamResponse({}, callbacks(), new AbortController().signal))
+      .streamResponse(emptyBody, callbacks(), new AbortController().signal))
       .rejects
       .toThrow(message)
   })

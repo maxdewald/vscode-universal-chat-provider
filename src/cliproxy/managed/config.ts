@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isPlainObject } from 'moderndash'
+import { Type } from '@sinclair/typebox'
 import { parse, stringify } from 'yaml'
+import { asValue } from '../../shared/json'
 
 export const DEFAULT_PORT = 8317
 export const DEFAULT_HOST = '127.0.0.1'
@@ -57,9 +58,13 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
   })
 }
 
+const ManagedConfigSchema = Type.Object({
+  port: Type.Optional(Type.Number()),
+}, { additionalProperties: true })
+
 export async function setConfigPort(configPath: string, port: number): Promise<void> {
   const parsed: unknown = parse(await readFile(configPath, 'utf8'))
-  const config = isPlainObject(parsed) ? parsed : {}
+  const config = asValue(ManagedConfigSchema, parsed) ?? {}
   if (config.port === port)
     return
   config.port = port

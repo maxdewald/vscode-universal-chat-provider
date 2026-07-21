@@ -1,27 +1,37 @@
+import type { Static } from '@sinclair/typebox'
 import type { LanguageModelChatInformation } from 'vscode'
 import type { CatalogModel } from './catalog'
+import { Type } from '@sinclair/typebox'
 import { capitalize, unique } from 'moderndash'
 
-export interface ProxyModelListEntry {
-  id: string
-  owned_by?: string
-  context_length?: number
-  max_completion_tokens?: number
-}
+export const ProxyModelListEntrySchema = Type.Object({
+  id: Type.String(),
+  owned_by: Type.Optional(Type.String()),
+  context_length: Type.Optional(Type.Number()),
+  max_completion_tokens: Type.Optional(Type.Number()),
+}, { additionalProperties: true })
 
-export interface ProxyModelMetadata {
-  slug: string
-  display_name?: string
-  description?: string
-  context_window?: number
-  max_context_window?: number
-  visibility?: string
-  supported_in_api?: boolean
-  input_modalities?: string[]
-  supports_parallel_tool_calls?: boolean
-  supported_reasoning_levels?: { effort: string }[]
-  default_reasoning_level?: string
-}
+export type ProxyModelListEntry = Static<typeof ProxyModelListEntrySchema>
+
+const SupportedReasoningLevelSchema = Type.Object({
+  effort: Type.String(),
+}, { additionalProperties: true })
+
+export const ProxyModelMetadataSchema = Type.Object({
+  slug: Type.String(),
+  display_name: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  context_window: Type.Optional(Type.Number()),
+  max_context_window: Type.Optional(Type.Number()),
+  visibility: Type.Optional(Type.String()),
+  supported_in_api: Type.Optional(Type.Boolean()),
+  input_modalities: Type.Optional(Type.Array(Type.String())),
+  supports_parallel_tool_calls: Type.Optional(Type.Boolean()),
+  supported_reasoning_levels: Type.Optional(Type.Array(SupportedReasoningLevelSchema)),
+  default_reasoning_level: Type.Optional(Type.String()),
+}, { additionalProperties: true })
+
+export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
 
 export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string

@@ -7,9 +7,9 @@ interface ApiCallResult { statusCode: number, body: unknown }
 
 function fakeClient(
   files: Record<string, unknown>[],
-  respond: (url: string, payload: Record<string, unknown>) => ApiCallResult,
+  respond: (url: string, payload: { url: string }) => ApiCallResult,
 ): { client: ManagementClient, apiCall: ReturnType<typeof vi.fn> } {
-  const apiCall = vi.fn(async (payload: Record<string, unknown>) => respond(String(payload.url), payload))
+  const apiCall = vi.fn(async (payload: { url: string }) => respond(payload.url, payload))
   const client = { listAuthFilesRaw: async () => files, apiCall } as unknown as ManagementClient
   return { client, apiCall }
 }

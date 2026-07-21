@@ -45,7 +45,7 @@ describe('accounts login completion', () => {
   })
 
   it('completes when a new auth file appears', async () => {
-    const list = vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
       .mockResolvedValueOnce([])
       .mockResolvedValue([{ name: 'codex-new.json', provider: 'codex' }])
     const onAccountsChanged = vi.fn()

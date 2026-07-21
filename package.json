@@ -246,6 +246,7 @@
     "ext:publish": "vsce publish --no-dependencies"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
     "eventsource-parser": "^3.1.0",
     "fflate": "^0.8.3",
     "get-port": "^7.2.0",
@@ -258,6 +259,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
+    "@tsconfig/strictest": "^2.0.8",
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",
     "@types/vscode": "^1.124.0",

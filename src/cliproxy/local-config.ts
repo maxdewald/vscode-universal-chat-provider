@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
-import { isPlainObject } from 'moderndash'
-import { parse } from 'yaml'
+import { Type } from '@sinclair/typebox'
+import { parseDocument } from 'yaml'
+import { asValue } from '../shared/json'
 
 const PLACEHOLDER_KEY = /^your-api-key(?:-\d+)?$/i
 
@@ -10,12 +11,22 @@ export interface LocalProxyConfig {
   managementKey?: string
 }
 
+const LocalConfigSchema = Type.Object({
+  'api-keys': Type.Optional(Type.Array(Type.Unknown())),
+  'remote-management': Type.Optional(Type.Object({
+    'secret-key': Type.Optional(Type.String()),
+  })),
+})
+
 export async function readLocalProxyConfig(configPath: string): Promise<LocalProxyConfig> {
-  const document = parse(await readFile(configPath, 'utf8'), {
+  const yamlDocument = parseDocument(await readFile(configPath, 'utf8'), {
     prettyErrors: true,
     strict: true,
     stringKeys: true,
-  }) as unknown
+  })
+  if (yamlDocument.errors.length > 0)
+    throw yamlDocument.errors[0]
+  const document: unknown = yamlDocument.toJSON() as unknown
   const apiKey = firstApiKey(document)
   const managementKey = managementSecretKey(document)
   return {
@@ -26,20 +37,22 @@ export async function readLocalProxyConfig(configPath: string): Promise<LocalPro
 }
 
 function managementSecretKey(value: unknown): string | undefined {
-  if (!isPlainObject(value) || !isPlainObject(value['remote-management']))
-    return undefined
-  const key = value['remote-management']['secret-key']
-  if (typeof key !== 'string' || key.trim().length === 0 || key.startsWith('$2'))
+  const key = asValue(LocalConfigSchema, value)?.['remote-management']?.['secret-key']
+  if (key === undefined || key.trim().length === 0 || key.startsWith('$2'))
     return undefined
   return key.trim()
 }
 
 function firstApiKey(value: unknown): string | undefined {
-  if (!isPlainObject(value) || !Array.isArray(value['api-keys']))
+  const keys = asValue(LocalConfigSchema, value)?.['api-keys']
+  if (keys === undefined)
     return undefined
-  return value['api-keys'].find((candidate): candidate is string =>
-    typeof candidate === 'string'
-    && candidate.trim().length > 0
-    && !PLACEHOLDER_KEY.test(candidate.trim()),
-  )?.trim()
+  for (const candidate of keys) {
+    if (typeof candidate !== 'string')
+      continue
+    const trimmed = candidate.trim()
+    if (trimmed.length > 0 && !PLACEHOLDER_KEY.test(trimmed))
+      return trimmed
+  }
+  return undefined
 }

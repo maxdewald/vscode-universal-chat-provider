@@ -2,9 +2,10 @@ import type { ExtensionContext, OutputChannel, StatusBarItem } from 'vscode'
 import { createHash } from 'node:crypto'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Type } from '@sinclair/typebox'
 import { LanguageModelDataPart, StatusBarAlignment, window, workspace } from 'vscode'
 import { errorMessage } from '../shared/errors'
-import { asRecord, asString } from '../shared/json'
+import { asValue } from '../shared/json'
 
 const ENABLED_SETTING = 'debug'
 const LOG_FILE = 'debug.jsonl'
@@ -30,11 +31,16 @@ interface UsageContext {
   inputItems?: readonly unknown[] | undefined
 }
 
+const FingerprintItemSchema = Type.Object({
+  role: Type.Optional(Type.String()),
+  type: Type.Optional(Type.String()),
+})
+
 function fingerprintInput(items: readonly unknown[] | undefined): string[] | undefined {
   return items?.map((item) => {
     const json = JSON.stringify(item) ?? ''
-    const record = asRecord(item)
-    const tag = asString(record?.role) ?? asString(record?.type) ?? 'item'
+    const record = asValue(FingerprintItemSchema, item)
+    const tag = record?.role ?? record?.type ?? 'item'
     const hash = createHash('sha256').update(json).digest('hex').slice(0, 8)
     return `${tag}:${json.length}:${hash}`
   })
@@ -94,8 +100,25 @@ function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
+const UsageDetailsSchema = Type.Object({
+  cached_tokens: Type.Optional(Type.Number()),
+})
+
+const UsageRecordSchema = Type.Object({
+  output_tokens: Type.Optional(Type.Number()),
+  completion_tokens: Type.Optional(Type.Number()),
+  cache_read_input_tokens: Type.Optional(Type.Number()),
+  cache_creation_input_tokens: Type.Optional(Type.Number()),
+  input_tokens: Type.Optional(Type.Number()),
+  prompt_tokens: Type.Optional(Type.Number()),
+  input_tokens_details: Type.Optional(UsageDetailsSchema),
+  prompt_tokens_details: Type.Optional(UsageDetailsSchema),
+})
+
+const ObjectSchema = Type.Object({}, { additionalProperties: true })
+
 export function normalizeUsage(usage: unknown): UsageSummary {
-  const record = asRecord(usage) ?? {}
+  const record = asValue(UsageRecordSchema, usage) ?? {}
   const output = num(record.output_tokens ?? record.completion_tokens)
 
   const cacheRead = record.cache_read_input_tokens
@@ -116,7 +139,7 @@ export function normalizeUsage(usage: unknown): UsageSummary {
     }
   }
 
-  const details = asRecord(record.input_tokens_details) ?? asRecord(record.prompt_tokens_details)
+  const details = record.input_tokens_details ?? record.prompt_tokens_details
   if (details?.cached_tokens !== undefined) {
     const total = num(record.input_tokens ?? record.prompt_tokens)
     const read = num(details.cached_tokens)
@@ -170,7 +193,7 @@ export function formatUsageLine(
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
     return base
-  const rawRecord = asRecord(raw)
+  const rawRecord = asValue(ObjectSchema, raw)
   return rawRecord !== undefined && Object.keys(rawRecord).length > 0
     ? `${base} raw=${JSON.stringify(rawRecord)}`
     : `${base} (unknown)`
