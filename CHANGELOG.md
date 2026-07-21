@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.20.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.4...v0.20.0) (2026-07-21)
+
+
+### Features
+
+* group quota sections by account ([4d6065f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4d6065fc332c3ff706d75a65b185e722ae94bff6))
+* support multi-account quotas and improve login detection ([011a96a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/011a96a8381850c70f5be4f4c1ef690bc84e54d5))
+
+
+### Bug Fixes
+
+* handle null codex rate limit windows ([def71e9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/def71e9f7225e355187f51bf963691d555772a7e))
+
+
+### Refactoring
+
+* use TypeBox schemas for runtime validation ([56b7bb2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/56b7bb27e5a02ea3384a30c6d25af4867efccab9))
+
 ## [0.19.4](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.3...v0.19.4) (2026-07-17)
 
 
