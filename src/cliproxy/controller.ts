@@ -22,7 +22,7 @@ import { claimCodexReset, listCodexResets } from './codex-resets'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
 import { DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
-import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
+import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from './managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
@@ -311,7 +311,7 @@ export class ServerController implements ProxyConnection {
     this.paths = state.paths
     this.server = state.server
     this.managementKey = state.managementKey
-    this.disposables.push(...watchAuthDir(state.paths.authDir, () => this.scheduleRefresh()))
+    this.disposables.push(...watchCredentialFiles(state.paths.authDir, () => this.scheduleRefresh()))
     if (this.logTailer === undefined) {
       this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()
       this.disposables.push(this.logTailer)

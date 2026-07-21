@@ -65,8 +65,8 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   return { paths, server, managementKey }
 }
 
-export function watchAuthDir(authDir: string, onChange: () => void): Disposable[] {
-  const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(authDir), '**'))
+export function watchCredentialFiles(authDir: string, onChange: () => void): Disposable[] {
+  const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(authDir), '*.json'))
   return [
     watcher,
     watcher.onDidCreate(onChange),
