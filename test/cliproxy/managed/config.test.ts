@@ -34,6 +34,10 @@ describe('managed config', () => {
       'auth-dir': '/tmp/store/auth',
       'api-keys': ['proxy-key'],
       'logging-to-file': false,
+      'routing': {
+        'strategy': 'round-robin',
+        'session-affinity': true,
+      },
       'remote-management': {
         'allow-remote': false,
         'secret-key': 'mgmt-key',
@@ -76,6 +80,10 @@ describe('setConfigPort', () => {
       'auth-dir': join(dir, 'auth'),
       'api-keys': ['proxy-key'],
       'logging-to-file': false,
+      'routing': {
+        'strategy': 'round-robin',
+        'session-affinity': true,
+      },
       'remote-management': {
         'allow-remote': false,
         'secret-key': 'mgmt-key',

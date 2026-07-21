@@ -51,6 +51,10 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
     'auth-dir': options.authDir,
     'api-keys': [options.apiKey],
     'logging-to-file': false,
+    'routing': {
+      'strategy': 'round-robin',
+      'session-affinity': true,
+    },
     'remote-management': {
       'allow-remote': false,
       'secret-key': options.managementKey,
