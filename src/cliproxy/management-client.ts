@@ -22,11 +22,17 @@ export interface AuthFile {
   type?: string
 }
 
+export interface OpenAICompatibilityModel {
+  name: string
+  alias?: string
+  thinking?: { levels: string[] }
+}
+
 export interface OpenAICompatibilityProvider {
   'name': string
   'base-url': string
   'api-key-entries'?: Array<{ 'api-key': string }>
-  'models'?: Array<{ name: string, alias?: string }>
+  'models'?: OpenAICompatibilityModel[]
 }
 
 const IdTokenSchema = Type.Object({

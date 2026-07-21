@@ -7,6 +7,16 @@ describe('createContextUsagePart', () => {
     expect(createContextUsagePart({})).toBeUndefined()
   })
 
+  it('omits cache details when the provider does not report them', () => {
+    const part = createContextUsagePart({ input_tokens: 100, output_tokens: 10 })
+
+    expect(JSON.parse(new TextDecoder().decode(part?.data))).toEqual({
+      prompt_tokens: 100,
+      completion_tokens: 10,
+      total_tokens: 110,
+    })
+  })
+
   it.each([
     [
       'Anthropic',

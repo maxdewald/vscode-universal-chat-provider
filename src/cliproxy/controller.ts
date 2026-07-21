@@ -1,4 +1,5 @@
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
+import type { CatalogModel } from '../chat/catalog'
 import type { CodexResetOption, CodexResetOutcome } from './codex-resets'
 import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
@@ -78,6 +79,10 @@ export class ServerController implements ProxyConnection {
       return normalizeBaseUrl(workspace.getConfiguration('universalChatProvider').get<string>('baseUrl', `http://${DEFAULT_HOST}:${DEFAULT_PORT}`))
     return this.server?.baseUrl()
       ?? `http://${DEFAULT_HOST}:${this.context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT}`
+  }
+
+  async enrichOpenAICompatibilityThinking(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
+    return this.accounts.enrichThinkingLevels(catalog)
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {

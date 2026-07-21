@@ -98,6 +98,25 @@ describe('model registry', () => {
     expect(window.showErrorMessage).not.toHaveBeenCalled()
   })
 
+  it('enriches openai-compatible thinking levels once before discovery', async () => {
+    const enrich = vi.fn(async () => true)
+    const registry = createRegistry('secret', {}, {
+      enrichOpenAICompatibilityThinking: enrich,
+    })
+    const catalog = new Map([['gpt-5.6-sol', { id: 'gpt-5.6-sol' }]])
+    catalogMocks.fetchCatalog.mockResolvedValue(catalog)
+    clientMocks.discover.mockResolvedValue(discovery())
+
+    await registry.forceRefresh(false)
+    await registry.forceRefresh(false)
+
+    expect(enrich).toHaveBeenCalledTimes(1)
+    expect(enrich).toHaveBeenCalledWith(catalog)
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      'Enriched OpenAI-compatible thinking levels from the model catalog.',
+    )
+  })
+
   it('reports regional restrictions without starting credential recovery', async () => {
     const rejected = vi.fn()
     const registry = createRegistry('secret', { onCredentialsRejected: rejected })
@@ -115,11 +134,13 @@ describe('model registry', () => {
 function createRegistry(
   apiKey?: string,
   hooks: Partial<ConstructorParameters<typeof ModelRegistry>[3]> = {},
+  connection: Partial<ConstructorParameters<typeof ModelRegistry>[0]> = {},
 ): ModelRegistry {
   return new ModelRegistry(
     {
       ensureReady: vi.fn(async () => {}),
       baseUrl: () => 'http://proxy',
+      ...connection,
     },
     { get: vi.fn(async () => apiKey) } as never,
     vscodeMock.output as never,

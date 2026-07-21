@@ -99,10 +99,9 @@ describe('language model provider', () => {
       prompt_tokens: 0,
       completion_tokens: 3,
       total_tokens: 3,
-      prompt_tokens_details: { cached_tokens: 0 },
     })
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: effort=high input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: effort=high input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
@@ -130,7 +129,7 @@ describe('language model provider', () => {
       expect.any(AbortSignal),
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=1 hit=n/a raw={"output_tokens":1}',
+      '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
     )
   })
 

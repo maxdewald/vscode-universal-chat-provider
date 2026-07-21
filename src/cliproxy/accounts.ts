@@ -1,10 +1,13 @@
+import type { CatalogModel } from '../chat/catalog'
 import type { ManagementEndpoint, OpenAICompatibilityProvider } from './management-client'
 import { Type } from '@sinclair/typebox'
 import { sleep } from 'moderndash'
 import { env, ProgressLocation, Uri, window } from 'vscode'
+import { fetchCatalog } from '../chat/catalog'
 import { errorMessage } from '../shared/errors'
 import { asValue } from '../shared/json'
 import { LOGIN_PROVIDERS, ManagementClient } from './management-client'
+import { enrichOpenAICompatibilityProviders } from './openai-compat-thinking'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
@@ -114,9 +117,12 @@ export class AccountsService {
       return
 
     const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
-    const discovered = await window.withProgress(
+    const [discovered, catalog] = await window.withProgress(
       { location: ProgressLocation.Notification, title: 'Fetching models from endpoint…' },
-      async () => discoverUpstreamModels(normalizedBaseUrl, apiKey.trim()),
+      async () => Promise.all([
+        discoverUpstreamModels(normalizedBaseUrl, apiKey.trim()),
+        fetchCatalog(),
+      ]),
     )
 
     let modelIds = discovered
@@ -148,12 +154,30 @@ export class AccountsService {
         'api-key-entries': [{ 'api-key': apiKey.trim() }],
         models,
       }
+      enrichOpenAICompatibilityProviders([provider], catalog)
       await client.putOpenAICompatibility([...existing, provider])
       void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${models.length} models).`)
       this.deps.onAccountsChanged()
     }
     catch (error) {
       void window.showErrorMessage(`Could not add OpenAI-compatible endpoint: ${errorMessage(error)}`)
+    }
+  }
+
+  async enrichThinkingLevels(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
+    const management = this.deps.currentManagement()
+    if (management === undefined)
+      return false
+    try {
+      const client = new ManagementClient(management.baseUrl, management.key)
+      const existing = await client.listOpenAICompatibility()
+      if (!enrichOpenAICompatibilityProviders(existing, catalog))
+        return false
+      await client.putOpenAICompatibility(existing)
+      return true
+    }
+    catch {
+      return false
     }
   }
 

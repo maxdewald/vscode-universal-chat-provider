@@ -167,14 +167,15 @@ export function normalizeUsage(usage: unknown): UsageSummary {
 }
 
 export function createContextUsagePart(usage: unknown): LanguageModelDataPart | undefined {
-  const { inputTokens, outputTokens, cacheReadTokens } = normalizeUsage(usage)
+  const summary = normalizeUsage(usage)
+  const { inputTokens, outputTokens, cacheReadTokens } = summary
   if (inputTokens <= 0 && outputTokens <= 0)
     return undefined
   return LanguageModelDataPart.json({
     prompt_tokens: inputTokens,
     completion_tokens: outputTokens,
     total_tokens: inputTokens + outputTokens,
-    prompt_tokens_details: { cached_tokens: cacheReadTokens },
+    ...(summary.shape !== 'unknown' ? { prompt_tokens_details: { cached_tokens: cacheReadTokens } } : {}),
   }, 'usage')
 }
 
@@ -189,7 +190,8 @@ export function formatUsageLine(
   reasoningEffort?: string,
 ): string {
   const effort = reasoningEffort !== undefined && reasoningEffort.length > 0 ? ` effort=${reasoningEffort}` : ''
-  const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
+  const cached = summary.shape === 'unknown' ? 'n/a' : summary.cacheReadTokens
+  const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${cached}`
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
     return base
@@ -253,9 +255,11 @@ export class CacheMetricsTracker {
   }
 
   private accumulate(summary: UsageSummary): void {
-    this.totals.read += summary.cacheReadTokens
-    this.totals.write += summary.cacheWriteTokens
-    this.totals.uncached += summary.uncachedInputTokens
+    if (summary.shape !== 'unknown') {
+      this.totals.read += summary.cacheReadTokens
+      this.totals.write += summary.cacheWriteTokens
+      this.totals.uncached += summary.uncachedInputTokens
+    }
     this.totals.output += summary.outputTokens
     this.totals.requests += 1
   }
@@ -263,9 +267,9 @@ export class CacheMetricsTracker {
   private updateStatusBar(): void {
     const { read, write, uncached, output, requests } = this.totals
     const input = read + write + uncached
-    const pct = input > 0 ? Math.round((read / input) * 100) : 0
-    this.statusBar.text = `$(database) ${pct}% cached`
-    this.statusBar.tooltip = `Prompt cache hit rate this session: ${pct}%\n`
+    const rate = input > 0 ? `${Math.round((read / input) * 100)}%` : 'n/a'
+    this.statusBar.text = `$(database) ${rate} cached`
+    this.statusBar.tooltip = `Prompt cache hit rate this session: ${rate}\n`
       + `cache read ${read} · cache write ${write} · uncached ${uncached} · output ${output}\n`
       + `${requests} request${requests === 1 ? '' : 's'} — logged to ${LOG_FILE}`
     this.statusBar.show()

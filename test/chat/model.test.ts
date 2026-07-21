@@ -14,7 +14,11 @@ describe('model mapping', () => {
           { effort: 'low' },
           { effort: 'medium' },
           { effort: 'high' },
+          { effort: 'xhigh' },
+          { effort: 'max' },
+          { effort: 'ultra' },
         ],
+        default_reasoning_level: 'medium',
         input_modalities: ['text', 'image'],
       }],
       new Map([['gpt-5.4', {
@@ -34,15 +38,15 @@ describe('model mapping', () => {
       maxInputTokens: 400_000,
       maxOutputTokens: 128_000,
       capabilities: { imageInput: true, toolCalling: true },
-      reasoningLevels: ['low', 'medium', 'high'],
+      reasoningLevels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
       reasoningEffort: 'medium',
     })
     expect(models[0]?.configurationSchema).toEqual({
       properties: {
         reasoningEffort: {
           type: 'string',
-          enum: ['low', 'medium', 'high'],
-          enumItemLabels: ['Low', 'Medium', 'High'],
+          enum: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+          enumItemLabels: ['Low', 'Medium', 'High', 'Extra High', 'Max', 'Ultra'],
           default: 'medium',
           description: 'Thinking Effort',
           group: 'navigation',
@@ -296,11 +300,11 @@ describe('model mapping', () => {
 
     const detail = Object.fromEntries(models.map(model => [model.id, model.detail]))
     expect(detail).toMatchObject({
-      gpt: '128K context · Codex',
-      atlas: '128K context · Antigravity',
-      sonnet: '128K context · Claude Code',
-      grok: '128K context · Grok',
-      mystery: '128K context · Acme-labs',
+      gpt: '136.2K context · Codex',
+      atlas: '136.2K context · Antigravity',
+      sonnet: '136.2K context · Claude Code',
+      grok: '136.2K context · Grok',
+      mystery: '136.2K context · Acme-labs',
     })
     expect(models.find(model => model.id === 'gpt')?.tooltip).toContain('Codex via CLIProxyAPI')
   })

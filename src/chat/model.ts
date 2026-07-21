@@ -61,7 +61,7 @@ export interface ModelMappingOptions {
   onCollision?: (message: string) => void
 }
 
-const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
+const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
 
 interface ModelCandidate {
   entry: ProxyModelListEntry
@@ -170,6 +170,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     || (catalogModel?.supported_parameters?.includes('tools') ?? true)
   const description = detail?.description ?? catalogModel?.description
   const tooltip = buildTooltip(name, description, displayProviderName, outputTokens, imageInput, toolCalling)
+  const maxContextTokens = totalContext + outputTokens
 
   const baseModel = {
     proxyModelId: entry.id,
@@ -179,7 +180,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     maxInputTokens: totalContext,
     maxOutputTokens: outputTokens,
     supportsParallelToolCalls,
-    detail: `${formatTokens(totalContext)} context · ${displayProviderName}`,
+    detail: `${formatTokens(maxContextTokens)} context · ${displayProviderName}`,
     tooltip,
     capabilities: {
       imageInput,
@@ -214,7 +215,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
   return { ...baseModel, id: entry.id, name, reasoningLevels: levels }
 }
 
-const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, auto: 7 }
+const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, ultra: 7, auto: 8 }
 
 function effortRank(level: string | undefined): number {
   return level === undefined ? -1 : EFFORT_RANK[level] ?? 99

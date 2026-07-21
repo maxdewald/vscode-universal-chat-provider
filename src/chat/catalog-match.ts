@@ -1,6 +1,6 @@
 import type { CatalogModel } from './catalog'
 
-const VARIANT_SUFFIX = /-(?:openai-compact|nothinking|thinking-\d+|thinking|internet|search|online|minimal|medium|xhigh|high|low|none|max|auto)$/i
+const VARIANT_SUFFIX = /-(?:openai-compact|nothinking|thinking-\d+|thinking|internet|search|online|minimal|medium|xhigh|high|low|none|max|ultra|auto)$/i
 
 export function matchCatalogModel(
   id: string,

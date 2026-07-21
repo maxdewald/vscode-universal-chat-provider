@@ -1,7 +1,16 @@
+import type { CatalogModel } from '../../src/chat/catalog'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountsService } from '../../src/cliproxy/accounts'
 import { ManagementClient } from '../../src/cliproxy/management-client'
 import { resetVSCodeMock, window } from '../support/vscode'
+
+const catalogMocks = vi.hoisted(() => ({
+  fetchCatalog: vi.fn<() => Promise<Map<string, CatalogModel>>>(),
+}))
+
+vi.mock('../../src/chat/catalog', () => ({
+  fetchCatalog: catalogMocks.fetchCatalog,
+}))
 
 describe('accounts login completion', () => {
   beforeEach(() => {
@@ -69,6 +78,16 @@ describe('openai-compatible endpoint', () => {
   beforeEach(() => {
     resetVSCodeMock()
     vi.unstubAllGlobals()
+    catalogMocks.fetchCatalog.mockReset().mockResolvedValue(new Map([
+      ['gpt-5.5', {
+        id: 'gpt-5.5',
+        thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
+      }],
+      ['gpt-5.6-sol', {
+        id: 'gpt-5.6-sol',
+        thinking: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      }],
+    ]))
   })
 
   afterEach(() => {
@@ -113,7 +132,11 @@ describe('openai-compatible endpoint', () => {
         'api-key-entries': [{ 'api-key': 'sk-test' }],
         'models': [
           { name: 'claude-opus-4-8', alias: 'opencode.ai/claude-opus-4-8' },
-          { name: 'gpt-5.5', alias: 'opencode.ai/gpt-5.5' },
+          {
+            name: 'gpt-5.5',
+            alias: 'opencode.ai/gpt-5.5',
+            thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
+          },
         ],
       },
     ])
@@ -146,13 +169,60 @@ describe('openai-compatible endpoint', () => {
         'base-url': 'https://openrouter.ai/api/v1',
         'api-key-entries': [{ 'api-key': 'sk-or' }],
         'models': [
-          { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
+          {
+            name: 'gpt-5.5',
+            alias: 'openrouter.ai/gpt-5.5',
+            thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
+          },
           { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
         ],
       },
     ])
     expect(window.showInputBox).toHaveBeenCalledTimes(2)
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('enriches existing openai-compatible providers missing thinking levels', async () => {
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
+      {
+        'name': 'codegate.dev',
+        'base-url': 'https://codegate.dev/v1',
+        'api-key-entries': [{ 'api-key': 'sk-test' }],
+        'models': [
+          { name: 'gpt-5.6-sol', alias: 'codegate.dev/gpt-5.6-sol' },
+          {
+            name: 'gpt-5.5',
+            alias: 'codegate.dev/gpt-5.5',
+            thinking: { levels: ['low', 'high'] },
+          },
+        ],
+      },
+    ])
+    const { service } = serviceWith({
+      currentManagement: () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
+    })
+
+    await expect(service.enrichThinkingLevels(await catalogMocks.fetchCatalog())).resolves.toBe(true)
+    expect(put).toHaveBeenCalledWith([
+      {
+        'name': 'codegate.dev',
+        'base-url': 'https://codegate.dev/v1',
+        'api-key-entries': [{ 'api-key': 'sk-test' }],
+        'models': [
+          {
+            name: 'gpt-5.6-sol',
+            alias: 'codegate.dev/gpt-5.6-sol',
+            thinking: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+          },
+          {
+            name: 'gpt-5.5',
+            alias: 'codegate.dev/gpt-5.5',
+            thinking: { levels: ['low', 'high'] },
+          },
+        ],
+      },
+    ])
   })
 
   it('keeps same-url endpoints with different tokens under unique names', async () => {
@@ -217,7 +287,9 @@ describe('openai-compatible endpoint', () => {
   })
 })
 
-function serviceWith(): { service: AccountsService, onAccountsChanged: ReturnType<typeof vi.fn> } {
+function serviceWith(
+  overrides: Partial<ConstructorParameters<typeof AccountsService>[0]> = {},
+): { service: AccountsService, onAccountsChanged: ReturnType<typeof vi.fn> } {
   const onAccountsChanged = vi.fn()
   return {
     onAccountsChanged,
@@ -225,6 +297,7 @@ function serviceWith(): { service: AccountsService, onAccountsChanged: ReturnTyp
       resolveManagement: async () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
       currentManagement: () => undefined,
       onAccountsChanged,
+      ...overrides,
     }),
   }
 }

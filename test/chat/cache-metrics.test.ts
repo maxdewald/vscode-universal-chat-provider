@@ -91,19 +91,19 @@ describe('formatUsageLine', () => {
   it('appends the raw object for an unrecognized shape so fields can be inspected', () => {
     const raw = { output_tokens: 3 }
     expect(formatUsageLine('model-a', normalizeUsage(raw), raw)).toBe(
-      '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
   it('marks an unknown shape without raw fields', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined))).toBe(
-      '[usage] model-a: input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: input=0 cached=n/a write=0 output=0 hit=n/a (unknown)',
     )
   })
 
   it('includes the reasoning effort sent to the proxy', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, 'xhigh')).toBe(
-      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=0 hit=n/a (unknown)',
     )
   })
 })
@@ -154,7 +154,7 @@ describe('cacheMetricsTracker', () => {
     await metrics.flush()
 
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
     expect(statusBarItem.show).not.toHaveBeenCalled()
     expect(statusBarItem.hide).toHaveBeenCalled()
@@ -185,6 +185,30 @@ describe('cacheMetricsTracker', () => {
       cacheReadTokens: 700,
       hitRate: 0.7,
     })
+  })
+
+  it('excludes usage without cache details from the session hit rate', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, {
+      input_tokens: 300,
+      cache_read_input_tokens: 700,
+      cache_creation_input_tokens: 0,
+    }, { model: 'claude-opus' })
+    record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
+    await metrics.flush()
+
+    expect(statusBarItem.text).toBe('$(database) 70% cached')
+    expect(statusBarItem.tooltip).toContain('cache read 700 · cache write 0 · uncached 300')
+  })
+
+  it('shows an unavailable session hit rate until cache details are received', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
+    await metrics.flush()
+
+    expect(statusBarItem.text).toBe('$(database) n/a cached')
   })
 
   it('fingerprints the request prefix so a stable lead and a divergent tail are distinguishable', async () => {
