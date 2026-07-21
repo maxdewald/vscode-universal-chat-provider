@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.22.0...v0.23.0) (2026-07-21)
+
+
+### Features
+
+* add provider aliases for OpenAI-compatible models ([60a1f3d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/60a1f3d386f934a5ae41372668b93ed21821aeb1))
+* generate unique provider names for OpenAI-compatible endpoints ([412ae13](https://github.com/maxdewald/vscode-universal-chat-provider/commit/412ae13b7e25103e938d057293a35bb81d0ae46d))
+
 ## [0.22.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.21.0...v0.22.0) (2026-07-21)
 
 
