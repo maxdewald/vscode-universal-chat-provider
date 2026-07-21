@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.0...v0.20.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* render empty track in quota usage bar ([5198312](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5198312c079cf4bfc42433aeadecb9127aa2f727))
+
 ## [0.20.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.4...v0.20.0) (2026-07-21)
 
 
