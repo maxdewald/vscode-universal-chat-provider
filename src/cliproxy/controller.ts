@@ -60,7 +60,10 @@ export class ServerController implements ProxyConnection {
     this.accounts = new AccountsService({
       resolveManagement: async start => this.resolveManagement(start),
       currentManagement: () => this.currentManagement(),
-      onAccountsChanged: () => this.notifyAccountsChanged(),
+      onAccountsChanged: () => {
+        this.notifyAccountsChanged()
+        this.scheduleSettledRefresh()
+      },
     })
   }
 

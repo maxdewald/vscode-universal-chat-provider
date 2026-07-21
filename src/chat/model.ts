@@ -3,6 +3,7 @@ import type { LanguageModelChatInformation } from 'vscode'
 import type { CatalogModel } from './catalog'
 import { Type } from '@sinclair/typebox'
 import { capitalize, unique } from 'moderndash'
+import { matchCatalogModel } from './catalog-match'
 
 export const ProxyModelListEntrySchema = Type.Object({
   id: Type.String(),
@@ -90,7 +91,7 @@ export function mapProxyModels(
     seen.add(entry.id)
 
     const detail = metadataById.get(entry.id)
-    const catalogModel = resolveCatalogModel(entry.id, catalog)
+    const catalogModel = matchCatalogModel(entry.id, catalog)
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
@@ -113,7 +114,9 @@ export function mapProxyModels(
       continue
     }
     const levels = resolveReasoning(detail, catalogModel)
-    const advertisedName = displayModelName(entry.id, detail, catalogModel)
+    const advertisedName = detail?.display_name !== undefined && detail.display_name !== entry.id
+      ? detail.display_name
+      : catalogModel?.display_name ?? humanizeModelId(entry.id)
     const baseName = normalizeReasoningModelName(advertisedName, levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     candidates.push({
@@ -308,10 +311,6 @@ function formatProviderName(value: string): string {
     ?? normalized.replace(/[a-z][\w'-]*/gi, word => capitalize(word))
 }
 
-function displayModelName(id: string, metadata: ProxyModelMetadata | undefined, catalog: CatalogModel | undefined): string {
-  return metadata?.display_name ?? catalog?.display_name ?? humanizeModelId(id)
-}
-
 function humanizeModelId(id: string): string {
   return id.replace(/[-_/]+/g, ' ').replace(/[a-z][\w.]*/gi, word => capitalize(word))
 }
@@ -320,10 +319,6 @@ function normalizeReasoningModelName(name: string, levels: readonly string[]): s
   if (levels.length < 2)
     return name
   return name.replace(REASONING_NAME_SUFFIX, '')
-}
-
-function resolveCatalogModel(id: string, catalog: ReadonlyMap<string, CatalogModel>): CatalogModel | undefined {
-  return catalog.get(id) ?? catalog.get(id.split('/').pop()!)
 }
 
 function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {

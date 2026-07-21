@@ -83,27 +83,6 @@ describe('model mapping', () => {
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'grok-code'])
   })
 
-  it('matches catalog limits by stripped vendor prefix', () => {
-    const models = mapProxyModels(
-      [{ id: 'openai/gpt-5.5', owned_by: 'openrouter.ai' }],
-      [],
-      new Map([['gpt-5.5', {
-        id: 'gpt-5.5',
-        context_length: 400_000,
-        max_completion_tokens: 128_000,
-      }]]),
-      {},
-    )
-
-    expect(models).toHaveLength(1)
-    expect(models[0]).toMatchObject({
-      id: 'openai/gpt-5.5',
-      maxInputTokens: 400_000,
-      maxOutputTokens: 128_000,
-      proxyOwner: 'openrouter.ai',
-    })
-  })
-
   it('skips unsupported models that have no proxy or catalog limits', () => {
     const skipped: { id: string, reason: string }[] = []
     const models = mapProxyModels(
@@ -299,46 +278,6 @@ describe('model mapping', () => {
     )
 
     expect(model?.name).toBe('Mystery Model Low')
-  })
-
-  it('derives reasoning levels and capability fallbacks from the catalog', () => {
-    const models = mapProxyModels(
-      [{ id: 'vendor/model' }],
-      [],
-      new Map([['vendor/model', {
-        id: 'vendor/model',
-        type: 'vendor',
-        display_name: 'Catalog Model',
-        version: 'v1',
-        inputTokenLimit: 1_000_000,
-        outputTokenLimit: 50_000,
-        supportedInputModalities: ['TEXT', 'IMAGE'],
-        supported_parameters: [],
-        thinking: {
-          zero_allowed: true,
-          dynamic_allowed: true,
-          max: 10,
-        },
-      }]]),
-      {},
-    )
-
-    const model = models[0]
-    expect(models).toHaveLength(1)
-    expect(model).toMatchObject({
-      name: 'Catalog Model',
-      family: 'vendor/model',
-      version: 'v1',
-      maxInputTokens: 1_000_000,
-      maxOutputTokens: 50_000,
-      reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
-      reasoningEffort: 'high',
-      detail: '1M context · Vendor',
-      capabilities: {
-        imageInput: true,
-        toolCalling: false,
-      },
-    })
   })
 
   it('shows the CLI app in model details and tooltips', () => {

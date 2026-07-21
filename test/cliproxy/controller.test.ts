@@ -97,6 +97,21 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('refreshes models again after an account change settles', async () => {
+    vi.useFakeTimers()
+    const refresh = vi.fn()
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    controller.setRefreshListener(refresh)
+    const accounts = (controller as unknown as { accounts: { deps: { onAccountsChanged: () => void } } }).accounts
+
+    accounts.deps.onAccountsChanged()
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(refresh).toHaveBeenCalledTimes(2)
+    controller.dispose()
+  })
+
   it('logs restart failures and offers both server log channels', async () => {
     const error = new Error('process ID is unavailable')
     vi.spyOn(ManagedServer.prototype, 'restart').mockRejectedValue(error)
