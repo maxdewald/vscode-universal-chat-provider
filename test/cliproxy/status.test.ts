@@ -9,7 +9,7 @@ describe('countAccounts', () => {
   it('counts auth files and openai-compatibility endpoints', async () => {
     vi.stubGlobal('fetch', vi.fn(async (request: Request) => {
       if (request.url.includes('/openai-compatibility'))
-        return Response.json({ 'openai-compatibility': [{ name: 'opencode.ai', 'base-url': 'https://opencode.ai/v1' }] })
+        return Response.json({ 'openai-compatibility': [{ 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1' }] })
       return Response.json({ files: [{ name: 'a' }, { name: 'b' }] })
     }))
 
