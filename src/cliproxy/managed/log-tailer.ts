@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs'
 import type { Disposable, OutputChannel } from 'vscode'
 import { createReadStream, statSync, unwatchFile, watchFile } from 'node:fs'
 
@@ -17,7 +18,8 @@ export class LogTailer implements Disposable {
   private skipFirstLine = false
   private reading = false
   private rereadQueued = false
-  private readonly listener: (curr: { size: number }) => void
+  private restartQueued = false
+  private readonly listener: (curr: Stats, prev: Stats) => void
 
   constructor(
     private readonly logPath: string,
@@ -26,7 +28,10 @@ export class LogTailer implements Disposable {
   ) {
     this.intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS
     this.seedBytes = options.seedBytes ?? DEFAULT_SEED_BYTES
-    this.listener = curr => this.onChange(curr.size)
+    this.listener = (curr, prev) => this.onChange(
+      curr.size,
+      curr.size < prev.size || curr.dev !== prev.dev || curr.ino !== prev.ino,
+    )
   }
 
   start(): this {
@@ -43,17 +48,19 @@ export class LogTailer implements Disposable {
     unwatchFile(this.logPath, this.listener)
   }
 
-  private onChange(size: number): void {
-    if (size < this.offset) {
+  private onChange(size: number, restart = size < this.offset): void {
+    if (this.reading) {
+      this.rereadQueued = true
+      this.restartQueued ||= restart
+      return
+    }
+    if (restart) {
       this.offset = 0
       this.pending = ''
+      this.skipFirstLine = false
     }
     if (size <= this.offset)
       return
-    if (this.reading) {
-      this.rereadQueued = true
-      return
-    }
     this.reading = true
     const target = size
     const stream = createReadStream(this.logPath, { start: this.offset, end: target - 1, encoding: 'utf8' })
@@ -73,7 +80,9 @@ export class LogTailer implements Disposable {
     this.reading = false
     if (this.rereadQueued) {
       this.rereadQueued = false
-      this.onChange(this.currentSize())
+      const restart = this.restartQueued
+      this.restartQueued = false
+      this.onChange(this.currentSize(), restart)
     }
   }
 

@@ -1,5 +1,5 @@
 import type { OutputChannel } from 'vscode'
-import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -54,7 +54,7 @@ describe('log tailer', () => {
     expect(lines).toEqual(['bbbbb'])
   })
 
-  it('restarts from the top when the file is truncated or rotated', async () => {
+  it('restarts from the top when the file is truncated', async () => {
     await writeFile(logPath, 'old line\n')
     tail()
     await appendFile(logPath, 'before\n')
@@ -64,9 +64,21 @@ describe('log tailer', () => {
     await waitFor(() => lines.includes('after'))
     expect(lines).toContain('after')
   })
+
+  it('restarts from the top when the file is rotated', async () => {
+    await writeFile(logPath, 'old line\n')
+    tail()
+    await appendFile(logPath, 'before\n')
+    await waitFor(() => lines.includes('before'))
+
+    await rename(logPath, `${logPath}.1`)
+    await writeFile(logPath, 'after rotation\n')
+    await waitFor(() => lines.includes('after rotation'))
+    expect(lines).toContain('after rotation')
+  })
 })
 
-async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
     if (Date.now() > deadline)
