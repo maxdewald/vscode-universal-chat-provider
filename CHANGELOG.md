@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.1...v0.21.0) (2026-07-21)
+
+
+### Features
+
+* support OpenAI-compatible endpoints ([2db9b83](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2db9b8301e2df8c3442f3efbd59a7be1bf1782b3))
+* support Retry-After backoff for quota fetching ([69875e0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/69875e03051285148302d290657cff9ba1cf8fa7))
+
 ## [0.20.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.0...v0.20.1) (2026-07-21)
 
 
