@@ -90,7 +90,7 @@ export function mapProxyModels(
     seen.add(entry.id)
 
     const detail = metadataById.get(entry.id)
-    const catalogModel = catalog.get(entry.id)
+    const catalogModel = resolveCatalogModel(entry.id, catalog)
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
@@ -100,18 +100,16 @@ export function mapProxyModels(
       catalogModel?.context_length,
       catalogModel?.inputTokenLimit,
     )
-    if (totalContext === undefined) {
-      options.onSkipped?.(entry.id, 'no context window reported by the proxy')
-      continue
-    }
-
     const outputTokens = firstPositiveInteger(
       entry.max_completion_tokens,
       catalogModel?.max_completion_tokens,
       catalogModel?.outputTokenLimit,
     )
-    if (outputTokens === undefined) {
-      options.onSkipped?.(entry.id, 'no output token limit reported by the proxy')
+    if (totalContext === undefined || outputTokens === undefined) {
+      options.onSkipped?.(
+        entry.id,
+        'model is not supported: context window and output tokens must be supplied manually',
+      )
       continue
     }
     const levels = resolveReasoning(detail, catalogModel)
@@ -322,6 +320,10 @@ function normalizeReasoningModelName(name: string, levels: readonly string[]): s
   if (levels.length < 2)
     return name
   return name.replace(REASONING_NAME_SUFFIX, '')
+}
+
+function resolveCatalogModel(id: string, catalog: ReadonlyMap<string, CatalogModel>): CatalogModel | undefined {
+  return catalog.get(id) ?? catalog.get(id.split('/').pop()!)
 }
 
 function firstPositiveInteger(...values: Array<number | undefined>): number | undefined {

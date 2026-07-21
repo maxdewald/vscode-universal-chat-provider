@@ -83,6 +83,43 @@ describe('model mapping', () => {
     expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'grok-code'])
   })
 
+  it('matches catalog limits by stripped vendor prefix', () => {
+    const models = mapProxyModels(
+      [{ id: 'openai/gpt-5.5', owned_by: 'openrouter.ai' }],
+      [],
+      new Map([['gpt-5.5', {
+        id: 'gpt-5.5',
+        context_length: 400_000,
+        max_completion_tokens: 128_000,
+      }]]),
+      {},
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      id: 'openai/gpt-5.5',
+      maxInputTokens: 400_000,
+      maxOutputTokens: 128_000,
+      proxyOwner: 'openrouter.ai',
+    })
+  })
+
+  it('skips unsupported models that have no proxy or catalog limits', () => {
+    const skipped: { id: string, reason: string }[] = []
+    const models = mapProxyModels(
+      [{ id: 'vendor/unknown-model', owned_by: 'openrouter.ai' }],
+      [],
+      new Map(),
+      { onSkipped: (id, reason) => skipped.push({ id, reason }) },
+    )
+
+    expect(models).toEqual([])
+    expect(skipped).toEqual([{
+      id: 'vendor/unknown-model',
+      reason: 'model is not supported: context window and output tokens must be supplied manually',
+    }])
+  })
+
   it('advertises exact model identities independently of provider categories', () => {
     const entries = [
       { id: 'gpt-5.6-sol', owned_by: 'openai', context_length: 372_000, max_completion_tokens: 128_000 },
@@ -459,7 +496,10 @@ describe('model mapping', () => {
     )
 
     expect(models.map(model => model.id)).toEqual(['sized'])
-    expect(skipped).toEqual([{ id: 'no-output', reason: 'no output token limit reported by the proxy' }])
+    expect(skipped).toEqual([{
+      id: 'no-output',
+      reason: 'model is not supported: context window and output tokens must be supplied manually',
+    }])
   })
 
   it('advertises the full context window as input regardless of the reported output cap', () => {

@@ -22,6 +22,13 @@ export interface AuthFile {
   type?: string
 }
 
+export interface OpenAICompatibilityProvider {
+  'name': string
+  'base-url': string
+  'api-key-entries'?: Array<{ 'api-key': string }>
+  'models'?: Array<{ name: string }>
+}
+
 const IdTokenSchema = Type.Object({
   email: Type.Optional(Type.String()),
   chatgpt_account_id: Type.Optional(Type.String()),
@@ -58,6 +65,15 @@ const ApiCallResponseSchema = Type.Object({
   status_code: Type.Optional(Type.Number()),
   statusCode: Type.Optional(Type.Number()),
   body: Type.Optional(Type.Unknown()),
+})
+
+const OpenAICompatibilityProviderSchema = Type.Object({
+  'name': Type.String(),
+  'base-url': Type.String(),
+}, { additionalProperties: true })
+
+const OpenAICompatibilityPayloadSchema = Type.Object({
+  'openai-compatibility': Type.Optional(Type.Array(Type.Unknown())),
 })
 
 const toManagementError: BeforeErrorHook = ({ error }) => {
@@ -129,6 +145,25 @@ export class ManagementClient {
       retry: { limit: 2, methods: ['post'], statusCodes: [408, 429, 500, 502, 503, 504] },
     }).json())
     return { statusCode: json?.status_code ?? json?.statusCode ?? 0, body: json?.body }
+  }
+
+  async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {
+    const payload = asValue(
+      OpenAICompatibilityPayloadSchema,
+      await this.fetcher.get('/openai-compatibility', { signal: signal ?? null }).json(),
+    )
+    return (payload?.['openai-compatibility'] ?? []).flatMap((entry) => {
+      const provider = asValue(OpenAICompatibilityProviderSchema, entry)
+      return provider === undefined ? [] : [provider]
+    })
+  }
+
+  async putOpenAICompatibility(providers: OpenAICompatibilityProvider[], signal?: AbortSignal): Promise<void> {
+    await this.fetcher.put('/openai-compatibility', { json: providers, signal: signal ?? null })
+  }
+
+  async deleteOpenAICompatibility(name: string, signal?: AbortSignal): Promise<void> {
+    await this.fetcher.delete(`/openai-compatibility?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
   }
 }
 

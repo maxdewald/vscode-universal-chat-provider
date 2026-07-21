@@ -92,4 +92,52 @@ describe('management client', () => {
     ])
     expect(LOGIN_PROVIDERS.find(provider => provider.label === 'Anthropic Claude')?.endpoint).toBe('anthropic-auth-url')
   })
+
+  it('lists and replaces openai-compatibility providers', async () => {
+    let putBody: unknown
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async (request) => {
+      if (request.method === 'GET') {
+        return Response.json({
+          'openai-compatibility': [
+            { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1', 'models': [{ name: 'gpt-5.5' }] },
+            { broken: true },
+          ],
+        })
+      }
+      if (request.method === 'PUT')
+        putBody = await request.json()
+      return Response.json({ status: 'ok' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+
+    await expect(client.listOpenAICompatibility()).resolves.toEqual([
+      { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1', 'models': [{ name: 'gpt-5.5' }] },
+    ])
+
+    await client.putOpenAICompatibility([
+      {
+        'name': 'opencode.ai',
+        'base-url': 'https://opencode.ai/v1',
+        'api-key-entries': [{ 'api-key': 'sk' }],
+        'models': [{ name: 'gpt-5.5' }],
+      },
+    ])
+    const put = fetchMock.mock.calls[1]![0]
+    expect(put.url).toBe('http://127.0.0.1:8317/v0/management/openai-compatibility')
+    expect(put.method).toBe('PUT')
+    expect(putBody).toEqual([
+      {
+        'name': 'opencode.ai',
+        'base-url': 'https://opencode.ai/v1',
+        'api-key-entries': [{ 'api-key': 'sk' }],
+        'models': [{ name: 'gpt-5.5' }],
+      },
+    ])
+
+    await client.deleteOpenAICompatibility('opencode.ai')
+    const del = fetchMock.mock.calls[2]![0]
+    expect(del.url).toBe('http://127.0.0.1:8317/v0/management/openai-compatibility?name=opencode.ai')
+    expect(del.method).toBe('DELETE')
+  })
 })

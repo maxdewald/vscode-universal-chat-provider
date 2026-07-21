@@ -6,10 +6,14 @@ beforeEach(() => {
 })
 
 describe('countAccounts', () => {
-  it('counts auth files when the management endpoint responds', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [{ name: 'a' }, { name: 'b' }] })))
+  it('counts auth files and openai-compatibility endpoints', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (request: Request) => {
+      if (request.url.includes('/openai-compatibility'))
+        return Response.json({ 'openai-compatibility': [{ name: 'opencode.ai', 'base-url': 'https://opencode.ai/v1' }] })
+      return Response.json({ files: [{ name: 'a' }, { name: 'b' }] })
+    }))
 
-    await expect(countAccounts({ baseUrl: 'http://127.0.0.1:8317', key: 'mgmt-key' })).resolves.toBe(2)
+    await expect(countAccounts({ baseUrl: 'http://127.0.0.1:8317', key: 'mgmt-key' })).resolves.toBe(3)
   })
 
   it('returns undefined on probe failure or missing endpoint', async () => {

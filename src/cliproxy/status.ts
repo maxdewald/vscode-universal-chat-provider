@@ -18,9 +18,13 @@ export async function countAccounts(management: ManagementEndpoint | undefined):
   if (management === undefined)
     return undefined
   try {
-    const files = await new ManagementClient(management.baseUrl, management.key)
-      .listAuthFiles(AbortSignal.timeout(STATUS_PROBE_TIMEOUT_MS))
-    return files.length
+    const client = new ManagementClient(management.baseUrl, management.key)
+    const signal = AbortSignal.timeout(STATUS_PROBE_TIMEOUT_MS)
+    const [files, endpoints] = await Promise.all([
+      client.listAuthFiles(signal),
+      client.listOpenAICompatibility(signal).catch(() => []),
+    ])
+    return files.length + endpoints.length
   }
   catch {
     return undefined

@@ -10,6 +10,7 @@ describe('accounts login completion', () => {
     window.showQuickPick.mockResolvedValue({
       label: 'OpenAI Codex',
       detail: 'ChatGPT / Codex account',
+      account: 'oauth',
       provider: { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
     })
     vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue('https://example.com/auth')
@@ -63,3 +64,120 @@ describe('accounts login completion', () => {
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('openai-compatible endpoint', () => {
+  beforeEach(() => {
+    resetVSCodeMock()
+    vi.unstubAllGlobals()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('falls back to manual models when /v1/models is unavailable', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://opencode.ai/v1/')
+      .mockResolvedValueOnce('sk-test')
+      .mockResolvedValueOnce('claude-opus-4-8, gpt-5.5')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
+      {
+        'name': 'openrouter',
+        'base-url': 'https://openrouter.ai/api/v1',
+        'api-key-entries': [{ 'api-key': 'old' }],
+        'models': [{ name: 'x' }],
+      },
+    ])
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.login()
+
+    expect(put).toHaveBeenCalledWith([
+      {
+        'name': 'openrouter',
+        'base-url': 'https://openrouter.ai/api/v1',
+        'api-key-entries': [{ 'api-key': 'old' }],
+        'models': [{ name: 'x' }],
+      },
+      {
+        'name': 'opencode.ai',
+        'base-url': 'https://opencode.ai/v1',
+        'api-key-entries': [{ 'api-key': 'sk-test' }],
+        'models': [{ name: 'claude-opus-4-8' }, { name: 'gpt-5.5' }],
+      },
+    ])
+    expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI-compatible endpoint “opencode.ai” added (2 models).')
+    expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes every model discovered from /v1/models', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      expect(String(input)).toBe('https://openrouter.ai/api/v1/models')
+      return Response.json({ data: [{ id: 'gpt-5.5' }, { id: 'claude-opus-4-8' }] })
+    }))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.login()
+
+    expect(put).toHaveBeenCalledWith([
+      {
+        'name': 'openrouter.ai',
+        'base-url': 'https://openrouter.ai/api/v1',
+        'api-key-entries': [{ 'api-key': 'sk-or' }],
+        'models': [{ name: 'gpt-5.5' }, { name: 'claude-opus-4-8' }],
+      },
+    ])
+    expect(window.showInputBox).toHaveBeenCalledTimes(2)
+    expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes openai-compatibility providers from manage accounts', async () => {
+    vi.spyOn(ManagementClient.prototype, 'listAuthFiles').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
+      { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1' },
+    ])
+    const del = vi.spyOn(ManagementClient.prototype, 'deleteOpenAICompatibility').mockResolvedValue()
+    window.showQuickPick.mockResolvedValue({
+      label: 'opencode.ai',
+      description: 'openai-compatibility',
+      account: 'openai-compatibility',
+    })
+    window.showWarningMessage.mockResolvedValue('Remove')
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.manageAccounts()
+
+    expect(del).toHaveBeenCalledWith('opencode.ai')
+    expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+})
+
+function serviceWith(): { service: AccountsService, onAccountsChanged: ReturnType<typeof vi.fn> } {
+  const onAccountsChanged = vi.fn()
+  return {
+    onAccountsChanged,
+    service: new AccountsService({
+      resolveManagement: async () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
+      currentManagement: () => undefined,
+      onAccountsChanged,
+    }),
+  }
+}
