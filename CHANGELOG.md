@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.23.0...v0.24.0) (2026-07-21)
+
+
+### Features
+
+* support thinking levels for OpenAI-compatible endpoints ([6186da9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6186da9b72ea133c14ba8560180e0ea9595c98ab))
+
+
+### Bug Fixes
+
+* harden log tailer rotation handling ([7f3bc38](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7f3bc3862d00c62c25c364551a36fe364b758da7))
+
 ## [0.23.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.22.0...v0.23.0) (2026-07-21)
 
 
