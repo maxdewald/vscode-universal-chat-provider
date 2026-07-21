@@ -173,6 +173,28 @@ describe('catalog model mapping', () => {
     ])
   })
 
+  it('keeps provider-scoped aliases distinct with the same catalog display name', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'claude-opus-4-8', owned_by: 'anthropic' },
+        { id: 'codegate.dev/claude-opus-4-8', owned_by: 'codegate.dev' },
+      ],
+      [],
+      new Map([['claude-opus-4-8', {
+        id: 'claude-opus-4-8',
+        display_name: 'Claude Opus 4.8',
+        context_length: 1_000_000,
+        max_completion_tokens: 128_000,
+      }]]),
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.name, model.proxyOwner])).toEqual([
+      ['claude-opus-4-8', 'Claude Opus 4.8', 'anthropic'],
+      ['codegate.dev/claude-opus-4-8', 'Claude Opus 4.8', 'codegate.dev'],
+    ])
+  })
+
   it('derives reasoning levels and capability fallbacks from the catalog', () => {
     const models = mapProxyModels(
       [{ id: 'vendor/model' }],

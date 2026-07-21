@@ -111,7 +111,10 @@ describe('openai-compatible endpoint', () => {
         'name': 'opencode.ai',
         'base-url': 'https://opencode.ai/v1',
         'api-key-entries': [{ 'api-key': 'sk-test' }],
-        'models': [{ name: 'claude-opus-4-8' }, { name: 'gpt-5.5' }],
+        'models': [
+          { name: 'claude-opus-4-8', alias: 'opencode.ai/claude-opus-4-8' },
+          { name: 'gpt-5.5', alias: 'opencode.ai/gpt-5.5' },
+        ],
       },
     ])
     expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI-compatible endpoint “opencode.ai” added (2 models).')
@@ -142,7 +145,10 @@ describe('openai-compatible endpoint', () => {
         'name': 'openrouter.ai',
         'base-url': 'https://openrouter.ai/api/v1',
         'api-key-entries': [{ 'api-key': 'sk-or' }],
-        'models': [{ name: 'gpt-5.5' }, { name: 'claude-opus-4-8' }],
+        'models': [
+          { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
+          { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
+        ],
       },
     ])
     expect(window.showInputBox).toHaveBeenCalledTimes(2)

@@ -26,7 +26,7 @@ export interface OpenAICompatibilityProvider {
   'name': string
   'base-url': string
   'api-key-entries'?: Array<{ 'api-key': string }>
-  'models'?: Array<{ name: string }>
+  'models'?: Array<{ name: string, alias?: string }>
 }
 
 const IdTokenSchema = Type.Object({

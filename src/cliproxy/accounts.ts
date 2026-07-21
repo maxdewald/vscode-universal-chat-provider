@@ -137,9 +137,10 @@ export class AccountsService {
         return
     }
 
-    const models = modelIds.map(name => ({ name }))
+    const providerName = new URL(normalizedBaseUrl).hostname.replace(/^www\./, '')
+    const models = modelIds.map(name => ({ name, alias: `${providerName}/${name}` }))
     const provider: OpenAICompatibilityProvider = {
-      'name': new URL(normalizedBaseUrl).hostname.replace(/^www\./, '') || 'openai-compat',
+      'name': providerName,
       'base-url': normalizedBaseUrl,
       'api-key-entries': [{ 'api-key': apiKey.trim() }],
       models,
