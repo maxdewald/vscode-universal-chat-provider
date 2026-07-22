@@ -54,7 +54,7 @@ const GrokBodySchema = Type.Object({
 })
 
 const ClaudeWindowSchema = Type.Object({
-  utilization: Type.Optional(Type.Number()),
+  utilization: Type.Optional(Type.Union([Type.Number(), Type.Null()])),
   resets_at: Type.Optional(Type.Union([Type.String(), Type.Number()])),
   is_enabled: Type.Optional(Type.Boolean()),
 })
@@ -277,10 +277,10 @@ function parseClaudeWindows(data: unknown): QuotaWindow[] {
       continue
     const used = raw.utilization
     const resetsAt = parseReset(raw.resets_at)
-    windows.push({ key, label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
+    windows.push({ key, label, ...(used == null ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
   }
   const extra = body.extra_usage
-  if (extra?.is_enabled === true && extra.utilization !== undefined)
+  if (extra?.is_enabled === true && extra.utilization != null)
     windows.push({ key: 'extra_usage', label: 'Extra Usage', remainingPercent: clamp(100 - extra.utilization, 0, 100) })
   return windows
 }

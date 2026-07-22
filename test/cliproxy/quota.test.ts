@@ -124,6 +124,21 @@ describe('fetchQuotas', () => {
     ])
   })
 
+  it('ignores unavailable claude extra usage utilization', async () => {
+    const body = JSON.stringify({
+      five_hour: { utilization: 20 },
+      extra_usage: { is_enabled: true, utilization: null },
+    })
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], () => ({
+      statusCode: 200,
+      body,
+    }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }])
+  })
+
   it('parses grok monthly credit usage as a single window', async () => {
     const { client, apiCall } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
 
