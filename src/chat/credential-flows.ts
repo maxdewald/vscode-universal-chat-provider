@@ -31,8 +31,7 @@ export class CredentialFlows {
     if (await this.credentials.get() === undefined && await this.credentials.prompt() === undefined)
       return
     this.markCredentialsAccepted()
-    if (!this.registry.isRefreshing())
-      await this.registry.forceRefresh(true)
+    await this.registry.forceRefresh(true)
   }
 
   async importConfig(): Promise<void> {
@@ -102,8 +101,7 @@ export class CredentialFlows {
       return
 
     this.markCredentialsAccepted()
-    if (!this.registry.isRefreshing())
-      await this.registry.forceRefresh(false)
+    await this.registry.forceRefresh(false)
     if (showSuccess)
       void window.showInformationMessage('CLIProxyAPI API key imported and models refreshed.')
   }

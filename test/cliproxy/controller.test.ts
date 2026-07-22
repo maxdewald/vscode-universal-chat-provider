@@ -135,40 +135,37 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('refreshes models twice while registration settles after restart', async () => {
-    vi.useFakeTimers()
+  it('refreshes models once after restart completes', async () => {
     const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
-    const refresh = vi.fn()
+    const refresh = vi.fn(async () => {})
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     controller.setRefreshListener(refresh)
 
     await controller.restartServer()
     expect(restart).toHaveBeenCalledWith('manual command')
-    expect(refresh).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(750)
     expect(refresh).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(4_249)
-    expect(refresh).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(1)
-    expect(refresh).toHaveBeenCalledTimes(2)
     controller.dispose()
   })
 
-  it('refreshes models again after an account change settles', async () => {
-    vi.useFakeTimers()
-    const refresh = vi.fn()
+  it('awaits one model refresh after an account change', async () => {
+    let releaseRefresh!: () => void
+    const refresh = vi.fn(async () => new Promise<void>(resolve => releaseRefresh = resolve))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     controller.setRefreshListener(refresh)
-    const accounts = (controller as unknown as { accounts: { deps: { onAccountsChanged: () => void } } }).accounts
+    const accounts = (controller as unknown as { accounts: { deps: { onAccountsChanged: (expectedModelIds?: readonly string[]) => Promise<void> } } }).accounts
 
-    accounts.deps.onAccountsChanged()
+    const expectedModelIds = ['codegate/gpt-5.6-sol']
+    const changed = accounts.deps.onAccountsChanged(expectedModelIds)
     expect(refresh).toHaveBeenCalledTimes(1)
+    expect(refresh).toHaveBeenCalledWith(expectedModelIds)
+    let completed = false
+    void changed.then(() => completed = true)
+    await Promise.resolve()
+    expect(completed).toBe(false)
 
-    await vi.advanceTimersByTimeAsync(5_000)
-    expect(refresh).toHaveBeenCalledTimes(2)
+    releaseRefresh()
+    await changed
+    expect(completed).toBe(true)
     controller.dispose()
   })
 

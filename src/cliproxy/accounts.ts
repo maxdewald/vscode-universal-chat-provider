@@ -1,5 +1,6 @@
+import type { CancellationToken, Memento } from 'vscode'
 import type { CatalogModel } from '../chat/catalog'
-import type { ManagementEndpoint, OpenAICompatibilityProvider } from './management-client'
+import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from './management-client'
 import { Type } from '@sinclair/typebox'
 import { sleep } from 'moderndash'
 import { env, ProgressLocation, Uri, window } from 'vscode'
@@ -11,16 +12,19 @@ import { enrichOpenAICompatibilityProviders } from './openai-compat-thinking'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
+const LAST_OPENAI_BASE_URL_KEY = 'universalChatProvider.lastOpenAIBaseUrl'
 
 export interface AccountsDeps {
   resolveManagement: (start: boolean) => Promise<ManagementEndpoint | undefined>
   currentManagement: () => ManagementEndpoint | undefined
+  state?: Pick<Memento, 'get' | 'update'>
   persistOpenAICompatibility?: (providers: OpenAICompatibilityProvider[]) => Promise<void>
-  onAccountsChanged: () => void
+  onAccountsChanged: (expectedModelIds?: readonly string[]) => Promise<void>
 }
 
 export class AccountsService {
   private loginPrompted = false
+  private loginPromise: Promise<void> | undefined
 
   constructor(private readonly deps: AccountsDeps) {}
 
@@ -29,6 +33,13 @@ export class AccountsService {
   }
 
   async login(): Promise<void> {
+    this.loginPromise ??= this.doLogin().finally(() => {
+      this.loginPromise = undefined
+    })
+    return this.loginPromise
+  }
+
+  private async doLogin(): Promise<void> {
     const management = await this.deps.resolveManagement(true)
     if (management === undefined)
       return
@@ -52,51 +63,95 @@ export class AccountsService {
     }
 
     const client = new ManagementClient(management.baseUrl, management.key)
-    let url: string
-    let before: string
+    let session: AuthSession
+    let before: AuthFileRaw[]
     try {
-      // ponytail: whole-blob compare; catches same-email overwrite (count stays flat).
-      // Byte-identical re-login won't trip this; fresh logins always rotate the token.
-      before = JSON.stringify(await client.listAuthFilesRaw())
-      url = await client.requestAuthUrl(picked.provider.endpoint)
+      before = await client.listAuthFilesRaw()
+      session = await client.requestAuthUrl(picked.provider.endpoint)
     }
     catch (error) {
       void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}`)
       return
     }
 
-    const opened = await env.openExternal(Uri.parse(url))
+    const opened = await env.openExternal(Uri.parse(session.url))
     if (!opened) {
-      void window.showWarningMessage(`Open this URL to finish signing in: ${url}`)
+      void window.showWarningMessage(`Open this URL to finish signing in: ${session.url}`)
       return
     }
 
-    const connected = await window.withProgress(
+    const result = await window.withProgress(
       { location: ProgressLocation.Notification, cancellable: true, title: `Waiting for ${picked.provider.label} sign-in…` },
-      async (_progress, token) => {
-        const deadline = Date.now() + LOGIN_TIMEOUT_MS
-        while (Date.now() < deadline && !token.isCancellationRequested) {
-          await sleep(LOGIN_POLL_MS)
-          const files = await client.listAuthFilesRaw().catch(() => undefined)
-          if (files !== undefined && JSON.stringify(files) !== before)
-            return true
-        }
-        return false
-      },
+      async (_progress, token) => this.waitForLogin(client, session, picked.provider.provider, before, token),
     )
 
-    if (connected) {
+    if (result.status === 'ok') {
+      await this.deps.onAccountsChanged()
       void window.showInformationMessage(`${picked.provider.label} account connected.`)
-      this.deps.onAccountsChanged()
+    }
+    else if (result.status === 'error') {
+      void window.showErrorMessage(`${picked.provider.label} sign-in failed: ${result.error}`)
     }
     else {
       void window.showWarningMessage(`${picked.provider.label} sign-in did not complete. Check Show Logs and try again.`)
     }
   }
 
+  private async waitForLogin(
+    client: ManagementClient,
+    session: AuthSession,
+    expectedProvider: string,
+    before: AuthFileRaw[],
+    token: CancellationToken,
+  ): Promise<{ status: 'wait' | 'ok' } | { status: 'error', error: string }> {
+    const deadline = Date.now() + LOGIN_TIMEOUT_MS
+
+    while (Date.now() < deadline && !token.isCancellationRequested) {
+      await sleep(LOGIN_POLL_MS)
+      const status = await client.getAuthStatus(session.state).catch(() => undefined)
+      if (status?.status === 'error')
+        return status
+      if (status?.status === 'ok' && await this.waitForRuntimeModels(client, expectedProvider, before, deadline, token))
+        return status
+    }
+
+    if (token.isCancellationRequested)
+      await client.cancelAuthSession(session.state).catch(() => undefined)
+    return { status: 'wait' }
+  }
+
+  private async waitForRuntimeModels(
+    client: ManagementClient,
+    expectedProvider: string,
+    before: AuthFileRaw[],
+    deadline: number,
+    token: CancellationToken,
+  ): Promise<boolean> {
+    const beforeFiles = new Map(before.map(file => [file.name ?? file.auth_index, JSON.stringify(file)]))
+    while (Date.now() < deadline && !token.isCancellationRequested) {
+      const after = await client.listAuthFilesRaw().catch(() => undefined)
+      const added = after?.find((file) => {
+        const name = file.name ?? file.auth_index
+        return name !== undefined
+          && (file.provider === expectedProvider || file.type === expectedProvider)
+          && beforeFiles.get(name) !== JSON.stringify(file)
+      })
+      if (added === undefined) {
+        await sleep(LOGIN_POLL_MS)
+        continue
+      }
+      const name = added.name ?? added.auth_index!
+      if ((await client.listAuthFileModels(name).catch(() => [])).length > 0)
+        return true
+      await sleep(LOGIN_POLL_MS)
+    }
+    return false
+  }
+
   private async addOpenAIEndpoint(client: ManagementClient): Promise<void> {
     const baseUrl = await window.showInputBox({
       title: 'OpenAI-compatible base URL',
+      value: this.deps.state?.get<string>(LAST_OPENAI_BASE_URL_KEY) ?? '',
       prompt: 'Must include the /v1 path when the provider uses one (e.g. https://openrouter.ai/api/v1).',
       placeHolder: 'https://openrouter.ai/api/v1',
       ignoreFocusOut: true,
@@ -106,6 +161,7 @@ export class AccountsService {
     })
     if (baseUrl === undefined)
       return
+    await this.deps.state?.update(LAST_OPENAI_BASE_URL_KEY, baseUrl.trim())
 
     const apiKey = await window.showInputBox({
       title: 'API key',
@@ -158,9 +214,13 @@ export class AccountsService {
       enrichOpenAICompatibilityProviders([provider], catalog)
       const updated = [...existing, provider]
       await client.putOpenAICompatibility(updated)
-      await this.deps.persistOpenAICompatibility?.(updated)
+      try {
+        await this.deps.persistOpenAICompatibility?.(updated)
+      }
+      finally {
+        await this.deps.onAccountsChanged(models.map(model => model.alias))
+      }
       void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${models.length} models).`)
-      this.deps.onAccountsChanged()
     }
     catch (error) {
       void window.showErrorMessage(`Could not add OpenAI-compatible endpoint: ${errorMessage(error)}`)
@@ -236,7 +296,7 @@ export class AccountsService {
         await client.deleteAuthFile(picked.label)
       }
       void window.showInformationMessage(`Removed ${picked.label}.`)
-      this.deps.onAccountsChanged()
+      await this.deps.onAccountsChanged()
     }
     catch (error) {
       void window.showErrorMessage(`Could not remove ${picked.label}: ${errorMessage(error)}`)

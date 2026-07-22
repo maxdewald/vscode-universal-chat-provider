@@ -53,6 +53,63 @@ describe('model registry', () => {
     expect(changes).toHaveBeenCalledTimes(1)
   })
 
+  it('runs one follow-up when forced refreshes arrive during discovery', async () => {
+    const registry = createRegistry('secret')
+    const firstDiscovery = deferredDiscovery()
+    const secondDiscovery = deferredDiscovery()
+    clientMocks.discover
+      .mockReturnValueOnce(firstDiscovery.promise)
+      .mockReturnValueOnce(secondDiscovery.promise)
+
+    const first = registry.forceRefresh(false)
+    await vi.waitFor(() => expect(clientMocks.discover).toHaveBeenCalledTimes(1))
+    const second = registry.forceRefresh(false)
+    const third = registry.forceRefresh(false)
+
+    firstDiscovery.resolve(discovery())
+    await vi.waitFor(() => expect(clientMocks.discover).toHaveBeenCalledTimes(2))
+    secondDiscovery.resolve(discovery())
+
+    await expect(Promise.all([first, second, third])).resolves.toEqual([
+      expect.any(Array),
+      expect.any(Array),
+      expect.any(Array),
+    ])
+    expect(clientMocks.discover).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not let an active passive refresh absorb a forced invalidation', async () => {
+    const registry = createRegistry('secret')
+    const firstDiscovery = deferredDiscovery()
+    clientMocks.discover
+      .mockReturnValueOnce(firstDiscovery.promise)
+      .mockResolvedValueOnce(discovery())
+
+    const passive = registry.refresh(false)
+    await vi.waitFor(() => expect(clientMocks.discover).toHaveBeenCalledTimes(1))
+    const forced = registry.forceRefresh(false)
+    firstDiscovery.resolve(discovery())
+
+    await expect(passive).resolves.toHaveLength(1)
+    await expect(forced).resolves.toHaveLength(1)
+    expect(clientMocks.discover).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries discovery until expected proxy models are visible', async () => {
+    const registry = createRegistry('secret')
+    clientMocks.discover
+      .mockResolvedValueOnce(discovery())
+      .mockResolvedValueOnce(singleModelDiscovery({
+        id: 'codegate/gpt-5.6-sol',
+        owned_by: 'openai',
+      }))
+
+    const models = await registry.forceRefresh(false, ['codegate/gpt-5.6-sol'])
+
+    expect(models.map(model => model.proxyModelId)).toContain('codegate/gpt-5.6-sol')
+    expect(clientMocks.discover).toHaveBeenCalledTimes(2)
+  })
+
   it('logs collisions only when they enter the current collision set', async () => {
     const registry = createRegistry('secret')
     const message = 'Model display collision for Test "Model": model-a, model-b; showing full IDs.'
@@ -169,6 +226,14 @@ function collidingDiscovery() {
       { slug: 'model-b', display_name: 'Model (High)', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
     ],
   }
+}
+
+function deferredDiscovery() {
+  let resolve!: (value: ReturnType<typeof discovery>) => void
+  const promise = new Promise<ReturnType<typeof discovery>>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
 }
 
 function outputMessages(message: string): unknown[][] {

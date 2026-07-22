@@ -2,6 +2,7 @@ import type { CancellationToken, Event, OutputChannel } from 'vscode'
 import type { ProxyConnection } from '../cliproxy/connection'
 import type { CredentialStore } from '../cliproxy/credentials'
 import type { ProviderModel } from './model'
+import { sleep } from 'moderndash'
 import { EventEmitter, window } from 'vscode'
 import { CLIProxyClient } from '../cliproxy/client'
 import { isProxyCredentialRejection } from '../cliproxy/errors'
@@ -16,6 +17,8 @@ export interface ModelRegistryHooks {
 }
 
 const REFRESH_TTL_MS = 15_000
+const MODEL_READY_POLL_MS = 50
+const MODEL_READY_TIMEOUT_MS = 5_000
 
 export class ModelRegistry {
   private readonly changeEmitter = new EventEmitter<void>()
@@ -24,6 +27,8 @@ export class ModelRegistry {
   private previousCollisions = new Set<string>()
   private lastRefreshAt = 0
   private refreshPromise: Promise<ProviderModel[]> | undefined
+  private refreshQueued = false
+  private queuedInteractiveRefresh = false
   private thinkingEnrichmentDone = false
 
   readonly onDidChange: Event<void> = this.changeEmitter.event
@@ -37,10 +42,6 @@ export class ModelRegistry {
 
   dispose(): void {
     this.changeEmitter.dispose()
-  }
-
-  isRefreshing(): boolean {
-    return this.refreshPromise !== undefined
   }
 
   snapshot(): ProviderModel[] {
@@ -61,17 +62,46 @@ export class ModelRegistry {
       return this.refreshPromise
     if (Date.now() - this.lastRefreshAt < REFRESH_TTL_MS)
       return this.cachedModels
-    this.refreshPromise = this.doRefresh(interactive, token).finally(() => {
+    return this.startRefresh(interactive, token)
+  }
+
+  async forceRefresh(interactive = true, expectedProxyModelIds: readonly string[] = []): Promise<ProviderModel[]> {
+    const expected = new Set(expectedProxyModelIds)
+    const deadline = Date.now() + MODEL_READY_TIMEOUT_MS
+    while (true) {
+      this.refreshQueued = true
+      this.queuedInteractiveRefresh ||= interactive
+      this.lastRefreshAt = 0
+      const models = await (this.refreshPromise ?? this.startRefresh(false))
+      const missing = [...expected].filter(id => !models.some(model => model.proxyModelId === id))
+      if (missing.length === 0)
+        return models
+      if (Date.now() >= deadline) {
+        this.output.appendLine(`Timed out waiting for CLIProxyAPI models: ${missing.join(', ')}.`)
+        return models
+      }
+      interactive = false
+      await sleep(MODEL_READY_POLL_MS)
+    }
+  }
+
+  private async startRefresh(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
+    this.refreshPromise = this.runRefreshes(interactive, token).finally(() => {
       this.refreshPromise = undefined
     })
     return this.refreshPromise
   }
 
-  async forceRefresh(interactive = true): Promise<ProviderModel[]> {
-    if (this.refreshPromise !== undefined)
-      await this.refreshPromise
-    this.lastRefreshAt = 0
-    return this.refresh(interactive)
+  private async runRefreshes(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
+    do {
+      this.refreshQueued = false
+      interactive ||= this.queuedInteractiveRefresh
+      this.queuedInteractiveRefresh = false
+      await this.doRefresh(interactive, token)
+      interactive = false
+      token = undefined
+    } while (this.refreshQueued)
+    return this.cachedModels
   }
 
   private async doRefresh(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {

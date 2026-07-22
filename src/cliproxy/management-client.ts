@@ -5,17 +5,26 @@ import ky, { isHTTPError } from 'ky'
 import { asValue } from '../shared/json'
 
 export const LOGIN_PROVIDERS = [
-  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
-  { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url' },
-  { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url' },
-  { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url' },
-  { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url' },
+  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },
+  { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url', provider: 'claude' },
+  { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url', provider: 'antigravity' },
+  { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url', provider: 'kimi' },
+  { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url', provider: 'xai' },
 ]
 
 export interface ManagementEndpoint {
   baseUrl: string
   key: string
 }
+
+export interface AuthSession {
+  url: string
+  state: string
+}
+
+export type AuthStatus
+  = | { status: 'wait' | 'ok' }
+    | { status: 'error', error: string }
 
 export interface AuthFile {
   name: string
@@ -65,6 +74,18 @@ const ManagementErrorSchema = Type.Object({
 
 const AuthUrlPayloadSchema = Type.Object({
   url: Type.Optional(Type.Unknown()),
+  state: Type.Optional(Type.Unknown()),
+})
+
+const AuthStatusPayloadSchema = Type.Object({
+  status: Type.Optional(Type.Unknown()),
+  error: Type.Optional(Type.Unknown()),
+})
+
+const AuthFileModelsPayloadSchema = Type.Object({
+  models: Type.Optional(Type.Array(Type.Object({
+    id: Type.String(),
+  }, { additionalProperties: true }))),
 })
 
 const ApiCallResponseSchema = Type.Object({
@@ -106,11 +127,41 @@ export class ManagementClient {
     })
   }
 
-  async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<string> {
+  async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<AuthSession> {
     const payload = asValue(AuthUrlPayloadSchema, await this.fetcher.get(`/${endpoint}?is_webui=true`, { signal: signal ?? null }).json())
-    if (typeof payload?.url !== 'string')
+    if (typeof payload?.url !== 'string' || typeof payload.state !== 'string' || payload.state.trim() === '')
       throw new Error('CLIProxyAPI returned an invalid auth URL response.')
-    return payload.url
+    return { url: payload.url, state: payload.state }
+  }
+
+  async getAuthStatus(state: string, signal?: AbortSignal): Promise<AuthStatus> {
+    const payload = asValue(
+      AuthStatusPayloadSchema,
+      await this.fetcher.get(`/get-auth-status?state=${encodeURIComponent(state)}`, { signal: signal ?? null }).json(),
+    )
+    if (payload?.status === 'wait' || payload?.status === 'ok')
+      return { status: payload.status }
+    if (payload?.status === 'error') {
+      return {
+        status: 'error',
+        error: typeof payload.error === 'string' && payload.error.trim() !== ''
+          ? payload.error
+          : 'Authentication failed.',
+      }
+    }
+    throw new Error('CLIProxyAPI returned an invalid auth status response.')
+  }
+
+  async cancelAuthSession(state: string, signal?: AbortSignal): Promise<void> {
+    await this.fetcher.delete(`/oauth-session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
+  }
+
+  async listAuthFileModels(name: string, signal?: AbortSignal): Promise<string[]> {
+    const payload = asValue(
+      AuthFileModelsPayloadSchema,
+      await this.fetcher.get(`/auth-files/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
+    )
+    return (payload?.models ?? []).map(model => model.id)
   }
 
   async listAuthFiles(signal?: AbortSignal): Promise<AuthFile[]> {

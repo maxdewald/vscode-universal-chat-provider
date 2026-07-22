@@ -20,9 +20,9 @@ describe('accounts login completion', () => {
       label: 'OpenAI Codex',
       detail: 'ChatGPT / Codex account',
       account: 'oauth',
-      provider: { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url' },
+      provider: { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },
     })
-    vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue('https://example.com/auth')
+    vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue({ url: 'https://example.com/auth', state: 'oauth-state' })
   })
 
   afterEach(() => {
@@ -48,6 +48,8 @@ describe('accounts login completion', () => {
     const list = vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
       .mockResolvedValueOnce(before)
       .mockResolvedValue(after)
+    vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'ok' })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFileModels').mockResolvedValue(['gpt-5.5'])
     const onAccountsChanged = vi.fn()
     const service = new AccountsService({
       resolveManagement: async () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
@@ -63,6 +65,32 @@ describe('accounts login completion', () => {
     expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI Codex account connected.')
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
     expect(window.showWarningMessage).not.toHaveBeenCalled()
+  })
+
+  it('reports server-declared login errors without refreshing models', async () => {
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'error', error: 'access denied' })
+    const { service, onAccountsChanged } = serviceWith()
+
+    const done = service.login()
+    await vi.advanceTimersByTimeAsync(1_500)
+    await done
+
+    expect(window.showErrorMessage).toHaveBeenCalledWith('OpenAI Codex sign-in failed: access denied')
+    expect(onAccountsChanged).not.toHaveBeenCalled()
+  })
+
+  it('shares one account picker across concurrent login requests', async () => {
+    let resolvePick!: (value: undefined) => void
+    window.showQuickPick.mockReturnValue(new Promise(resolve => resolvePick = resolve))
+    const { service } = serviceWith()
+
+    const first = service.login()
+    const second = service.login()
+    await vi.waitFor(() => expect(window.showQuickPick).toHaveBeenCalledTimes(1))
+    resolvePick(undefined)
+
+    await Promise.all([first, second])
   })
 })
 
@@ -85,6 +113,31 @@ describe('openai-compatible endpoint', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('remembers only the last base URL', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce(' https://new.example/v1 ')
+      .mockResolvedValueOnce(undefined)
+    const values = new Map<string, unknown>([
+      ['universalChatProvider.lastOpenAIBaseUrl', 'https://old.example/v1'],
+    ])
+    const { service } = serviceWith({
+      state: {
+        get: <T>(key: string): T | undefined => values.get(key) as T | undefined,
+        update: async (key: string, value: unknown) => void values.set(key, value),
+      },
+    })
+
+    await service.login()
+
+    expect(window.showInputBox.mock.calls[0]?.[0]).toMatchObject({ value: 'https://old.example/v1' })
+    expect(window.showInputBox.mock.calls[1]?.[0]).not.toHaveProperty('value')
+    expect(values.get('universalChatProvider.lastOpenAIBaseUrl')).toBe('https://new.example/v1')
   })
 
   it('falls back to manual models when /v1/models is unavailable', async () => {
@@ -175,7 +228,30 @@ describe('openai-compatible endpoint', () => {
       },
     ])
     expect(window.showInputBox).toHaveBeenCalledTimes(2)
+    expect(onAccountsChanged).toHaveBeenCalledWith([
+      'openrouter.ai/gpt-5.5',
+      'openrouter.ai/claude-opus-4-8',
+    ])
+  })
+
+  it('refreshes models when persistence fails after the live endpoint update', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'gpt-5.5' }] })))
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('storage full'))
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
+
+    await service.login()
+
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+    expect(window.showErrorMessage).toHaveBeenCalledWith('Could not add OpenAI-compatible endpoint: storage full')
   })
 
   it('enriches existing openai-compatible providers missing thinking levels', async () => {
@@ -291,7 +367,7 @@ describe('openai-compatible endpoint', () => {
 function serviceWith(
   overrides: Partial<ConstructorParameters<typeof AccountsService>[0]> = {},
 ): { service: AccountsService, onAccountsChanged: ReturnType<typeof vi.fn> } {
-  const onAccountsChanged = vi.fn()
+  const onAccountsChanged = vi.fn(async () => {})
   return {
     onAccountsChanged,
     service: new AccountsService({

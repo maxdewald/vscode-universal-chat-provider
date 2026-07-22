@@ -37,6 +37,33 @@ describe('managed server lifecycle', () => {
     expect(writeConfig).toHaveBeenCalledWith(8317)
   })
 
+  it('retries a restart twice before succeeding', async () => {
+    const appendLine = vi.fn()
+    const server = createServer({ output: { appendLine } as unknown as OutputChannel })
+    const start = vi.fn()
+      .mockRejectedValueOnce(new Error('first failure'))
+      .mockRejectedValueOnce(new Error('second failure'))
+      .mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317 })
+    Object.assign(server, { start })
+
+    await expect(server.restart('manual command')).resolves.toMatchObject({ port: 8317 })
+
+    expect(start).toHaveBeenCalledTimes(3)
+    expect(appendLine).toHaveBeenCalledWith('Managed CLIProxyAPI restart attempt 1 failed: first failure Retrying.')
+    expect(appendLine).toHaveBeenCalledWith('Managed CLIProxyAPI restart attempt 2 failed: second failure Retrying.')
+  })
+
+  it('fails a restart after two retries', async () => {
+    const server = createServer()
+    const error = new Error('still unavailable')
+    const start = vi.fn().mockRejectedValue(error)
+    Object.assign(server, { start })
+
+    await expect(server.restart('manual command')).rejects.toBe(error)
+
+    expect(start).toHaveBeenCalledTimes(3)
+  })
+
   it('waits for an owned child to stop answering before completing stop', async () => {
     let healthy = true
     vi.stubGlobal('fetch', vi.fn(async () => healthy

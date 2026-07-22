@@ -81,7 +81,6 @@ function createFlow() {
     importFromConfig: vi.fn<() => Promise<string | undefined>>(async () => 'key'),
   }
   const registry = {
-    isRefreshing: vi.fn(() => false),
     forceRefresh: vi.fn(async () => []),
     reset: vi.fn(),
   }

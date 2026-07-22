@@ -96,7 +96,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 | `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                             | `boolean` | `true`                    |
 | ▿ <b>Managed Server</b>                       |
 | `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                       | `string`  | `"automatic"`             |
-| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                                       | `string`  | `"7.2.5"`                 |
+| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                                       | `string`  | `"7.2.94"`                |
 | `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. A running managed server restarts automatically when this changes. | `string`  | `""`                      |
 | ▿ <b>Status Bar</b>                           |
 | `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                      | `boolean` | `true`                    |

@@ -213,8 +213,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return this.registry.refresh(interactive, token)
   }
 
-  async forceRefresh(interactive = true): Promise<ProviderModel[]> {
-    return this.registry.forceRefresh(interactive)
+  async forceRefresh(interactive = true, expectedProxyModelIds: readonly string[] = []): Promise<ProviderModel[]> {
+    return this.registry.forceRefresh(interactive, expectedProxyModelIds)
   }
 
   getUtilityEffort(modelId: string): string | undefined {

@@ -8,11 +8,13 @@ import process from 'node:process'
 import getPort from 'get-port'
 import ky from 'ky'
 import { sleep } from 'moderndash'
+import { errorMessage } from '../../shared/errors'
 import { acquireBinary, readInstalledVersion } from './binary'
 import { DEFAULT_PORT } from './config'
 import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from './leases'
 
 const HEALTH_TIMEOUT_MS = 1500
+const RESTART_RETRIES = 2
 const STARTUP_TIMEOUT_MS = 20_000
 const STARTUP_POLL_MS = 300
 
@@ -76,8 +78,17 @@ export class ManagedServer {
     }
     const version = requestedVersion ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
     this.startPromise = withOperationLock(this.deps.paths.operationLockPath, async () => {
-      await this.stopUnlocked()
-      return this.start(signal, version ?? this.deps.requestedVersion())
+      for (let retry = 0; ; retry++) {
+        try {
+          await this.stopUnlocked()
+          return await this.start(signal, version ?? this.deps.requestedVersion())
+        }
+        catch (error) {
+          if (signal?.aborted || retry >= RESTART_RETRIES)
+            throw error
+          this.deps.output.appendLine(`Managed CLIProxyAPI restart attempt ${retry + 1} failed: ${errorMessage(error)} Retrying.`)
+        }
+      }
     }).finally(() => {
       this.startPromise = undefined
     })

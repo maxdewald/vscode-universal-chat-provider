@@ -42,11 +42,10 @@ export class ServerController implements ProxyConnection {
   private managementKey: string | undefined
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
-  private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
-  private readonly scheduleSettledRefresh = debounce(() => this.notifyAccountsChanged(), 5_000)
+  private readonly scheduleRefresh = debounce(() => void this.notifyAccountsChanged(), 750)
   // Anthropic's oauth/usage rate-limits with a ~4min Retry-After, so stay well above that.
   readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 120_000)
-  private refreshListener: (() => void) | undefined
+  private refreshListener: ((expectedModelIds?: readonly string[]) => Promise<void>) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private quotaRefresh: Promise<void> | undefined
@@ -63,12 +62,12 @@ export class ServerController implements ProxyConnection {
     this.accounts = new AccountsService({
       resolveManagement: async start => this.resolveManagement(start),
       currentManagement: () => this.currentManagement(),
+      state: context.globalState,
       persistOpenAICompatibility: async (providers: OpenAICompatibilityProvider[]) => this.mode() === 'managed'
         ? openAICompatibility.set(providers)
         : undefined,
-      onAccountsChanged: () => {
-        this.notifyAccountsChanged()
-        this.scheduleSettledRefresh()
+      onAccountsChanged: async (expectedModelIds) => {
+        await this.notifyAccountsChanged(expectedModelIds)
       },
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
@@ -129,7 +128,7 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  setRefreshListener(listener: () => void): void {
+  setRefreshListener(listener: (expectedModelIds?: readonly string[]) => Promise<void>): void {
     this.refreshListener = listener
   }
 
@@ -189,8 +188,7 @@ export class ServerController implements ProxyConnection {
       void window.showInformationMessage(previous === current
         ? `CLIProxyAPI ${current ?? 'binary'} is already installed.`
         : `CLIProxyAPI updated from ${previous ?? 'an unknown version'} to ${current ?? version}.`)
-      this.scheduleRefresh()
-      this.scheduleSettledRefresh()
+      await this.notifyAccountsChanged()
     }
     catch (error) {
       this.setStatus('error')
@@ -240,8 +238,7 @@ export class ServerController implements ProxyConnection {
       await this.server!.restart(reason)
       this.setStatus('running')
       void window.showInformationMessage('Managed CLIProxyAPI restarted.')
-      this.scheduleRefresh()
-      this.scheduleSettledRefresh()
+      await this.notifyAccountsChanged()
     }
     catch (error) {
       this.setStatus('error')
@@ -276,7 +273,6 @@ export class ServerController implements ProxyConnection {
 
   dispose(): void {
     this.scheduleRefresh.cancel()
-    this.scheduleSettledRefresh.cancel()
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
     if (this.paths !== undefined && releaseLease(this.paths.leaseDir))
@@ -344,8 +340,8 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  private notifyAccountsChanged(): void {
-    this.refreshListener?.()
+  private async notifyAccountsChanged(expectedModelIds?: readonly string[]): Promise<void> {
+    await this.refreshListener?.(expectedModelIds)
     void this.refreshQuotas()
   }
 

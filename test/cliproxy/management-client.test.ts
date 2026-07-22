@@ -14,15 +14,57 @@ beforeEach(() => {
 
 describe('management client', () => {
   it('requests an auth URL with the management bearer key', async () => {
-    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({ status: 'ok', url: 'https://login' }))
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({ status: 'ok', url: 'https://login', state: 'oauth-state' }))
     vi.stubGlobal('fetch', fetchMock)
     const client = createClient()
 
-    await expect(client.requestAuthUrl('codex-auth-url')).resolves.toBe('https://login')
+    await expect(client.requestAuthUrl('codex-auth-url')).resolves.toEqual({ url: 'https://login', state: 'oauth-state' })
     const request = fetchMock.mock.calls[0]![0]
     expect(request.url).toBe('http://127.0.0.1:8317/v0/management/codex-auth-url?is_webui=true')
     expect(request.method).toBe('GET')
     expect(request.headers.get('authorization')).toBe('Bearer mgmt-key')
+  })
+
+  it('rejects auth URL responses without state', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ status: 'ok', url: 'https://login' })))
+    const client = createClient()
+
+    await expect(client.requestAuthUrl('codex-auth-url')).rejects.toThrow('CLIProxyAPI returned an invalid auth URL response.')
+  })
+
+  it.each([
+    ['wait', { status: 'wait' }, { status: 'wait' }],
+    ['ok', { status: 'ok' }, { status: 'ok' }],
+    ['error', { status: 'error', error: 'access denied' }, { status: 'error', error: 'access denied' }],
+  ] as const)('reads %s auth status', async (_name, response, expected) => {
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json(response))
+    vi.stubGlobal('fetch', fetchMock)
+    const client = createClient()
+
+    await expect(client.getAuthStatus('state value')).resolves.toEqual(expected)
+    expect(fetchMock.mock.calls[0]![0].url).toBe('http://127.0.0.1:8317/v0/management/get-auth-status?state=state%20value')
+  })
+
+  it('rejects malformed auth status responses', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ status: 'done' })))
+    const client = createClient()
+
+    await expect(client.getAuthStatus('state')).rejects.toThrow('CLIProxyAPI returned an invalid auth status response.')
+  })
+
+  it('cancels an auth session and lists registered auth models', async () => {
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async (request) => {
+      if (request.method === 'DELETE')
+        return Response.json({ status: 'ok' })
+      return Response.json({ models: [{ id: 'gpt-5.5' }, { id: 'claude-opus-4-8' }] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = createClient()
+
+    await client.cancelAuthSession('state value')
+    await expect(client.listAuthFileModels('codex user.json')).resolves.toEqual(['gpt-5.5', 'claude-opus-4-8'])
+    expect(fetchMock.mock.calls[0]![0].url).toBe('http://127.0.0.1:8317/v0/management/oauth-session?state=state%20value')
+    expect(fetchMock.mock.calls[1]![0].url).toBe('http://127.0.0.1:8317/v0/management/auth-files/models?name=codex%20user.json')
   })
 
   it('lists auth files defensively and skips malformed entries', async () => {

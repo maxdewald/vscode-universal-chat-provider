@@ -27,7 +27,9 @@ export function activate(context: ExtensionContext): void {
     renderStatusBar()
     controller!.scheduleQuotaRefresh()
   }
-  controller.setRefreshListener(() => void provider?.forceRefresh(false))
+  controller.setRefreshListener(async (expectedModelIds) => {
+    await provider?.forceRefresh(false, expectedModelIds)
+  })
   controller.setStatusListener((status) => {
     lastStatus = status
     renderStatusBar()
