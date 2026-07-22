@@ -126,8 +126,15 @@ describe('fetchQuotas', () => {
 
   it('ignores unavailable claude extra usage utilization', async () => {
     const body = JSON.stringify({
-      five_hour: { utilization: 20 },
-      extra_usage: { is_enabled: true, utilization: null },
+      five_hour: { utilization: 20, resets_at: null },
+      seven_day_sonnet: null,
+      extra_usage: null,
+      unknown_limit: null,
+      rate_limits: [
+        { kind: 'session', percent: 0, resets_at: null, is_active: false },
+        { kind: 'weekly_all', percent: 61, resets_at: '2026-07-25T09:00:00.306312+00:00', is_active: true },
+      ],
+      feature_enabled: false,
     })
     const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], () => ({
       statusCode: 200,

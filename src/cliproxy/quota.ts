@@ -55,12 +55,14 @@ const GrokBodySchema = Type.Object({
 
 const ClaudeWindowSchema = Type.Object({
   utilization: Type.Optional(Type.Union([Type.Number(), Type.Null()])),
-  resets_at: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+  resets_at: Type.Optional(Type.Union([Type.String(), Type.Number(), Type.Null()])),
   is_enabled: Type.Optional(Type.Boolean()),
 })
 
+const ClaudeWindowValueSchema = Type.Union([ClaudeWindowSchema, Type.Null()])
+
 const ClaudeBodySchema = Type.Object({
-  extra_usage: Type.Optional(ClaudeWindowSchema),
+  extra_usage: Type.Optional(ClaudeWindowValueSchema),
 }, { additionalProperties: true })
 
 const CodexWindowSchema = Type.Object({
@@ -269,11 +271,11 @@ function parseClaudeWindows(data: unknown): QuotaWindow[] {
     return []
   const windows: QuotaWindow[] = []
   for (const [key, rawValue] of Object.entries(body)) {
-    const raw = asValue(ClaudeWindowSchema, rawValue)
-    if (raw === undefined)
-      continue
     const label = claudeWindowLabel(key)
     if (label === undefined)
+      continue
+    const raw = asValue(ClaudeWindowValueSchema, rawValue)
+    if (raw == null)
       continue
     const used = raw.utilization
     const resetsAt = parseReset(raw.resets_at)
@@ -351,8 +353,8 @@ function parseRetryAfter(header: Record<string, string[]> | undefined): number |
 }
 
 // Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.
-function parseReset(value: string | number | undefined): number | undefined {
-  if (value === undefined)
+function parseReset(value: string | number | null | undefined): number | undefined {
+  if (value == null)
     return undefined
   const ms = typeof value === 'string' ? Date.parse(value) : value * 1000
   return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
