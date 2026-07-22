@@ -6,6 +6,7 @@ import { maybeSuggestUtilityModel } from './chat/utility-model-nudge'
 import { ServerController } from './cliproxy/controller'
 import { registerCommands } from './extension/commands'
 import { createStatusBar, updateStatusBar } from './extension/status-bar'
+import { setJsonValidationErrorReporter } from './shared/json'
 
 let provider: UniversalChatProvider | undefined
 let controller: ServerController | undefined
@@ -13,6 +14,7 @@ let controller: ServerController | undefined
 export function activate(context: ExtensionContext): void {
   const output = window.createOutputChannel('Universal Chat Provider', { log: true })
   const serverOutput = window.createOutputChannel('CLIProxyAPI Server')
+  setJsonValidationErrorReporter(message => output.error(message))
   controller = new ServerController(context, output, serverOutput)
   provider = new UniversalChatProvider(context, output, controller, async () => controller!.login())
 

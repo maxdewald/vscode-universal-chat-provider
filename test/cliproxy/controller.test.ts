@@ -19,6 +19,7 @@ describe('server controller lifecycle', () => {
 
   beforeEach(async () => {
     resetVSCodeMock()
+    vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'manual')
     root = await makeTempDirectory('ucp-controller-')
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
   })
