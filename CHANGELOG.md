@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.25.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.24.0...v0.25.0) (2026-07-22)
+
+
+### Features
+
+* enable session affinity in managed CLIProxyAPI configs ([13a952e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/13a952e842c6680d41749a6f764bbc13d1452b63))
+* represent missing Codex usage as unavailable ([8ce739a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/8ce739a527f9f470acf9d0506ae7c3aedea797ca))
+
+
+### Bug Fixes
+
+* avoid quota refreshes from auth logs ([63ce312](https://github.com/maxdewald/vscode-universal-chat-provider/commit/63ce3125a03619eb65b7ec19f52bf9db0d16293e))
+
 ## [0.24.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.23.0...v0.24.0) (2026-07-21)
 
 
