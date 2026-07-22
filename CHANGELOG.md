@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.27.0...v0.28.0) (2026-07-22)
+
+
+### Features
+
+* log reason when restarting managed server ([336cd4a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/336cd4a24b4b63307f762e6e18ee183af6c68acc))
+
 ## [0.27.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.26.0...v0.27.0) (2026-07-22)
 
 
