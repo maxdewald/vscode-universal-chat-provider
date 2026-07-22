@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.25.0...v0.26.0) (2026-07-22)
+
+
+### Features
+
+* report schema validation errors ([d183d3c](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d183d3c687af25065991c5672962476ee8c44c44))
+* support OpenAI-compatible endpoints and refactor schema validation ([c29446f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c29446f1c1fa55822578cb10d90be7dc4b60c6a4))
+
 ## [0.25.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.24.0...v0.25.0) (2026-07-22)
 
 
