@@ -6,6 +6,7 @@ import { parse } from 'yaml'
 import { ServerController } from '../../src/cliproxy/controller'
 import { managedPaths } from '../../src/cliproxy/managed/config'
 import { claimLease } from '../../src/cliproxy/managed/leases'
+import { OPENAI_COMPATIBILITY_SECRET } from '../../src/cliproxy/managed/openai-compatibility-store'
 import { ManagedServer } from '../../src/cliproxy/managed/server'
 import { useChildProcesses } from '../support/process'
 import { useTempDirectories } from '../support/temp'
@@ -83,6 +84,27 @@ describe('server controller lifecycle', () => {
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
+    controller.dispose()
+  })
+
+  it('generates managed config from persisted openai-compatible providers', async () => {
+    const providers = [{
+      'name': 'openrouter.ai',
+      'base-url': 'https://openrouter.ai/api/v1',
+      'api-key-entries': [{ 'api-key': 'sk-or' }],
+      'models': [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' }],
+    }]
+    const secrets = new Map([[OPENAI_COMPATIBILITY_SECRET, JSON.stringify(providers)]])
+    const controller = new ServerController(
+      createExtensionContext({ globalStoragePath: root, secrets }),
+      vscodeMock.output as never,
+      vscodeMock.output as never,
+    )
+
+    await controller.ensureReady(false)
+
+    const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
+    expect(config['openai-compatibility']).toEqual(providers)
     controller.dispose()
   })
 

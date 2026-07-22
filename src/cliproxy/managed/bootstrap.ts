@@ -11,6 +11,7 @@ import {
   managedPaths,
 } from './config'
 import { claimLease } from './leases'
+import { OpenAICompatibilityStore } from './openai-compatibility-store'
 import { ManagedServer } from './server'
 
 export const MGMT_KEY_SECRET = 'universalChatProvider.managementKey'
@@ -40,15 +41,18 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
 
   const apiKey = await ensureSecret(context, SECRET_KEY)
   const managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
+  const openAICompatibility = new OpenAICompatibilityStore(context.secrets)
 
   const writeConfig = async (port: number): Promise<void> => {
     const proxyUrl = options.proxyUrl()
+    const providers = await openAICompatibility.get()
     await writeFile(paths.configPath, buildManagedConfig({
       host: DEFAULT_HOST,
       port,
       apiKey,
       managementKey,
       authDir: paths.authDir,
+      openAICompatibility: providers,
       ...(proxyUrl !== undefined ? { proxyUrl } : {}),
     }))
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)

@@ -1,3 +1,4 @@
+import type { OpenAICompatibilityProvider } from '../management-client'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { stringify } from 'yaml'
@@ -39,6 +40,7 @@ export interface ManagedConfigOptions {
   apiKey: string
   managementKey: string
   authDir: string
+  openAICompatibility?: OpenAICompatibilityProvider[]
   proxyUrl?: string
 }
 
@@ -61,5 +63,7 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
   const proxyUrl = options.proxyUrl?.trim()
   if (proxyUrl !== undefined && proxyUrl.length > 0)
     config['proxy-url'] = proxyUrl
+  if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
+    config['openai-compatibility'] = options.openAICompatibility
   return stringify(config)
 }

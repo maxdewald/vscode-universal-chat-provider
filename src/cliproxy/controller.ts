@@ -5,7 +5,7 @@ import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
 import type { ManagedServer } from './managed/server'
 import type { UpdatePolicy } from './managed/updates'
-import type { ManagementEndpoint } from './management-client'
+import type { ManagementEndpoint, OpenAICompatibilityProvider } from './management-client'
 import type { QuotaReport } from './quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from './status'
 import { rm } from 'node:fs/promises'
@@ -26,6 +26,7 @@ import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredential
 import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
+import { OpenAICompatibilityStore } from './managed/openai-compatibility-store'
 import { pickUpdate } from './managed/updates'
 import { ManagementClient } from './management-client'
 import { fetchQuotas } from './quota'
@@ -58,9 +59,13 @@ export class ServerController implements ProxyConnection {
     private readonly output: OutputChannel,
     private readonly serverOutput: OutputChannel,
   ) {
+    const openAICompatibility = new OpenAICompatibilityStore(context.secrets)
     this.accounts = new AccountsService({
       resolveManagement: async start => this.resolveManagement(start),
       currentManagement: () => this.currentManagement(),
+      persistOpenAICompatibility: async (providers: OpenAICompatibilityProvider[]) => this.mode() === 'managed'
+        ? openAICompatibility.set(providers)
+        : undefined,
       onAccountsChanged: () => {
         this.notifyAccountsChanged()
         this.scheduleSettledRefresh()

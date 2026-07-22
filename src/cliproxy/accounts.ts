@@ -15,6 +15,7 @@ const LOGIN_POLL_MS = 1500
 export interface AccountsDeps {
   resolveManagement: (start: boolean) => Promise<ManagementEndpoint | undefined>
   currentManagement: () => ManagementEndpoint | undefined
+  persistOpenAICompatibility?: (providers: OpenAICompatibilityProvider[]) => Promise<void>
   onAccountsChanged: () => void
 }
 
@@ -155,7 +156,9 @@ export class AccountsService {
         models,
       }
       enrichOpenAICompatibilityProviders([provider], catalog)
-      await client.putOpenAICompatibility([...existing, provider])
+      const updated = [...existing, provider]
+      await client.putOpenAICompatibility(updated)
+      await this.deps.persistOpenAICompatibility?.(updated)
       void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${models.length} models).`)
       this.deps.onAccountsChanged()
     }
@@ -174,6 +177,7 @@ export class AccountsService {
       if (!enrichOpenAICompatibilityProviders(existing, catalog))
         return false
       await client.putOpenAICompatibility(existing)
+      await this.deps.persistOpenAICompatibility?.(existing)
       return true
     }
     catch {
@@ -224,10 +228,13 @@ export class AccountsService {
     if (confirm !== 'Remove')
       return
     try {
-      if (picked.account === 'openai-compatibility')
+      if (picked.account === 'openai-compatibility') {
         await client.deleteOpenAICompatibility(picked.label)
-      else
+        await this.deps.persistOpenAICompatibility?.(endpoints.filter(endpoint => endpoint.name !== picked.label))
+      }
+      else {
         await client.deleteAuthFile(picked.label)
+      }
       void window.showInformationMessage(`Removed ${picked.label}.`)
       this.deps.onAccountsChanged()
     }

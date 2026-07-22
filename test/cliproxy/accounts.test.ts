@@ -107,7 +107,8 @@ describe('openai-compatible endpoint', () => {
         'models': [{ name: 'x' }],
       },
     ])
-    const { service, onAccountsChanged } = serviceWith()
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
 
     await service.login()
 
@@ -132,6 +133,9 @@ describe('openai-compatible endpoint', () => {
         ],
       },
     ])
+    expect(persistOpenAICompatibility).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ name: 'opencode.ai' }),
+    ]))
     expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI-compatible endpoint “opencode.ai” added (2 models).')
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })
@@ -191,8 +195,10 @@ describe('openai-compatible endpoint', () => {
         ],
       },
     ])
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
     const { service } = serviceWith({
       currentManagement: () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
+      persistOpenAICompatibility,
     })
 
     await expect(service.enrichThinkingLevels(await catalogMocks.fetchCatalog())).resolves.toBe(true)
@@ -215,6 +221,7 @@ describe('openai-compatible endpoint', () => {
         ],
       },
     ])
+    expect(persistOpenAICompatibility).toHaveBeenCalledWith(put.mock.calls[0]?.[0])
   })
 
   it('keeps same-url endpoints with different tokens under unique names', async () => {
@@ -270,11 +277,13 @@ describe('openai-compatible endpoint', () => {
       account: 'openai-compatibility',
     })
     window.showWarningMessage.mockResolvedValue('Remove')
-    const { service, onAccountsChanged } = serviceWith()
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
 
     await service.manageAccounts()
 
     expect(del).toHaveBeenCalledWith('opencode.ai')
+    expect(persistOpenAICompatibility).toHaveBeenCalledWith([])
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })
 })
