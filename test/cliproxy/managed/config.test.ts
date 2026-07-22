@@ -1,9 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { buildManagedConfig, generateSecret, managedPaths, setConfigPort } from '../../../src/cliproxy/managed/config'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
 
 describe('managed config', () => {
   it('derives all managed paths from a root directory', () => {
@@ -54,15 +56,8 @@ describe('managed config', () => {
 })
 
 describe('setConfigPort', () => {
-  let dir: string
-
-  afterEach(async () => {
-    if (dir !== undefined)
-      await rm(dir, { recursive: true, force: true })
-  })
-
   it('rewrites only the port and preserves the keys', async () => {
-    dir = await mkdtemp(join(tmpdir(), 'ucp-config-'))
+    const dir = await makeTempDirectory('ucp-config-')
     const configPath = join(dir, 'config.yaml')
     await writeFile(configPath, buildManagedConfig({
       host: '127.0.0.1',

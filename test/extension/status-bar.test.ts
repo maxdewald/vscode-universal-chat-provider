@@ -1,5 +1,5 @@
 import type { MarkdownString, ThemeColor } from 'vscode'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
 import { createStatusBar, updateStatusBar } from '../../src/extension/status-bar'
 import { resetVSCodeMock, statusBarItem, vscodeMock, window } from '../support/vscode'
@@ -10,10 +10,6 @@ function tooltipValue(): string {
 
 beforeEach(() => {
   resetVSCodeMock()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('status bar', () => {

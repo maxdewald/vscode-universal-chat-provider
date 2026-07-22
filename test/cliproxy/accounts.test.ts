@@ -26,17 +26,28 @@ describe('accounts login completion', () => {
   })
 
   afterEach(() => {
-    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
-  it('treats a same-email auth overwrite as completed login', async () => {
-    const files = [
-      { name: 'codex-user.json', provider: 'codex', email: 'same@example.com', expires_at: '2026-01-01T00:00:00Z' },
-    ]
+  it.each([
+    {
+      name: 'a same-email auth overwrite',
+      before: [
+        { name: 'codex-user.json', provider: 'codex', email: 'same@example.com', expires_at: '2026-01-01T00:00:00Z' },
+      ],
+      after: [
+        { name: 'codex-user.json', provider: 'codex', email: 'same@example.com', expires_at: '2026-07-20T00:00:00Z' },
+      ],
+    },
+    {
+      name: 'a new auth file',
+      before: [],
+      after: [{ name: 'codex-new.json', provider: 'codex' }],
+    },
+  ])('completes login after $name appears', async ({ before, after }) => {
     const list = vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
-      .mockResolvedValueOnce([...files])
-      .mockImplementation(async () => [{ ...files[0], expires_at: '2026-07-20T00:00:00Z' }])
+      .mockResolvedValueOnce(before)
+      .mockResolvedValue(after)
     const onAccountsChanged = vi.fn()
     const service = new AccountsService({
       resolveManagement: async () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
@@ -52,25 +63,6 @@ describe('accounts login completion', () => {
     expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI Codex account connected.')
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
     expect(window.showWarningMessage).not.toHaveBeenCalled()
-  })
-
-  it('completes when a new auth file appears', async () => {
-    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([{ name: 'codex-new.json', provider: 'codex' }])
-    const onAccountsChanged = vi.fn()
-    const service = new AccountsService({
-      resolveManagement: async () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
-      currentManagement: () => undefined,
-      onAccountsChanged,
-    })
-
-    const done = service.login()
-    await vi.advanceTimersByTimeAsync(1_500)
-    await done
-
-    expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI Codex account connected.')
-    expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })
 })
 

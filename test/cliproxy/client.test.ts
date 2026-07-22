@@ -68,7 +68,13 @@ describe('cLIProxyClient', () => {
         item_id: 'item-1',
         item: { type: 'function_call', call_id: 'call-1', name: 'lookup' },
       }),
-      event({ type: 'response.completed', response: { usage: { output_tokens: 2 } } }),
+      event({
+        type: 'response.completed',
+        response: {
+          error: null,
+          usage: { input_tokens: 10, output_tokens: 2 },
+        },
+      }),
       'data: [DONE]\n\n',
       event({
         type: 'response.output_item.done',
@@ -94,7 +100,7 @@ describe('cLIProxyClient', () => {
     expect(handlers.onThinking).toHaveBeenCalledWith('think')
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
     expect(handlers.onToolCall).toHaveBeenCalledWith('call-1', 'lookup', { q: 'x' })
-    expect(handlers.onUsage).toHaveBeenCalledWith({ output_tokens: 2 })
+    expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
   })
 
   it.each([

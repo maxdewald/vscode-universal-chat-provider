@@ -1,4 +1,3 @@
-import type { ProviderModel } from '../../src/chat/model'
 import { describe, expect, it } from 'vitest'
 import {
   LanguageModelChatMessageRole,
@@ -9,13 +8,14 @@ import {
   LanguageModelToolResultPart,
 } from 'vscode'
 import { buildPromptCacheKey, buildRequest, convertMessage } from '../../src/chat/request'
+import { createProviderModel, userTextMessage } from '../support/chat'
 
-const model = {
+const model = createProviderModel({
   proxyModelId: 'proxy-model',
   maxOutputTokens: 4096,
   reasoningLevels: ['low', 'high'],
   supportsParallelToolCalls: true,
-} as unknown as ProviderModel
+})
 
 describe('response request conversion', () => {
   it('preserves Copilot system messages as Responses API system input', () => {
@@ -110,11 +110,7 @@ describe('response request conversion', () => {
   it('adds supported reasoning and tool options', () => {
     const request = buildRequest(
       model,
-      [{
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('hello')],
-        name: undefined,
-      }],
+      [userTextMessage('hello')],
       {
         toolMode: LanguageModelChatToolMode.Required,
         tools: [{
@@ -143,11 +139,7 @@ describe('response request conversion', () => {
       }],
       stream: true,
       max_output_tokens: 4096,
-      prompt_cache_key: buildPromptCacheKey(model, [{
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('hello')],
-        name: undefined,
-      }]),
+      prompt_cache_key: buildPromptCacheKey(model, [userTextMessage('hello')]),
       reasoning: { effort: 'high', summary: 'detailed' },
       tools: [{
         type: 'function',
@@ -166,11 +158,7 @@ describe('response request conversion', () => {
   })
 
   it('keeps prompt cache keys stable across turns in the same chat seed', () => {
-    const firstTurn = [{
-      role: LanguageModelChatMessageRole.User,
-      content: [new LanguageModelTextPart('hello')],
-      name: undefined,
-    }]
+    const firstTurn = [userTextMessage('hello')]
     const secondTurn = [
       ...firstTurn,
       {
@@ -178,11 +166,7 @@ describe('response request conversion', () => {
         content: [new LanguageModelTextPart('hi')],
         name: undefined,
       },
-      {
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('next')],
-        name: undefined,
-      },
+      userTextMessage('next'),
     ]
 
     const key = buildPromptCacheKey(model, firstTurn)
@@ -212,7 +196,7 @@ describe('response request conversion', () => {
   })
 
   it('omits reasoning for models without reasoning levels', () => {
-    const plainModel = { ...model, reasoningLevels: [] } as unknown as ProviderModel
+    const plainModel = { ...model, reasoningLevels: [] }
     const request = buildRequest(plainModel, [], { toolMode: LanguageModelChatToolMode.Auto })
 
     expect(request).not.toHaveProperty('reasoning')

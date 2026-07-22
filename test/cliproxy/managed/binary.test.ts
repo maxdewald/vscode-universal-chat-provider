@@ -1,10 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zipSync } from 'fflate'
 import { createTarGzip } from 'nanotar'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '../../../src/cliproxy/managed/binary'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
 
 describe('binary asset resolution', () => {
   it.each([
@@ -39,11 +41,7 @@ describe('extractArchive', () => {
   let dest: string
 
   beforeEach(async () => {
-    dest = await mkdtemp(join(tmpdir(), 'ucp-extract-'))
-  })
-
-  afterEach(async () => {
-    await rm(dest, { recursive: true, force: true })
+    dest = await makeTempDirectory('ucp-extract-')
   })
 
   const bin = new TextEncoder().encode('#!/bin/sh\necho hi\n')
@@ -74,11 +72,7 @@ describe('readInstalledVersion', () => {
   let binDir: string
 
   beforeEach(async () => {
-    binDir = await mkdtemp(join(tmpdir(), 'ucp-bin-'))
-  })
-
-  afterEach(async () => {
-    await rm(binDir, { recursive: true, force: true })
+    binDir = await makeTempDirectory('ucp-bin-')
   })
 
   it('returns undefined when the directory is missing or has no version dirs', async () => {

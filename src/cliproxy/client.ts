@@ -49,7 +49,7 @@ const StreamItemSchema = Type.Object({
 
 const StreamResponseSchema = Type.Object({
   usage: Type.Optional(Type.Unknown()),
-  error: Type.Optional(Type.Union([Type.String(), ErrorObjectSchema])),
+  error: Type.Optional(Type.Union([Type.Null(), Type.String(), ErrorObjectSchema])),
 })
 
 const StreamEventSchema = Type.Object({

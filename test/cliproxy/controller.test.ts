@@ -1,33 +1,29 @@
-import type { ChildProcess } from 'node:child_process'
 import type { ExtensionContext } from 'vscode'
-import { spawn } from 'node:child_process'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readdir } from 'node:fs/promises'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ServerController } from '../../src/cliproxy/controller'
 import { managedPaths } from '../../src/cliproxy/managed/config'
 import { claimLease } from '../../src/cliproxy/managed/leases'
 import { ManagedServer } from '../../src/cliproxy/managed/server'
-import { resetVSCodeMock, vscodeMock } from '../support/vscode'
+import { useChildProcesses } from '../support/process'
+import { useTempDirectories } from '../support/temp'
+import { createExtensionContext, resetVSCodeMock, vscodeMock } from '../support/vscode'
+
+const makeTempDirectory = useTempDirectories()
+const { spawnPersistentNodeProcess } = useChildProcesses()
 
 describe('server controller lifecycle', () => {
   let root: string
-  const spawned: ChildProcess[] = []
 
   beforeEach(async () => {
     resetVSCodeMock()
-    root = await mkdtemp(join(tmpdir(), 'ucp-controller-'))
+    root = await makeTempDirectory('ucp-controller-')
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
   })
 
   afterEach(async () => {
-    vi.useRealTimers()
-    for (const child of spawned.splice(0))
-      child.kill()
     vi.restoreAllMocks()
-    await rm(root, { recursive: true, force: true })
   })
 
   it('claims a lease on start and stops the sidecar when the last window closes', async () => {
@@ -49,7 +45,7 @@ describe('server controller lifecycle', () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
 
-    claimLease(managedPaths(root).leaseDir, liveProcess().pid)
+    claimLease(managedPaths(root).leaseDir, spawnPersistentNodeProcess().pid)
 
     controller.dispose()
     expect(dispose).toHaveBeenCalledTimes(1)
@@ -132,12 +128,6 @@ describe('server controller lifecycle', () => {
     )
     expect(await controller.statusSnapshot()).toMatchObject({ status: 'error' })
   })
-
-  function liveProcess(): ChildProcess {
-    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
-    spawned.push(child)
-    return child
-  }
 })
 
 describe('server controller status snapshot', () => {
@@ -145,7 +135,7 @@ describe('server controller status snapshot', () => {
 
   beforeEach(async () => {
     resetVSCodeMock()
-    root = await mkdtemp(join(tmpdir(), 'ucp-status-'))
+    root = await makeTempDirectory('ucp-status-')
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
     vi.spyOn(ManagedServer.prototype, 'shutdown').mockReturnValue()
     vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
@@ -153,7 +143,6 @@ describe('server controller status snapshot', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks()
-    await rm(root, { recursive: true, force: true })
   })
 
   it('reports the managed server as running once it has started', async () => {
@@ -191,25 +180,5 @@ describe('server controller status snapshot', () => {
 })
 
 function context(root: string): ExtensionContext {
-  const globalState = new Map<string, unknown>()
-  return {
-    subscriptions: [],
-    globalStorageUri: { fsPath: root },
-    globalState: {
-      get: <T>(key: string, fallback?: T): T => (globalState.get(key) ?? fallback) as T,
-      update: async (key: string, value: unknown) => {
-        globalState.set(key, value)
-      },
-    },
-    secrets: {
-      get: async (key: string) => vscodeMock.secrets.get(key),
-      store: async (key: string, value: string) => {
-        vscodeMock.secrets.set(key, value)
-      },
-      delete: async (key: string) => {
-        vscodeMock.secrets.delete(key)
-      },
-      onDidChange: () => ({ dispose() {} }),
-    },
-  } as unknown as ExtensionContext
+  return createExtensionContext({ globalStoragePath: root })
 }

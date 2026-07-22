@@ -4,7 +4,7 @@ import type { QuotaSection } from '../../src/extension/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuickPickItemKind } from 'vscode'
 import { showQuotaMenu } from '../../src/extension/quota-menu'
-import { env, quickPick, resetVSCodeMock, triggerQuickPickItemButton, window } from '../support/vscode'
+import { env, latestQuickPick, resetVSCodeMock, triggerQuickPickAccept, triggerQuickPickItemButton, window } from '../support/vscode'
 
 beforeEach(() => {
   resetVSCodeMock()
@@ -15,7 +15,11 @@ function source(sections: QuotaSection[]): () => QuotaSection[] {
 }
 
 function labels(): string[] {
-  return (quickPick.items as QuickPickItem[]).map(item => item.label)
+  return (picker().items as QuickPickItem[]).map(item => item.label)
+}
+
+function picker() {
+  return latestQuickPick()!
 }
 
 const RESET = {
@@ -25,18 +29,13 @@ const RESET = {
 } satisfies CodexResetOption
 
 async function clickReset(): Promise<void> {
-  const item = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
+  const item = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
   await triggerQuickPickItemButton({ item, button: item.buttons![0] })
 }
 
 async function acceptReset(): Promise<void> {
-  const item = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
-  quickPick.activeItems = [item]
-  const listener: unknown = quickPick.onDidAccept.mock.calls[0]?.[0]
-  if (typeof listener !== 'function') {
-    throw new TypeError('No Quick Pick accept listener was registered.')
-  }
-  ;(listener as () => void)()
+  const item = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
+  await triggerQuickPickAccept(picker(), item)
   await vi.waitFor(() => expect(window.showWarningMessage).toHaveBeenCalled())
 }
 
@@ -50,7 +49,7 @@ describe('showQuotaMenu', () => {
       refreshed = true
     })
 
-    expect(quickPick.show).toHaveBeenCalled()
+    expect(picker().show).toHaveBeenCalled()
     expect(refreshed).toBe(true)
     expect(labels()).toEqual([
       'Codex · 5h Quota — 99% left',
@@ -58,8 +57,8 @@ describe('showQuotaMenu', () => {
       '',
       'Antigravity · Claude Sonnet 4.6 — 100% left',
     ])
-    expect((quickPick.items as QuickPickItem[]).filter(item => item.kind === QuickPickItemKind.Separator).map(item => item.label)).toEqual([''])
-    expect(quickPick.busy).toBe(false)
+    expect((picker().items as QuickPickItem[]).filter(item => item.kind === QuickPickItemKind.Separator).map(item => item.label)).toEqual([''])
+    expect(picker().busy).toBe(false)
   })
 
   it('shows a no-data row when there is no quota', async () => {
@@ -80,8 +79,7 @@ describe('showQuotaMenu', () => {
     const resetsAt = Date.parse('2026-07-12T03:25:00Z') // 3h 25m ahead
     await showQuotaMenu(source([{ title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75, resetsAt }] }]), async () => {})
     expect(labels()).toEqual(['Grok · Credits — 75% left'])
-    expect((quickPick.items as QuickPickItem[])[0]?.description).toBe('resets in 3h 25m')
-    vi.useRealTimers()
+    expect((picker().items as QuickPickItem[])[0]?.description).toBe('resets in 3h 25m')
   })
 
   it('omits the reset suffix when resetsAt is missing or in the past', async () => {
@@ -95,7 +93,6 @@ describe('showQuotaMenu', () => {
       'Codex · 5h Quota — 99% left',
       'Codex · 7d Quota — 51% left',
     ])
-    vi.useRealTimers()
   })
 
   it('shows one reset action per eligible account', async () => {
@@ -113,7 +110,7 @@ describe('showQuotaMenu', () => {
       'Codex · one@example.com — 2 resets available',
       'Codex · two@example.com — 1 reset available',
     ])
-    const resetItems = (quickPick.items as Array<QuickPickItem & { reset?: CodexResetOption }>).filter(item => item.reset !== undefined)
+    const resetItems = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).filter(item => item.reset !== undefined)
     expect(resetItems.map(item => item.description)).toEqual([
       `Next reset expires ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt)}`,
       'Next reset does not expire',
@@ -131,7 +128,7 @@ describe('showQuotaMenu', () => {
 
     await trigger()
 
-    expect(quickPick.hide).not.toHaveBeenCalled()
+    expect(picker().hide).not.toHaveBeenCalled()
     expect(window.showWarningMessage).toHaveBeenCalledWith(
       expect.stringContaining('consumes one reset credit'),
       { modal: true },
@@ -181,7 +178,7 @@ describe('showQuotaMenu', () => {
       .mockResolvedValueOnce([RESET])
       .mockResolvedValueOnce([])
     window.showWarningMessage.mockImplementationOnce(async () => {
-      const hide: unknown = quickPick.onDidHide.mock.calls[0]?.[0]
+      const hide: unknown = picker().onDidHide.mock.calls[0]?.[0]
       if (typeof hide === 'function')
         (hide as () => void)()
       return 'Use Reset'
@@ -193,7 +190,7 @@ describe('showQuotaMenu', () => {
     expect(claim).toHaveBeenCalledWith(RESET, expect.any(String))
     expect(list).toHaveBeenCalledTimes(2)
     expect(window.showInformationMessage).toHaveBeenCalledWith('Codex usage reset for one@example.com.')
-    expect(quickPick.dispose).toHaveBeenCalled()
+    expect(picker().dispose).toHaveBeenCalled()
   })
 
   it('requires confirmation again while reusing the same idempotency key on retry', async () => {

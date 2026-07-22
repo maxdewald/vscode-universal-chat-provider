@@ -1,23 +1,22 @@
 import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { managedPaths } from '../../../src/cliproxy/managed/config'
 import { ManagedServer } from '../../../src/cliproxy/managed/server'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
 
 describe('managed server lifecycle', () => {
   let root: string
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'ucp-server-'))
+    root = await makeTempDirectory('ucp-server-')
   })
 
   afterEach(async () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
-    await rm(root, { recursive: true, force: true })
   })
 
   it('waits for an owned child to stop answering before completing stop', async () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ModelRegistry } from '../../src/chat/model-registry'
 import { ProxyHttpError } from '../../src/cliproxy/errors'
+import { singleModelDiscovery } from '../support/chat'
 import { resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
@@ -154,10 +155,7 @@ function createRegistry(
 }
 
 function discovery() {
-  return {
-    available: [{ id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 }],
-    metadata: [],
-  }
+  return singleModelDiscovery()
 }
 
 function collidingDiscovery() {

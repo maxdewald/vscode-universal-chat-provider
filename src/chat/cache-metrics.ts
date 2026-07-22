@@ -180,8 +180,6 @@ export function normalizeUsage(usage: unknown): UsageSummary {
 
 export function createContextUsagePart(usage: unknown): LanguageModelDataPart | undefined {
   const summary = normalizeUsage(usage)
-  if (summary.shape === 'unavailable')
-    return undefined
   const { inputTokens, outputTokens, cacheReadTokens } = summary
   if (inputTokens <= 0 && outputTokens <= 0)
     return undefined
@@ -211,10 +209,7 @@ export function formatUsageLine(
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
     return base
-  const rawRecord = asValue(ObjectSchema, raw)
-  return rawRecord !== undefined && Object.keys(rawRecord).length > 0
-    ? `${base} raw=${JSON.stringify(rawRecord)}`
-    : `${base} (unknown)`
+  return `${base} raw=${JSON.stringify(raw)}`
 }
 
 export class CacheMetricsTracker {

@@ -1,9 +1,11 @@
 import type { OutputChannel } from 'vscode'
-import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { appendFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LogTailer } from '../../../src/cliproxy/managed/log-tailer'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
 
 describe('log tailer', () => {
   let dir: string
@@ -13,7 +15,7 @@ describe('log tailer', () => {
   const tailers: LogTailer[] = []
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'ucp-tailer-'))
+    dir = await makeTempDirectory('ucp-tailer-')
     logPath = join(dir, 'cliproxy.log')
     lines = []
     channel = { appendLine: (line: string) => lines.push(line) } as unknown as OutputChannel
@@ -22,7 +24,6 @@ describe('log tailer', () => {
   afterEach(async () => {
     for (const tailer of tailers.splice(0))
       tailer.dispose()
-    await rm(dir, { recursive: true, force: true })
   })
 
   function tail(seedBytes = 0): LogTailer {

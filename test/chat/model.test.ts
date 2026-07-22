@@ -460,3 +460,143 @@ describe('model mapping', () => {
     expect(over).toMatchObject({ id: 'over-reported', maxInputTokens: 100_000 })
   })
 })
+
+describe('catalog model mapping', () => {
+  it('matches catalog limits by stripped vendor prefix, colon variants, and dotted versions', () => {
+    const catalog = new Map([
+      ['gpt-5.5', {
+        id: 'gpt-5.5',
+        display_name: 'GPT-5.5',
+        context_length: 400_000,
+        max_completion_tokens: 128_000,
+      }],
+      ['claude-opus-4-8', {
+        id: 'claude-opus-4-8',
+        display_name: 'Claude Opus 4.8',
+        context_length: 200_000,
+        max_completion_tokens: 64_000,
+      }],
+    ])
+
+    const models = mapProxyModels(
+      [
+        { id: 'openai/gpt-5.5:free', owned_by: 'openrouter.ai' },
+        { id: 'anthropic/claude-opus-4.8', owned_by: 'openrouter.ai' },
+        { id: 'anthropic/claude-opus-4.8:thinking', owned_by: 'openrouter.ai' },
+      ],
+      [],
+      catalog,
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.name, model.maxInputTokens])).toEqual([
+      ['anthropic/claude-opus-4.8', 'anthropic/claude-opus-4.8', 200_000],
+      ['anthropic/claude-opus-4.8:thinking', 'anthropic/claude-opus-4.8:thinking', 200_000],
+      ['openai/gpt-5.5:free', 'GPT-5.5', 400_000],
+    ])
+  })
+
+  it('matches New API-style catalog variants for limits and display names', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'gpt-5.5-openai-compact', owned_by: 'codegate.dev' },
+        { id: 'claude-opus-4-8-thinking', owned_by: 'codegate.dev' },
+        { id: 'claude-opus-4-8-high', owned_by: 'codegate.dev' },
+        { id: 'gemini-3.5-flash-nothinking', owned_by: 'codegate.dev' },
+      ],
+      [
+        { slug: 'gpt-5.5-openai-compact', display_name: 'gpt-5.5-openai-compact' },
+      ],
+      new Map([
+        ['gpt-5.5', {
+          id: 'gpt-5.5',
+          display_name: 'GPT-5.5',
+          context_length: 272_000,
+          max_completion_tokens: 128_000,
+        }],
+        ['claude-opus-4-8', {
+          id: 'claude-opus-4-8',
+          display_name: 'Claude Opus 4.8',
+          context_length: 200_000,
+          max_completion_tokens: 64_000,
+        }],
+        ['gemini-3.5-flash', {
+          id: 'gemini-3.5-flash',
+          display_name: 'Gemini 3.5 Flash',
+          context_length: 1_000_000,
+          max_completion_tokens: 65_536,
+        }],
+      ]),
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.name, model.maxInputTokens])).toEqual([
+      ['claude-opus-4-8-high', 'claude-opus-4-8-high', 200_000],
+      ['claude-opus-4-8-thinking', 'claude-opus-4-8-thinking', 200_000],
+      ['gemini-3.5-flash-nothinking', 'Gemini 3.5 Flash', 1_000_000],
+      ['gpt-5.5-openai-compact', 'GPT-5.5', 272_000],
+    ])
+  })
+
+  it('keeps provider-scoped aliases distinct with the same catalog display name', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'claude-opus-4-8', owned_by: 'anthropic' },
+        { id: 'codegate.dev/claude-opus-4-8', owned_by: 'codegate.dev' },
+      ],
+      [],
+      new Map([['claude-opus-4-8', {
+        id: 'claude-opus-4-8',
+        display_name: 'Claude Opus 4.8',
+        context_length: 1_000_000,
+        max_completion_tokens: 128_000,
+      }]]),
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.name, model.proxyOwner])).toEqual([
+      ['claude-opus-4-8', 'Claude Opus 4.8', 'anthropic'],
+      ['codegate.dev/claude-opus-4-8', 'Claude Opus 4.8', 'codegate.dev'],
+    ])
+  })
+
+  it('derives reasoning levels and capability fallbacks from the catalog', () => {
+    const models = mapProxyModels(
+      [{ id: 'vendor/model' }],
+      [],
+      new Map([['vendor/model', {
+        id: 'vendor/model',
+        type: 'vendor',
+        display_name: 'Catalog Model',
+        version: 'v1',
+        inputTokenLimit: 1_000_000,
+        outputTokenLimit: 50_000,
+        supportedInputModalities: ['TEXT', 'IMAGE'],
+        supported_parameters: [],
+        thinking: {
+          zero_allowed: true,
+          dynamic_allowed: true,
+          max: 10,
+        },
+      }]]),
+      {},
+    )
+
+    const model = models[0]
+    expect(models).toHaveLength(1)
+    expect(model).toMatchObject({
+      name: 'Catalog Model',
+      family: 'vendor/model',
+      version: 'v1',
+      maxInputTokens: 1_000_000,
+      maxOutputTokens: 50_000,
+      reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
+      reasoningEffort: 'high',
+      detail: '1.1M context · Vendor',
+      capabilities: {
+        imageInput: true,
+        toolCalling: false,
+      },
+    })
+  })
+})
