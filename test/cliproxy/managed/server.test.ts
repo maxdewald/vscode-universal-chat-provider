@@ -22,14 +22,17 @@ describe('managed server lifecycle', () => {
   it('recreates the config when restarting the server', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
     const writeConfig = vi.fn()
+    const appendLine = vi.fn()
     const server = createServer({
+      output: { appendLine } as unknown as OutputChannel,
       getPort: () => 8317,
       writeConfig,
       inspectServer: async () => '7.2.5',
     })
 
-    await server.restart()
+    await server.restart('manual command')
 
+    expect(appendLine).toHaveBeenCalledWith('Restarting managed CLIProxyAPI (reason: manual command).')
     expect(writeConfig).toHaveBeenCalledOnce()
     expect(writeConfig).toHaveBeenCalledWith(8317)
   })

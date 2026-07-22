@@ -3,7 +3,7 @@ import type { CatalogModel } from '../chat/catalog'
 import type { CodexResetOption, CodexResetOutcome } from './codex-resets'
 import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
-import type { ManagedServer } from './managed/server'
+import type { ManagedServer, RestartReason } from './managed/server'
 import type { UpdatePolicy } from './managed/updates'
 import type { ManagementEndpoint, OpenAICompatibilityProvider } from './management-client'
 import type { QuotaReport } from './quota'
@@ -73,7 +73,7 @@ export class ServerController implements ProxyConnection {
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('universalChatProvider.server.proxyUrl') && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
-        void this.restartServer()
+        void this.restartServer('proxy configuration changed')
     }))
   }
 
@@ -181,7 +181,7 @@ export class ServerController implements ProxyConnection {
       await window.withProgress(
         { location: ProgressLocation.Notification, title: 'Updating CLIProxyAPI…' },
         async () => {
-          await this.server!.restart(undefined, version)
+          await this.server!.restart('binary update', undefined, version)
         },
       )
       this.setStatus('running')
@@ -230,14 +230,14 @@ export class ServerController implements ProxyConnection {
     await this.applyBinaryUpdate(target)
   }
 
-  async restartServer(): Promise<void> {
+  async restartServer(reason: RestartReason = 'manual command'): Promise<void> {
     if (this.mode() === 'external') {
       void window.showInformationMessage('The managed server is not active in external mode.')
       return
     }
     try {
       await this.bootstrap()
-      await this.server!.restart()
+      await this.server!.restart(reason)
       this.setStatus('running')
       void window.showInformationMessage('Managed CLIProxyAPI restarted.')
       this.scheduleRefresh()

@@ -34,6 +34,8 @@ export interface RunningServer {
   version?: string
 }
 
+export type RestartReason = 'manual command' | 'proxy configuration changed' | 'binary update'
+
 export class ManagedServer {
   private child: ChildProcess | undefined
   private adopted = false
@@ -63,7 +65,8 @@ export class ManagedServer {
     return this.startPromise
   }
 
-  async restart(signal?: AbortSignal, requestedVersion?: string): Promise<RunningServer> {
+  async restart(reason: RestartReason, signal?: AbortSignal, requestedVersion?: string): Promise<RunningServer> {
+    this.deps.output.appendLine(`Restarting managed CLIProxyAPI (reason: ${reason}).`)
     const starting = this.startPromise
     if (starting !== undefined) {
       try {

@@ -76,6 +76,18 @@ describe('server controller lifecycle', () => {
     ))
   })
 
+  it('logs binary updates as restarts with the configured version', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.version', '8.0.0')
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.5')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.updateBinary()
+
+    expect(restart).toHaveBeenCalledWith('binary update', undefined, '8.0.0')
+    controller.dispose()
+  })
+
   it('writes the configured upstream proxy to managed config', async () => {
     vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
@@ -119,18 +131,19 @@ describe('server controller lifecycle', () => {
       affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl',
     })
 
-    await vi.waitFor(() => expect(restart).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(restart).toHaveBeenCalledWith('proxy configuration changed'))
     controller.dispose()
   })
 
   it('refreshes models twice while registration settles after restart', async () => {
     vi.useFakeTimers()
-    vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
     const refresh = vi.fn()
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     controller.setRefreshListener(refresh)
 
     await controller.restartServer()
+    expect(restart).toHaveBeenCalledWith('manual command')
     expect(refresh).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(750)
