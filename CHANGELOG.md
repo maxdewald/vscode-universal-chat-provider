@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.27.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.26.0...v0.27.0) (2026-07-22)
+
+
+### Features
+
+* persist OpenAI-compatible endpoints in secret storage ([78f6889](https://github.com/maxdewald/vscode-universal-chat-provider/commit/78f6889c19248572b1325509bae8278124d0b052))
+
+
+### Bug Fixes
+
+* handle null utilization in Claude quota reports ([ba96e61](https://github.com/maxdewald/vscode-universal-chat-provider/commit/ba96e613032d4d69f7368658d0af5a8bd6016f6a))
+
 ## [0.26.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.25.0...v0.26.0) (2026-07-22)
 
 
