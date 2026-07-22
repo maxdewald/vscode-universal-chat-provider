@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.28.0...v0.28.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* handle null values in Claude quota responses ([c7e10af](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c7e10afc326dbba6e6e1bfd655bb4f8c25fc697e))
+
 ## [0.28.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.27.0...v0.28.0) (2026-07-22)
 
 
