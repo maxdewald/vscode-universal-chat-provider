@@ -1,23 +1,37 @@
 import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { managedPaths } from '../../../src/cliproxy/managed/config'
 import { ManagedServer } from '../../../src/cliproxy/managed/server'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
 
 describe('managed server lifecycle', () => {
   let root: string
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'ucp-server-'))
+    root = await makeTempDirectory('ucp-server-')
   })
 
   afterEach(async () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
-    await rm(root, { recursive: true, force: true })
+  })
+
+  it('recreates the config when restarting the server', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 200 })))
+    const writeConfig = vi.fn()
+    const server = createServer({
+      getPort: () => 8317,
+      writeConfig,
+      inspectServer: async () => '7.2.5',
+    })
+
+    await server.restart()
+
+    expect(writeConfig).toHaveBeenCalledOnce()
+    expect(writeConfig).toHaveBeenCalledWith(8317)
   })
 
   it('waits for an owned child to stop answering before completing stop', async () => {
@@ -48,7 +62,7 @@ describe('managed server lifecycle', () => {
     await stopping
   })
 
-  function createServer(): ManagedServer {
+  function createServer(overrides: Partial<ConstructorParameters<typeof ManagedServer>[0]> = {}): ManagedServer {
     return new ManagedServer({
       paths: managedPaths(root),
       output: { appendLine: vi.fn() } as unknown as OutputChannel,
@@ -56,6 +70,8 @@ describe('managed server lifecycle', () => {
       requestedVersion: () => '7.2.5',
       getPort: () => undefined,
       setPort: vi.fn(),
+      writeConfig: vi.fn(),
+      ...overrides,
     })
   }
 })

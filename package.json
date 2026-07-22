@@ -3,11 +3,11 @@
   "name": "universal-chat-provider",
   "displayName": "Universal Chat Provider",
   "type": "module",
-  "version": "0.19.4",
-  "packageManager": "pnpm@11.14.0",
+  "version": "0.25.0",
+  "packageManager": "pnpm@11.15.1",
   "volta": {
     "node": "24.18.0",
-    "pnpm": "11.14.0"
+    "pnpm": "11.15.1"
   },
   "description": "Claude, Codex, Antigravity & more in GitHub Copilot Chat. No API key, just OAuth.",
   "author": "Maximilian Dewald <maximilian@dewald.one>",
@@ -197,8 +197,8 @@
             "default": "",
             "scope": "machine",
             "order": 3,
-            "description": "Optional upstream proxy URL for the managed CLIProxyAPI server. Restart the managed server after changing it.",
-            "markdownDescription": "Optional upstream proxy URL written to `proxy-url` in the managed CLIProxyAPI `config.yaml`. Restart the managed server after changing it."
+            "description": "Optional upstream proxy URL for the managed CLIProxyAPI server. A running managed server restarts automatically when this changes.",
+            "markdownDescription": "Optional upstream proxy URL written to `proxy-url` in the managed CLIProxyAPI `config.yaml`. A running managed server restarts automatically when this changes."
           }
         }
       },
@@ -254,6 +254,7 @@
     "ext:publish": "vsce publish --no-dependencies"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
     "eventsource-parser": "^3.1.0",
     "fflate": "^0.8.3",
     "get-port": "^7.2.0",
@@ -266,6 +267,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
+    "@tsconfig/strictest": "^2.0.8",
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",
     "@types/vscode": "^1.124.0",

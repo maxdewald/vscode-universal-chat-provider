@@ -1,23 +1,18 @@
-import type { ChildProcess } from 'node:child_process'
-import { spawn } from 'node:child_process'
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { claimLease, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '../../../src/cliproxy/managed/leases'
+import { useChildProcesses, waitForExit } from '../../support/process'
+import { useTempDirectories } from '../../support/temp'
+
+const makeTempDirectory = useTempDirectories()
+const { spawnPersistentNodeProcess } = useChildProcesses()
 
 describe('window leases', () => {
   let dir: string
-  const spawned: ChildProcess[] = []
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'ucp-lease-'))
-  })
-
-  afterEach(async () => {
-    for (const child of spawned.splice(0))
-      child.kill()
-    await rm(dir, { recursive: true, force: true })
+    dir = await makeTempDirectory('ucp-lease-')
   })
 
   it('reports the releasing window as last when no one else holds a lease', () => {
@@ -26,7 +21,7 @@ describe('window leases', () => {
   })
 
   it('keeps the sidecar alive while another live window holds a lease', () => {
-    const other = liveProcess()
+    const other = spawnPersistentNodeProcess()
     claimLease(dir, process.pid)
     claimLease(dir, other.pid)
 
@@ -34,10 +29,10 @@ describe('window leases', () => {
   })
 
   it('prunes a crashed window’s lease and counts it as gone', async () => {
-    const crashed = liveProcess()
+    const crashed = spawnPersistentNodeProcess()
     const crashedPid = crashed.pid!
     crashed.kill()
-    await onExit(crashed)
+    await waitForExit(crashed)
     claimLease(dir, process.pid)
     claimLease(dir, crashedPid)
 
@@ -96,18 +91,4 @@ describe('window leases', () => {
 
     await expect(withOperationLock(lockPath, async () => 'recovered')).resolves.toBe('recovered')
   })
-
-  function liveProcess(): ChildProcess {
-    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
-    spawned.push(child)
-    return child
-  }
 })
-
-async function onExit(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null)
-    return
-  await new Promise<void>((resolve) => {
-    child.once('exit', () => resolve())
-  })
-}

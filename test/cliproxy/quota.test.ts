@@ -1,18 +1,7 @@
-import type { ManagementClient } from '../../src/cliproxy/management-client'
 import type { QuotaReport } from '../../src/cliproxy/quota'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuotas, formatResetCountdown, remainingForModel } from '../../src/cliproxy/quota'
-
-interface ApiCallResult { statusCode: number, body: unknown }
-
-function fakeClient(
-  files: Record<string, unknown>[],
-  respond: (url: string, payload: Record<string, unknown>) => ApiCallResult,
-): { client: ManagementClient, apiCall: ReturnType<typeof vi.fn> } {
-  const apiCall = vi.fn(async (payload: Record<string, unknown>) => respond(String(payload.url), payload))
-  const client = { listAuthFilesRaw: async () => files, apiCall } as unknown as ManagementClient
-  return { client, apiCall }
-}
+import { createManagementClientFake } from './support/management'
 
 const CODEX_BODY = JSON.stringify({
   plan_type: 'plus',
@@ -47,7 +36,7 @@ const GROK_BODY = JSON.stringify({
   },
 })
 
-function respondOk(url: string): ApiCallResult {
+function respondOk(url: string) {
   if (url.includes('wham/usage'))
     return { statusCode: 200, body: CODEX_BODY }
   if (url.includes('fetchAvailableModels'))
@@ -63,12 +52,9 @@ describe('fetchQuotas', () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date('2026-06-01T00:00:00Z') })
   })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
 
   it('parses codex 5h/7d windows from a string body', async () => {
-    const { client } = fakeClient([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], respondOk)
+    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
@@ -87,7 +73,7 @@ describe('fetchQuotas', () => {
         secondary_window: { used_percent: 20, limit_window_seconds: 604_800, reset_after_seconds: 86_400 },
       },
     })
-    const { client } = fakeClient([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({
+    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({
       statusCode: 200,
       body,
     }))
@@ -102,7 +88,7 @@ describe('fetchQuotas', () => {
     const body = JSON.stringify({
       config: { used: { val: 10 }, monthlyLimit: { val: 100 }, billingPeriodEnd: '2025-01-01T00:00:00Z' },
     })
-    const { client } = fakeClient([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({
+    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({
       statusCode: 200,
       body,
     }))
@@ -113,7 +99,7 @@ describe('fetchQuotas', () => {
   })
 
   it('maps antigravity quota by model id, skipping entries without a fraction', async () => {
-    const { client } = fakeClient([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1', project_id: 'p1' }], respondOk)
+    const { client } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1', project_id: 'p1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
@@ -124,7 +110,7 @@ describe('fetchQuotas', () => {
   })
 
   it('parses claude account windows and enabled extra usage', async () => {
-    const { client } = fakeClient([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
@@ -139,7 +125,7 @@ describe('fetchQuotas', () => {
   })
 
   it('parses grok monthly credit usage as a single window', async () => {
-    const { client, apiCall } = fakeClient([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
+    const { client, apiCall } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
@@ -152,14 +138,14 @@ describe('fetchQuotas', () => {
   })
 
   it('skips providers without a known quota endpoint', async () => {
-    const { client, apiCall } = fakeClient([{ name: 'kimi.json', type: 'kimi', auth_index: 'x1' }], respondOk)
+    const { client, apiCall } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'x1' }], respondOk)
 
     await expect(fetchQuotas(client)).resolves.toEqual([])
     expect(apiCall).not.toHaveBeenCalled()
   })
 
   it('reports an HTTP error instead of throwing', async () => {
-    const { client, apiCall } = fakeClient(
+    const { client, apiCall } = createManagementClientFake(
       [{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }],
       () => ({ statusCode: 401, body: 'unauthorized' }),
     )
@@ -169,8 +155,35 @@ describe('fetchQuotas', () => {
     expect(apiCall).toHaveBeenCalledTimes(1)
   })
 
+  it('captures the upstream Retry-After from a 429 as an epoch deadline', async () => {
+    const { client } = createManagementClientFake(
+      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
+      () => ({ statusCode: 429, body: '', header: { 'Retry-After': ['238'] } }),
+    )
+
+    const report = (await fetchQuotas(client))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: 'HTTP 429', retryAfter: Date.now() + 238_000 })
+  })
+
+  it('skips the upstream call while an account is inside its Retry-After window', async () => {
+    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const until = Date.now() + 60_000
+
+    const report = (await fetchQuotas(client, undefined, new Map([['x1', until]])))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: 'rate limited', retryAfter: until })
+    expect(apiCall).not.toHaveBeenCalled()
+  })
+
+  it('fetches normally once the Retry-After window has elapsed', async () => {
+    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+
+    const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() - 1]])))[0]!
+    expect(report.error).toBeUndefined()
+    expect(apiCall).toHaveBeenCalledTimes(1)
+  })
+
   it('reports missing project_id without calling the upstream', async () => {
-    const { client, apiCall } = fakeClient([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1' }], respondOk)
+    const { client, apiCall } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
     expect(report).toMatchObject({ error: 'missing project_id' })
@@ -238,7 +251,5 @@ describe('formatResetCountdown', () => {
     expect(formatResetCountdown(Date.parse('2026-07-12T00:00:20Z'))).toBe('soon')
     expect(formatResetCountdown(undefined)).toBeUndefined()
     expect(formatResetCountdown(Date.parse('2026-07-11T00:00:00Z'))).toBeUndefined()
-
-    vi.useRealTimers()
   })
 })

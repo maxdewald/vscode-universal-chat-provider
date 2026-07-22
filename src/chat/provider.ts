@@ -21,7 +21,6 @@ import {
 } from 'vscode'
 import { CredentialStore } from '../cliproxy/credentials'
 import { remainingForModel } from '../cliproxy/quota'
-import { asRecord, asString } from '../shared/json'
 import { CacheMetricsTracker, createContextUsagePart } from './cache-metrics'
 import { streamCompletion } from './completion'
 import { CredentialFlows } from './credential-flows'
@@ -31,9 +30,13 @@ import { buildRequest } from './request'
 
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 
-const LanguageModelThinkingPart = (vscode as unknown as {
-  LanguageModelThinkingPart: new (value: string) => LanguageModelResponsePart
-}).LanguageModelThinkingPart
+interface HostChatResponseOptions {
+  modelConfiguration?: { reasoningEffort?: string }
+  requestInitiator?: string
+}
+
+// Not yet in the published @types/vscode this project pins; present at runtime in Copilot Chat.
+const LanguageModelThinkingPart = (vscode as Record<string, unknown>)['LanguageModelThinkingPart'] as new (value: string) => LanguageModelResponsePart
 
 export class UniversalChatProvider implements LanguageModelChatProvider<ProviderModel> {
   private readonly credentials: CredentialStore
@@ -48,7 +51,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   constructor(
     private readonly context: ExtensionContext,
-    private readonly output: OutputChannel,
+    output: OutputChannel,
     private readonly connection: ProxyConnection,
     private readonly onSignIn?: () => Promise<void>,
   ) {
@@ -151,7 +154,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     token: CancellationToken,
   ): Promise<void> {
     this.lastUsedModel = { proxyModelId: model.proxyModelId, proxyOwner: model.proxyOwner, name: model.name }
-    const requestOptions = options as { modelConfiguration?: { reasoningEffort?: string }, requestInitiator?: string }
+    // Host-only fields used by Copilot Chat; not in the public ProvideLanguageModelChatResponseOptions type.
+    const requestOptions = options as HostChatResponseOptions
     const storedUtilityEffort = this.getUtilityEffort(model.id)
     const utilityEffort = storedUtilityEffort !== undefined && model.reasoningLevels.includes(storedUtilityEffort)
       ? storedUtilityEffort
@@ -162,9 +166,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     const request = buildRequest(model, messages, options, chosenEffort)
     const recordUsage = this.cacheMetrics.start({
       model: model.proxyModelId,
-      promptCacheKey: asString(request.prompt_cache_key),
-      reasoningEffort: asString(asRecord(request.reasoning)?.effort),
-      inputItems: request.input as readonly unknown[],
+      promptCacheKey: request.prompt_cache_key,
+      reasoningEffort: request.reasoning?.effort,
+      inputItems: request.input,
     })
     try {
       await streamCompletion(

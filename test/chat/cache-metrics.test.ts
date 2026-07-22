@@ -1,10 +1,14 @@
-import type { ExtensionContext, OutputChannel } from 'vscode'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import type { OutputChannel } from 'vscode'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { CacheMetricsTracker, formatUsageLine, normalizeUsage } from '../../src/chat/cache-metrics'
-import { resetVSCodeMock, statusBarItem, vscodeMock } from '../support/vscode'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { LanguageModelDataPart } from 'vscode'
+import { CacheMetricsTracker, createContextUsagePart, formatUsageLine, normalizeUsage } from '../../src/chat/cache-metrics'
+import { decodeJsonDataPart } from '../support/chat'
+import { useTempDirectories } from '../support/temp'
+import { createExtensionContext, resetVSCodeMock, statusBarItemByPriority, vscodeMock } from '../support/vscode'
+
+const makeTempDirectory = useTempDirectories()
 
 beforeEach(() => {
   resetVSCodeMock()
@@ -27,15 +31,15 @@ describe('normalizeUsage', () => {
     ],
     [
       'OpenAI Responses usage where input_tokens is the total',
-      { input_tokens: 1000, input_tokens_details: { cached_tokens: 800 }, output_tokens: 40 },
+      { input_tokens: 1000, input_tokens_details: { cached_tokens: 700, cache_write_tokens: 200 }, output_tokens: 40 },
       {
         shape: 'openai',
         inputTokens: 1000,
-        cacheReadTokens: 800,
-        cacheWriteTokens: 0,
-        uncachedInputTokens: 200,
+        cacheReadTokens: 700,
+        cacheWriteTokens: 200,
+        uncachedInputTokens: 100,
         outputTokens: 40,
-        hitRate: 0.8,
+        hitRate: 0.7,
       },
     ],
     [
@@ -69,9 +73,46 @@ describe('normalizeUsage', () => {
   })
 
   it('tolerates a missing or non-object usage value', () => {
-    expect(normalizeUsage(undefined).shape).toBe('unknown')
+    expect(normalizeUsage(undefined).shape).toBe('unavailable')
     expect(normalizeUsage(undefined).outputTokens).toBe(0)
-    expect(normalizeUsage('nonsense').inputTokens).toBe(0)
+    expect(normalizeUsage('nonsense').shape).toBe('unavailable')
+    expect(normalizeUsage({}).shape).toBe('unavailable')
+  })
+})
+
+describe('createContextUsagePart', () => {
+  it('returns nothing when usage is unavailable', () => {
+    expect(createContextUsagePart(undefined)).toBeUndefined()
+    expect(createContextUsagePart({})).toBeUndefined()
+  })
+
+  it('omits cache details when the provider does not report them', () => {
+    const part = createContextUsagePart({ input_tokens: 100, output_tokens: 10 })
+
+    expect(decodeJsonDataPart(part!)).toEqual({
+      prompt_tokens: 100,
+      completion_tokens: 10,
+      total_tokens: 110,
+    })
+  })
+
+  it.each([
+    [
+      'Anthropic',
+      { input_tokens: 300, cache_read_input_tokens: 700, cache_creation_input_tokens: 0, output_tokens: 50 },
+      { prompt_tokens: 1000, completion_tokens: 50, total_tokens: 1050, prompt_tokens_details: { cached_tokens: 700 } },
+    ],
+    [
+      'OpenAI',
+      { input_tokens: 1000, input_tokens_details: { cached_tokens: 800 }, output_tokens: 40 },
+      { prompt_tokens: 1000, completion_tokens: 40, total_tokens: 1040, prompt_tokens_details: { cached_tokens: 800 } },
+    ],
+  ])('normalizes %s usage', (_name, usage, expected) => {
+    const part = createContextUsagePart(usage)
+
+    expect(part).toBeInstanceOf(LanguageModelDataPart)
+    expect(part?.mimeType).toBe('usage')
+    expect(decodeJsonDataPart(part!)).toEqual(expected)
   })
 })
 
@@ -91,19 +132,19 @@ describe('formatUsageLine', () => {
   it('appends the raw object for an unrecognized shape so fields can be inspected', () => {
     const raw = { output_tokens: 3 }
     expect(formatUsageLine('model-a', normalizeUsage(raw), raw)).toBe(
-      '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
-  it('marks an unknown shape without raw fields', () => {
+  it('marks missing usage as unavailable', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined))).toBe(
-      '[usage] model-a: input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
     )
   })
 
   it('includes the reasoning effort sent to the proxy', () => {
     expect(formatUsageLine('model-a', normalizeUsage(undefined), undefined, 'xhigh')).toBe(
-      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=0 hit=n/a (unknown)',
+      '[usage] model-a: effort=xhigh input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
     )
   })
 })
@@ -112,16 +153,18 @@ describe('cacheMetricsTracker', () => {
   let directory: string
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'ucp-cache-metrics-'))
-  })
-
-  afterEach(async () => {
-    await rm(directory, { recursive: true, force: true })
+    directory = await makeTempDirectory('ucp-cache-metrics-')
   })
 
   function tracker(): CacheMetricsTracker {
-    const context = { globalStorageUri: { fsPath: directory } } as unknown as ExtensionContext
-    return new CacheMetricsTracker(context, vscodeMock.output as unknown as OutputChannel)
+    return new CacheMetricsTracker(
+      createExtensionContext({ globalStoragePath: directory }),
+      vscodeMock.output as unknown as OutputChannel,
+    )
+  }
+
+  function cacheStatusBar() {
+    return statusBarItemByPriority(99)!
   }
 
   function record(metrics: CacheMetricsTracker, usage: unknown, context: Parameters<CacheMetricsTracker['start']>[0]): void {
@@ -154,10 +197,10 @@ describe('cacheMetricsTracker', () => {
     await metrics.flush()
 
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
-    expect(statusBarItem.show).not.toHaveBeenCalled()
-    expect(statusBarItem.hide).toHaveBeenCalled()
+    expect(cacheStatusBar().show).not.toHaveBeenCalled()
+    expect(cacheStatusBar().hide).toHaveBeenCalled()
     await expect(readFile(join(directory, 'debug.jsonl'), 'utf8')).rejects.toThrow()
   })
 
@@ -172,8 +215,8 @@ describe('cacheMetricsTracker', () => {
     }, { model: 'claude-opus', promptCacheKey: 'session-1' })
     await metrics.flush()
 
-    expect(statusBarItem.show).toHaveBeenCalled()
-    expect(statusBarItem.text).toBe('$(database) 70% cached')
+    expect(cacheStatusBar().show).toHaveBeenCalled()
+    expect(cacheStatusBar().text).toBe('$(database) 70% cached')
 
     const logged = await entries()
     expect(logged).toHaveLength(1)
@@ -185,6 +228,47 @@ describe('cacheMetricsTracker', () => {
       cacheReadTokens: 700,
       hitRate: 0.7,
     })
+  })
+
+  it('excludes usage without cache details from the session hit rate', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, {
+      input_tokens: 300,
+      cache_read_input_tokens: 700,
+      cache_creation_input_tokens: 0,
+    }, { model: 'claude-opus' })
+    record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
+    await metrics.flush()
+
+    expect(cacheStatusBar().text).toBe('$(database) 70% cached')
+    expect(cacheStatusBar().tooltip).toContain('cache read 700 · cache write 0 · uncached 300')
+  })
+
+  it('shows an unavailable session hit rate until cache details are received', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
+    await metrics.flush()
+
+    expect(cacheStatusBar().text).toBe('$(database) n/a cached')
+  })
+
+  it('counts unavailable requests without adding them to usage totals', async () => {
+    vscodeMock.settings.set('universalChatProvider.debug', true)
+    const metrics = tracker()
+    record(metrics, undefined, { model: 'codex' })
+    record(metrics, {
+      input_tokens: 300,
+      cache_read_input_tokens: 700,
+      cache_creation_input_tokens: 0,
+      output_tokens: 50,
+    }, { model: 'claude' })
+    await metrics.flush()
+
+    expect(cacheStatusBar().text).toBe('$(database) 70% cached')
+    expect(cacheStatusBar().tooltip).toContain('cache read 700 · cache write 0 · uncached 300 · output 50')
+    expect(cacheStatusBar().tooltip).toContain('2 requests, 1 with usage')
   })
 
   it('fingerprints the request prefix so a stable lead and a divergent tail are distinguishable', async () => {

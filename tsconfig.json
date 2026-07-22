@@ -1,18 +1,12 @@
 {
+  "extends": "@tsconfig/strictest/tsconfig.json",
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2024"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["node", "vscode"],
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "skipLibCheck": true
+    "noEmit": true
   },
   "include": [
     "src/**/*.ts",

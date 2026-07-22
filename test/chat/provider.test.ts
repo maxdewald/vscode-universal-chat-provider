@@ -1,10 +1,8 @@
-import type { ExtensionContext, OutputChannel } from 'vscode'
-import type { ProviderModel } from '../../src/chat/model'
+import type { OutputChannel } from 'vscode'
 import type { StreamCallbacks } from '../../src/cliproxy/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CancellationTokenSource,
-  LanguageModelChatMessageRole,
   LanguageModelChatToolMode,
   LanguageModelDataPart,
   LanguageModelTextPart,
@@ -12,7 +10,8 @@ import {
 } from 'vscode'
 import { estimateTokens } from '../../src/chat/estimate'
 import { UniversalChatProvider } from '../../src/chat/provider'
-import { LanguageModelThinkingPart, resetVSCodeMock, vscodeMock } from '../support/vscode'
+import { createProviderModel, decodeJsonDataPart, singleModelDiscovery, userTextMessage } from '../support/chat'
+import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
   discover: vi.fn(),
@@ -68,11 +67,7 @@ describe('language model provider', () => {
 
     await provider.provideLanguageModelChatResponse(
       { ...model(), reasoningEffort: 'high' },
-      [{
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('hello')],
-        name: undefined,
-      }],
+      [userTextMessage('hello')],
       options(),
       { report },
       new CancellationTokenSource().token,
@@ -95,14 +90,13 @@ describe('language model provider', () => {
     const usagePart = report.mock.calls[3]?.[0] as LanguageModelDataPart
     expect(usagePart).toBeInstanceOf(LanguageModelDataPart)
     expect(usagePart.mimeType).toBe('usage')
-    expect(JSON.parse(new TextDecoder().decode(usagePart.data))).toEqual({
+    expect(decodeJsonDataPart(usagePart)).toEqual({
       prompt_tokens: 0,
       completion_tokens: 3,
       total_tokens: 3,
-      prompt_tokens_details: { cached_tokens: 0 },
     })
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: effort=high input=0 cached=0 write=0 output=3 hit=n/a raw={"output_tokens":3}',
+      '[usage] model-a: effort=high input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
   })
 
@@ -114,11 +108,7 @@ describe('language model provider', () => {
 
     await provider.provideLanguageModelChatResponse(
       { ...model(), reasoningLevels: ['low', 'high', 'xhigh'], reasoningEffort: 'low' },
-      [{
-        role: LanguageModelChatMessageRole.User,
-        content: [new LanguageModelTextPart('hello')],
-        name: undefined,
-      }],
+      [userTextMessage('hello')],
       { ...options(), modelConfiguration: { reasoningEffort: 'xhigh' } } as ReturnType<typeof options>,
       { report: vi.fn() },
       new CancellationTokenSource().token,
@@ -130,7 +120,30 @@ describe('language model provider', () => {
       expect.any(AbortSignal),
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[usage] model-a: effort=xhigh input=0 cached=0 write=0 output=1 hit=n/a raw={"output_tokens":1}',
+      '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
+    )
+  })
+
+  it('reports missing Codex usage as unavailable without emitting a usage part', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onText('text')
+      callbacks.onUsage?.(undefined)
+    })
+    const report = vi.fn()
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningEffort: 'xhigh' },
+      [userTextMessage('hello')],
+      options(),
+      { report },
+      new CancellationTokenSource().token,
+    )
+
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith(new LanguageModelTextPart('text'))
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      '[usage] model-a: effort=xhigh input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)',
     )
   })
 
@@ -138,7 +151,7 @@ describe('language model provider', () => {
     const provider = createProvider('secret')
     await provider.updateUtilityEffort('model-a', 'high')
     clientMocks.streamResponse.mockResolvedValue(undefined)
-    const message = [{ role: LanguageModelChatMessageRole.User, content: [new LanguageModelTextPart('hello')], name: undefined }]
+    const message = [userTextMessage('hello')]
 
     await provider.provideLanguageModelChatResponse(
       { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'low' },
@@ -170,7 +183,7 @@ describe('language model provider', () => {
 
     await provider.provideLanguageModelChatResponse(
       { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
-      [{ role: LanguageModelChatMessageRole.User, content: [new LanguageModelTextPart('hello')], name: undefined }],
+      [userTextMessage('hello')],
       { ...options(), requestInitiator: 'core' } as ReturnType<typeof options>,
       { report: vi.fn() },
       new CancellationTokenSource().token,
@@ -313,50 +326,16 @@ describe('language model provider', () => {
 function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {
   if (apiKey !== undefined)
     vscodeMock.secrets.set('universalChatProvider.apiKey', apiKey)
-  const context = {
-    subscriptions: [],
-    globalState: {
-      get: <T>(key: string, fallback?: T): T => (vscodeMock.settings.get(key) ?? fallback) as T,
-      update: async (key: string, value: unknown) => {
-        vscodeMock.settings.set(key, value)
-      },
-    },
-    secrets: {
-      get: async (key: string) => vscodeMock.secrets.get(key),
-      store: async (key: string, value: string) => {
-        vscodeMock.secrets.set(key, value)
-      },
-      delete: async (key: string) => {
-        vscodeMock.secrets.delete(key)
-      },
-      onDidChange: () => ({ dispose() {} }),
-    },
-  } as unknown as ExtensionContext
   return new UniversalChatProvider(
-    context,
+    createExtensionContext({ globalState: vscodeMock.settings }),
     vscodeMock.output as unknown as OutputChannel,
     { ensureReady: async () => {}, baseUrl: () => 'http://127.0.0.1:8317' },
     onSignIn,
   )
 }
 
-function model(): ProviderModel {
-  return {
-    id: 'model-a',
-    proxyModelId: 'model-a',
-    proxyOwner: 'openai',
-    name: 'Model A',
-    family: 'test',
-    version: '1',
-    maxInputTokens: 100,
-    maxOutputTokens: 20,
-    reasoningLevels: ['low', 'high'],
-    supportsParallelToolCalls: true,
-    capabilities: {
-      imageInput: false,
-      toolCalling: true,
-    },
-  }
+function model() {
+  return createProviderModel()
 }
 
 function options() {
@@ -366,8 +345,5 @@ function options() {
 }
 
 function discovery() {
-  return {
-    available: [{ id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 }],
-    metadata: [],
-  }
+  return singleModelDiscovery()
 }

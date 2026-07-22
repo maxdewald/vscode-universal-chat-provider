@@ -1,4 +1,5 @@
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
+import type { CatalogModel } from '../chat/catalog'
 import type { CodexResetOption, CodexResetOutcome } from './codex-resets'
 import type { ProxyConnection } from './connection'
 import type { ManagedPaths } from './managed/config'
@@ -21,8 +22,8 @@ import { claimCodexReset, listCodexResets } from './codex-resets'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from './credentials'
 import { readLocalProxyConfig } from './local-config'
 import { DEFAULT_BINARY_VERSION, resolveVersion } from './managed/binary'
-import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchAuthDir } from './managed/bootstrap'
-import { DEFAULT_HOST, DEFAULT_PORT, setProxyUrl } from './managed/config'
+import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from './managed/bootstrap'
+import { DEFAULT_HOST, DEFAULT_PORT } from './managed/config'
 import { releaseLease } from './managed/leases'
 import { LogTailer } from './managed/log-tailer'
 import { pickUpdate } from './managed/updates'
@@ -42,13 +43,13 @@ export class ServerController implements ProxyConnection {
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => this.notifyAccountsChanged(), 750)
   private readonly scheduleSettledRefresh = debounce(() => this.notifyAccountsChanged(), 5_000)
-  // Refreshes immediately on the first prompt, then at most once per window during a long session,
-  // so the quota warning stays current without hammering the upstream usage endpoints.
-  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 30_000)
+  // Anthropic's oauth/usage rate-limits with a ~4min Retry-After, so stay well above that.
+  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 120_000)
   private refreshListener: (() => void) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private quotaRefresh: Promise<void> | undefined
+  private quotaBackoff = new Map<string, number>()
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
 
@@ -60,11 +61,14 @@ export class ServerController implements ProxyConnection {
     this.accounts = new AccountsService({
       resolveManagement: async start => this.resolveManagement(start),
       currentManagement: () => this.currentManagement(),
-      onAccountsChanged: () => this.notifyAccountsChanged(),
+      onAccountsChanged: () => {
+        this.notifyAccountsChanged()
+        this.scheduleSettledRefresh()
+      },
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration('universalChatProvider.server.proxyUrl'))
-        void this.syncManagedProxyUrl()
+      if (event.affectsConfiguration('universalChatProvider.server.proxyUrl') && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
+        void this.restartServer()
     }))
   }
 
@@ -79,6 +83,10 @@ export class ServerController implements ProxyConnection {
       return normalizeBaseUrl(workspace.getConfiguration('universalChatProvider').get<string>('baseUrl', `http://${DEFAULT_HOST}:${DEFAULT_PORT}`))
     return this.server?.baseUrl()
       ?? `http://${DEFAULT_HOST}:${this.context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT}`
+  }
+
+  async enrichOpenAICompatibilityThinking(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
+    return this.accounts.enrichThinkingLevels(catalog)
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {
@@ -291,18 +299,6 @@ export class ServerController implements ProxyConnection {
     return proxyUrl.length > 0 ? proxyUrl : undefined
   }
 
-  private async syncManagedProxyUrl(): Promise<void> {
-    if (this.mode() === 'external' || this.paths === undefined)
-      return
-    try {
-      await setProxyUrl(this.paths.configPath, this.configuredProxyUrl())
-      void window.showInformationMessage('Managed proxy setting updated. Restart the managed server to apply it.')
-    }
-    catch (error) {
-      this.output.appendLine(`Could not update managed proxy setting: ${errorMessage(error)}`)
-    }
-  }
-
   private async bootstrap(): Promise<void> {
     if (this.bootstrapPromise === undefined) {
       this.bootstrapPromise = this.doBootstrap().catch((error: unknown) => {
@@ -325,7 +321,7 @@ export class ServerController implements ProxyConnection {
     this.paths = state.paths
     this.server = state.server
     this.managementKey = state.managementKey
-    this.disposables.push(...watchAuthDir(state.paths.authDir, () => this.scheduleRefresh()))
+    this.disposables.push(...watchCredentialFiles(state.paths.authDir, () => this.scheduleRefresh()))
     if (this.logTailer === undefined) {
       this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()
       this.disposables.push(this.logTailer)
@@ -364,7 +360,21 @@ export class ServerController implements ProxyConnection {
     if (management === undefined)
       return
     try {
-      this.quotaListener?.(await fetchQuotas(new ManagementClient(management.baseUrl, management.key)))
+      const reports = await fetchQuotas(
+        new ManagementClient(management.baseUrl, management.key),
+        undefined,
+        this.quotaBackoff,
+      )
+      for (const report of reports) {
+        const authIndex = report.account?.authIndex
+        if (authIndex === undefined)
+          continue
+        if (report.retryAfter !== undefined)
+          this.quotaBackoff.set(authIndex, report.retryAfter)
+        else if (report.error === undefined)
+          this.quotaBackoff.delete(authIndex)
+      }
+      this.quotaListener?.(reports)
     }
     catch {}
   }

@@ -2,16 +2,17 @@ import type { ExtensionContext, OutputChannel, StatusBarItem } from 'vscode'
 import { createHash } from 'node:crypto'
 import { appendFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Type } from '@sinclair/typebox'
 import { LanguageModelDataPart, StatusBarAlignment, window, workspace } from 'vscode'
 import { errorMessage } from '../shared/errors'
-import { asRecord, asString } from '../shared/json'
+import { asValue } from '../shared/json'
 
 const ENABLED_SETTING = 'debug'
 const LOG_FILE = 'debug.jsonl'
 const DIVERGED_CONTENT_CAP = 6000
 const DIVERGED_CONTENT_LEAD = 200
 
-type UsageShape = 'anthropic' | 'openai' | 'unknown'
+type UsageShape = 'anthropic' | 'openai' | 'unknown' | 'unavailable'
 
 export interface UsageSummary {
   shape: UsageShape
@@ -30,11 +31,16 @@ interface UsageContext {
   inputItems?: readonly unknown[] | undefined
 }
 
+const FingerprintItemSchema = Type.Object({
+  role: Type.Optional(Type.String()),
+  type: Type.Optional(Type.String()),
+})
+
 function fingerprintInput(items: readonly unknown[] | undefined): string[] | undefined {
   return items?.map((item) => {
     const json = JSON.stringify(item) ?? ''
-    const record = asRecord(item)
-    const tag = asString(record?.role) ?? asString(record?.type) ?? 'item'
+    const record = asValue(FingerprintItemSchema, item)
+    const tag = record?.role ?? record?.type ?? 'item'
     const hash = createHash('sha256').update(json).digest('hex').slice(0, 8)
     return `${tag}:${json.length}:${hash}`
   })
@@ -94,8 +100,38 @@ function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
+const UsageDetailsSchema = Type.Object({
+  cache_write_tokens: Type.Optional(Type.Number()),
+  cached_tokens: Type.Optional(Type.Number()),
+})
+
+const UsageRecordSchema = Type.Object({
+  output_tokens: Type.Optional(Type.Number()),
+  completion_tokens: Type.Optional(Type.Number()),
+  cache_read_input_tokens: Type.Optional(Type.Number()),
+  cache_creation_input_tokens: Type.Optional(Type.Number()),
+  input_tokens: Type.Optional(Type.Number()),
+  prompt_tokens: Type.Optional(Type.Number()),
+  input_tokens_details: Type.Optional(UsageDetailsSchema),
+  prompt_tokens_details: Type.Optional(UsageDetailsSchema),
+})
+
+const ObjectSchema = Type.Object({}, { additionalProperties: true })
+
 export function normalizeUsage(usage: unknown): UsageSummary {
-  const record = asRecord(usage) ?? {}
+  const rawRecord = asValue(ObjectSchema, usage)
+  if (rawRecord === undefined || Object.keys(rawRecord).length === 0) {
+    return {
+      shape: 'unavailable',
+      inputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      uncachedInputTokens: 0,
+      outputTokens: 0,
+      hitRate: undefined,
+    }
+  }
+  const record = asValue(UsageRecordSchema, usage) ?? {}
   const output = num(record.output_tokens ?? record.completion_tokens)
 
   const cacheRead = record.cache_read_input_tokens
@@ -116,16 +152,17 @@ export function normalizeUsage(usage: unknown): UsageSummary {
     }
   }
 
-  const details = asRecord(record.input_tokens_details) ?? asRecord(record.prompt_tokens_details)
-  if (details?.cached_tokens !== undefined) {
+  const details = record.input_tokens_details ?? record.prompt_tokens_details
+  if (details?.cached_tokens !== undefined || details?.cache_write_tokens !== undefined) {
     const total = num(record.input_tokens ?? record.prompt_tokens)
     const read = num(details.cached_tokens)
+    const write = num(details.cache_write_tokens)
     return {
       shape: 'openai',
       inputTokens: total,
       cacheReadTokens: read,
-      cacheWriteTokens: 0,
-      uncachedInputTokens: Math.max(0, total - read),
+      cacheWriteTokens: write,
+      uncachedInputTokens: Math.max(0, total - read - write),
       outputTokens: output,
       hitRate: total > 0 ? read / total : undefined,
     }
@@ -144,14 +181,15 @@ export function normalizeUsage(usage: unknown): UsageSummary {
 }
 
 export function createContextUsagePart(usage: unknown): LanguageModelDataPart | undefined {
-  const { inputTokens, outputTokens, cacheReadTokens } = normalizeUsage(usage)
+  const summary = normalizeUsage(usage)
+  const { inputTokens, outputTokens, cacheReadTokens } = summary
   if (inputTokens <= 0 && outputTokens <= 0)
     return undefined
   return LanguageModelDataPart.json({
     prompt_tokens: inputTokens,
     completion_tokens: outputTokens,
     total_tokens: inputTokens + outputTokens,
-    prompt_tokens_details: { cached_tokens: cacheReadTokens },
+    ...(summary.shape !== 'unknown' ? { prompt_tokens_details: { cached_tokens: cacheReadTokens } } : {}),
   }, 'usage')
 }
 
@@ -166,19 +204,19 @@ export function formatUsageLine(
   reasoningEffort?: string,
 ): string {
   const effort = reasoningEffort !== undefined && reasoningEffort.length > 0 ? ` effort=${reasoningEffort}` : ''
-  const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${summary.cacheReadTokens}`
+  if (summary.shape === 'unavailable')
+    return `[usage] ${model}:${effort} input=n/a cached=n/a write=n/a output=n/a hit=n/a (unavailable)`
+  const cached = summary.shape === 'unknown' ? 'n/a' : summary.cacheReadTokens
+  const base = `[usage] ${model}:${effort} input=${summary.inputTokens} cached=${cached}`
     + ` write=${summary.cacheWriteTokens} output=${summary.outputTokens} hit=${formatHitRate(summary.hitRate)}`
   if (summary.shape !== 'unknown')
     return base
-  const rawRecord = asRecord(raw)
-  return rawRecord !== undefined && Object.keys(rawRecord).length > 0
-    ? `${base} raw=${JSON.stringify(rawRecord)}`
-    : `${base} (unknown)`
+  return `${base} raw=${JSON.stringify(raw)}`
 }
 
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
-  private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0 }
+  private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0, requestsWithUsage: 0 }
   private readonly lastItemsByCacheKey = new Map<string, readonly unknown[]>()
   private writes: Promise<void> = Promise.resolve()
 
@@ -230,21 +268,26 @@ export class CacheMetricsTracker {
   }
 
   private accumulate(summary: UsageSummary): void {
-    this.totals.read += summary.cacheReadTokens
-    this.totals.write += summary.cacheWriteTokens
-    this.totals.uncached += summary.uncachedInputTokens
-    this.totals.output += summary.outputTokens
     this.totals.requests += 1
+    if (summary.shape === 'unavailable')
+      return
+    this.totals.requestsWithUsage += 1
+    if (summary.shape !== 'unknown') {
+      this.totals.read += summary.cacheReadTokens
+      this.totals.write += summary.cacheWriteTokens
+      this.totals.uncached += summary.uncachedInputTokens
+    }
+    this.totals.output += summary.outputTokens
   }
 
   private updateStatusBar(): void {
-    const { read, write, uncached, output, requests } = this.totals
+    const { read, write, uncached, output, requests, requestsWithUsage } = this.totals
     const input = read + write + uncached
-    const pct = input > 0 ? Math.round((read / input) * 100) : 0
-    this.statusBar.text = `$(database) ${pct}% cached`
-    this.statusBar.tooltip = `Prompt cache hit rate this session: ${pct}%\n`
+    const rate = input > 0 ? `${Math.round((read / input) * 100)}%` : 'n/a'
+    this.statusBar.text = `$(database) ${rate} cached`
+    this.statusBar.tooltip = `Prompt cache hit rate this session: ${rate}\n`
       + `cache read ${read} · cache write ${write} · uncached ${uncached} · output ${output}\n`
-      + `${requests} request${requests === 1 ? '' : 's'} — logged to ${LOG_FILE}`
+      + `${requests} request${requests === 1 ? '' : 's'}, ${requestsWithUsage} with usage — logged to ${LOG_FILE}`
     this.statusBar.show()
   }
 

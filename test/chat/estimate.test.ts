@@ -23,24 +23,33 @@ describe('estimateTokens', () => {
     expect(estimateTokens('Hello, world!')).toBe(estimateTokenCount('Hello, world!'))
   })
 
-  it('adds framing overhead around text parts of a message', () => {
-    const result = estimateTokens(message([new LanguageModelTextPart('Hello, world!')]))
-    expect(result).toBe(MESSAGE_BASE + PART_BASE + estimateTokenCount('Hello, world!'))
-  })
-
-  it('charges a flat allowance for image data parts and counts non-image data as text', () => {
-    const image = estimateTokens(message([LanguageModelDataPart.image(new Uint8Array([1, 2, 3]), 'image/png')]))
-    expect(image).toBe(MESSAGE_BASE + PART_BASE + IMAGE_TOKENS)
-
-    const text = estimateTokens(message([LanguageModelDataPart.text('plain text', 'text/plain')]))
-    expect(text).toBe(MESSAGE_BASE + PART_BASE + estimateTokenCount('plain text'))
-  })
-
-  it('counts tool calls and tool results as serialized text', () => {
-    const call = estimateTokens(message([new LanguageModelToolCallPart('id', 'lookup', { q: 'x' })]))
-    expect(call).toBe(MESSAGE_BASE + PART_BASE + estimateTokenCount(`lookup(${JSON.stringify({ q: 'x' })})`))
-
-    const result = estimateTokens(message([new LanguageModelToolResultPart('id', [new LanguageModelTextPart('answer')])]))
-    expect(result).toBe(MESSAGE_BASE + PART_BASE + estimateTokenCount('answer'))
+  it.each([
+    [
+      'text parts with framing overhead',
+      new LanguageModelTextPart('Hello, world!'),
+      MESSAGE_BASE + PART_BASE + estimateTokenCount('Hello, world!'),
+    ],
+    [
+      'image data with a flat allowance',
+      LanguageModelDataPart.image(new Uint8Array([1, 2, 3]), 'image/png'),
+      MESSAGE_BASE + PART_BASE + IMAGE_TOKENS,
+    ],
+    [
+      'non-image data as text',
+      LanguageModelDataPart.text('plain text', 'text/plain'),
+      MESSAGE_BASE + PART_BASE + estimateTokenCount('plain text'),
+    ],
+    [
+      'tool calls as serialized text',
+      new LanguageModelToolCallPart('id', 'lookup', { q: 'x' }),
+      MESSAGE_BASE + PART_BASE + estimateTokenCount(`lookup(${JSON.stringify({ q: 'x' })})`),
+    ],
+    [
+      'tool results as serialized text',
+      new LanguageModelToolResultPart('id', [new LanguageModelTextPart('answer')]),
+      MESSAGE_BASE + PART_BASE + estimateTokenCount('answer'),
+    ],
+  ])('counts %s', (_name, part, expected) => {
+    expect(estimateTokens(message([part]))).toBe(expected)
   })
 })

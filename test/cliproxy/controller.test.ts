@@ -1,9 +1,5 @@
-import type { ChildProcess } from 'node:child_process'
 import type { ExtensionContext } from 'vscode'
-import { spawn } from 'node:child_process'
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readdir, readFile } from 'node:fs/promises'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
@@ -11,24 +7,25 @@ import { ServerController } from '../../src/cliproxy/controller'
 import { managedPaths } from '../../src/cliproxy/managed/config'
 import { claimLease } from '../../src/cliproxy/managed/leases'
 import { ManagedServer } from '../../src/cliproxy/managed/server'
-import { resetVSCodeMock, vscodeMock, workspace } from '../support/vscode'
+import { useChildProcesses } from '../support/process'
+import { useTempDirectories } from '../support/temp'
+import { createExtensionContext, resetVSCodeMock, vscodeMock, workspace } from '../support/vscode'
+
+const makeTempDirectory = useTempDirectories()
+const { spawnPersistentNodeProcess } = useChildProcesses()
 
 describe('server controller lifecycle', () => {
   let root: string
-  const spawned: ChildProcess[] = []
 
   beforeEach(async () => {
     resetVSCodeMock()
-    root = await mkdtemp(join(tmpdir(), 'ucp-controller-'))
+    root = await makeTempDirectory('ucp-controller-')
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
   })
 
   afterEach(async () => {
     vi.useRealTimers()
-    for (const child of spawned.splice(0))
-      child.kill()
     vi.restoreAllMocks()
-    await rm(root, { recursive: true, force: true })
   })
 
   it('claims a lease on start and stops the sidecar when the last window closes', async () => {
@@ -50,7 +47,7 @@ describe('server controller lifecycle', () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
 
-    claimLease(managedPaths(root).leaseDir, liveProcess().pid)
+    claimLease(managedPaths(root).leaseDir, spawnPersistentNodeProcess().pid)
 
     controller.dispose()
     expect(dispose).toHaveBeenCalledTimes(1)
@@ -88,18 +85,18 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('synchronizes proxy setting changes into managed config', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
+  it('restarts the managed server when the proxy setting changes', async () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
+    vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317 })
     const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
 
-    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', '')
-    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl' })
-
-    await vi.waitFor(async () => {
-      expect(parse(await readFile(managedPaths(root).configPath, 'utf8'))).not.toHaveProperty('proxy-url')
+    configurationListener?.({
+      affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl',
     })
+
+    await vi.waitFor(() => expect(restart).toHaveBeenCalledOnce())
     controller.dispose()
   })
 
@@ -124,6 +121,21 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('refreshes models again after an account change settles', async () => {
+    vi.useFakeTimers()
+    const refresh = vi.fn()
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    controller.setRefreshListener(refresh)
+    const accounts = (controller as unknown as { accounts: { deps: { onAccountsChanged: () => void } } }).accounts
+
+    accounts.deps.onAccountsChanged()
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(refresh).toHaveBeenCalledTimes(2)
+    controller.dispose()
+  })
+
   it('logs restart failures and offers both server log channels', async () => {
     const error = new Error('process ID is unavailable')
     vi.spyOn(ManagedServer.prototype, 'restart').mockRejectedValue(error)
@@ -144,12 +156,6 @@ describe('server controller lifecycle', () => {
     )
     expect(await controller.statusSnapshot()).toMatchObject({ status: 'error' })
   })
-
-  function liveProcess(): ChildProcess {
-    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' })
-    spawned.push(child)
-    return child
-  }
 })
 
 describe('server controller status snapshot', () => {
@@ -157,7 +163,7 @@ describe('server controller status snapshot', () => {
 
   beforeEach(async () => {
     resetVSCodeMock()
-    root = await mkdtemp(join(tmpdir(), 'ucp-status-'))
+    root = await makeTempDirectory('ucp-status-')
     vi.spyOn(ManagedServer.prototype, 'ensureRunning').mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', port: 1 })
     vi.spyOn(ManagedServer.prototype, 'shutdown').mockReturnValue()
     vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
@@ -165,7 +171,6 @@ describe('server controller status snapshot', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks()
-    await rm(root, { recursive: true, force: true })
   })
 
   it('reports the managed server as running once it has started', async () => {
@@ -203,25 +208,5 @@ describe('server controller status snapshot', () => {
 })
 
 function context(root: string): ExtensionContext {
-  const globalState = new Map<string, unknown>()
-  return {
-    subscriptions: [],
-    globalStorageUri: { fsPath: root },
-    globalState: {
-      get: <T>(key: string, fallback?: T): T => (globalState.get(key) ?? fallback) as T,
-      update: async (key: string, value: unknown) => {
-        globalState.set(key, value)
-      },
-    },
-    secrets: {
-      get: async (key: string) => vscodeMock.secrets.get(key),
-      store: async (key: string, value: string) => {
-        vscodeMock.secrets.set(key, value)
-      },
-      delete: async (key: string) => {
-        vscodeMock.secrets.delete(key)
-      },
-      onDidChange: () => ({ dispose() {} }),
-    },
-  } as unknown as ExtensionContext
+  return createExtensionContext({ globalStoragePath: root })
 }

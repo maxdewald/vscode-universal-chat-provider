@@ -9,7 +9,7 @@ import getPort from 'get-port'
 import ky from 'ky'
 import { sleep } from 'moderndash'
 import { acquireBinary, readInstalledVersion } from './binary'
-import { DEFAULT_PORT, setConfigPort } from './config'
+import { DEFAULT_PORT } from './config'
 import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from './leases'
 
 const HEALTH_TIMEOUT_MS = 1500
@@ -23,6 +23,7 @@ export interface ServerDeps {
   requestedVersion: () => string
   getPort: () => number | undefined
   setPort: (port: number) => void | Thenable<void>
+  writeConfig: (port: number) => Promise<void>
   inspectServer?: (baseUrl: string) => Promise<string | undefined | false>
   onUnexpectedExit?: () => void
 }
@@ -150,9 +151,7 @@ export class ManagedServer {
         this.adopted = true
         this.port = preferred
         this.version = inspected ?? await readInstalledVersion(this.deps.paths.binDir)
-        // Keep the config port in sync with the adopted server: CPA derives OAuth
-        // callback URLs from the config, and a stale port breaks login flows.
-        await setConfigPort(this.deps.paths.configPath, preferred)
+        await this.deps.writeConfig(preferred)
         this.deps.output.appendLine(`Adopted a healthy CLIProxyAPI server on port ${preferred}.`)
         return { baseUrl: preferredBase, port: preferred, ...(this.version !== undefined ? { version: this.version } : {}) }
       }
@@ -179,7 +178,7 @@ export class ManagedServer {
 
   private async spawnServer(binaryPath: string, port: number): Promise<void> {
     await mkdir(this.deps.paths.authDir, { recursive: true })
-    await setConfigPort(this.deps.paths.configPath, port)
+    await this.deps.writeConfig(port)
     const logFd = openSync(this.deps.paths.logPath, 'a')
     try {
       const child = spawn(binaryPath, ['--config', this.deps.paths.configPath], {

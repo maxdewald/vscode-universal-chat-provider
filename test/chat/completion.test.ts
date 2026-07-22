@@ -1,9 +1,11 @@
 import type { CompletionDeps } from '../../src/chat/completion'
+import type { ProxyRequestBody } from '../../src/chat/request'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CancellationTokenSource } from 'vscode'
 import { streamCompletion } from '../../src/chat/completion'
 import { ProxyHttpError } from '../../src/cliproxy/errors'
 
+const emptyBody = {} as ProxyRequestBody
 const clientMocks = vi.hoisted(() => ({
   streamResponse: vi.fn(),
 }))
@@ -20,7 +22,7 @@ beforeEach(() => {
 
 describe('streamCompletion', () => {
   it('requires credentials', async () => {
-    await expect(streamCompletion(deps(), {}, callbacks())).rejects.toMatchObject({
+    await expect(streamCompletion(deps(), emptyBody, callbacks())).rejects.toMatchObject({
       code: 'NoPermissions',
       message: 'Configure a CLIProxyAPI API key first.',
     })
@@ -35,7 +37,7 @@ describe('streamCompletion', () => {
       throw new Error('aborted')
     })
 
-    await expect(streamCompletion(deps('key'), {}, callbacks(), token.token)).resolves.toBeUndefined()
+    await expect(streamCompletion(deps('key'), emptyBody, callbacks(), token.token)).resolves.toBeUndefined()
   })
 
   it.each([
@@ -48,7 +50,7 @@ describe('streamCompletion', () => {
     clientMocks.streamResponse.mockRejectedValueOnce(new ProxyHttpError(message, status))
 
     await expect(
-      streamCompletion(deps('key', rejected), {}, callbacks()),
+      streamCompletion(deps('key', rejected), emptyBody, callbacks()),
     ).rejects.toMatchObject({ code, message })
     expect(rejected).toHaveBeenCalledTimes(recovers ? 1 : 0)
   })

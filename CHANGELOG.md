@@ -1,5 +1,83 @@
 # Changelog
 
+## [0.25.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.24.0...v0.25.0) (2026-07-22)
+
+
+### Features
+
+* enable session affinity in managed CLIProxyAPI configs ([13a952e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/13a952e842c6680d41749a6f764bbc13d1452b63))
+* represent missing Codex usage as unavailable ([8ce739a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/8ce739a527f9f470acf9d0506ae7c3aedea797ca))
+
+
+### Bug Fixes
+
+* avoid quota refreshes from auth logs ([63ce312](https://github.com/maxdewald/vscode-universal-chat-provider/commit/63ce3125a03619eb65b7ec19f52bf9db0d16293e))
+
+## [0.24.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.23.0...v0.24.0) (2026-07-21)
+
+
+### Features
+
+* support thinking levels for OpenAI-compatible endpoints ([6186da9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6186da9b72ea133c14ba8560180e0ea9595c98ab))
+
+
+### Bug Fixes
+
+* harden log tailer rotation handling ([7f3bc38](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7f3bc3862d00c62c25c364551a36fe364b758da7))
+
+## [0.23.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.22.0...v0.23.0) (2026-07-21)
+
+
+### Features
+
+* add provider aliases for OpenAI-compatible models ([60a1f3d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/60a1f3d386f934a5ae41372668b93ed21821aeb1))
+* generate unique provider names for OpenAI-compatible endpoints ([412ae13](https://github.com/maxdewald/vscode-universal-chat-provider/commit/412ae13b7e25103e938d057293a35bb81d0ae46d))
+
+## [0.22.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.21.0...v0.22.0) (2026-07-21)
+
+
+### Features
+
+* improve catalog model matching for model variants ([d7e531d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d7e531d5ab293282dd2446bacf7c49b3a17102f2))
+
+
+### Documentation
+
+* add OpenAI-compatible badge to README ([7d658ca](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7d658ca1d12d51c44ead9b589d55f65d751b06a0))
+
+## [0.21.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.1...v0.21.0) (2026-07-21)
+
+
+### Features
+
+* support OpenAI-compatible endpoints ([2db9b83](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2db9b8301e2df8c3442f3efbd59a7be1bf1782b3))
+* support Retry-After backoff for quota fetching ([69875e0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/69875e03051285148302d290657cff9ba1cf8fa7))
+
+## [0.20.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.20.0...v0.20.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* render empty track in quota usage bar ([5198312](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5198312c079cf4bfc42433aeadecb9127aa2f727))
+
+## [0.20.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.4...v0.20.0) (2026-07-21)
+
+
+### Features
+
+* group quota sections by account ([4d6065f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4d6065fc332c3ff706d75a65b185e722ae94bff6))
+* support multi-account quotas and improve login detection ([011a96a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/011a96a8381850c70f5be4f4c1ef690bc84e54d5))
+
+
+### Bug Fixes
+
+* handle null codex rate limit windows ([def71e9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/def71e9f7225e355187f51bf963691d555772a7e))
+
+
+### Refactoring
+
+* use TypeBox schemas for runtime validation ([56b7bb2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/56b7bb27e5a02ea3384a30c6d25af4867efccab9))
+
 ## [0.19.4](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.19.3...v0.19.4) (2026-07-17)
 
 

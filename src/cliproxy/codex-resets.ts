@@ -1,5 +1,6 @@
-import type { ManagementClient } from './management-client'
-import { isPlainObject } from 'moderndash'
+import type { AuthFileRaw, ManagementClient } from './management-client'
+import { Type } from '@sinclair/typebox'
+import { asJsonValue, asValue } from '../shared/json'
 
 const RESET_CREDITS_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits'
 const CONSUME_RESET_CREDIT_URL = `${RESET_CREDITS_URL}/consume`
@@ -14,6 +15,34 @@ export interface CodexResetOption {
 
 export type CodexResetOutcome = 'success' | 'nothingToReset' | 'noCredit' | 'failed'
 
+const CreditSchema = Type.Object({
+  status: Type.Optional(Type.String()),
+  id: Type.Optional(Type.String()),
+  expires_at: Type.Optional(Type.String()),
+})
+
+const ResetCreditsBodySchema = Type.Object({
+  credits: Type.Optional(Type.Array(Type.Unknown())),
+  available_count: Type.Optional(Type.Number()),
+})
+
+const RateLimitWindowSchema = Type.Object({
+  used_percent: Type.Optional(Type.Number()),
+})
+
+const RateLimitBodySchema = Type.Object({
+  primary_window: Type.Optional(RateLimitWindowSchema),
+  secondary_window: Type.Optional(RateLimitWindowSchema),
+})
+
+const UsageBodySchema = Type.Object({
+  rate_limit: Type.Optional(RateLimitBodySchema),
+})
+
+const ConsumeBodySchema = Type.Object({
+  code: Type.Optional(Type.String()),
+})
+
 export async function listCodexResets(client: ManagementClient, signal?: AbortSignal): Promise<CodexResetOption[]> {
   const accounts = (await client.listAuthFilesRaw(signal)).flatMap(toCodexAccount)
   const options = await Promise.all(accounts.map(async (account) => {
@@ -26,7 +55,7 @@ export async function listCodexResets(client: ManagementClient, signal?: AbortSi
       }, signal)
       if (response.statusCode < 200 || response.statusCode >= 300)
         return undefined
-      const body = parseBody(response.body)
+      const body = asJsonValue(ResetCreditsBodySchema, response.body)
       if (body === undefined)
         return undefined
       const credits = parseCredits(body.credits)
@@ -37,7 +66,7 @@ export async function listCodexResets(client: ManagementClient, signal?: AbortSi
       const option: CodexResetOption = {
         account,
         credit,
-        availableCount: Math.max(number(body.available_count) ?? credits.length, credits.length),
+        availableCount: Math.max(body.available_count ?? credits.length, credits.length),
         ...(hasRemainingUsage ? { hasRemainingUsage } : {}),
       }
       return option
@@ -63,11 +92,11 @@ async function fetchHasRemainingUsage(
     }, signal)
     if (response.statusCode < 200 || response.statusCode >= 300)
       return false
-    const rateLimit = parseBody(response.body)?.rate_limit
-    if (!isPlainObject(rateLimit))
+    const rateLimit = asJsonValue(UsageBodySchema, response.body)?.rate_limit
+    if (rateLimit === undefined)
       return false
     return [rateLimit.primary_window, rateLimit.secondary_window]
-      .some(raw => isPlainObject(raw) && (number(raw.used_percent) ?? 100) < 100)
+      .some(window => window !== undefined && (window.used_percent ?? 100) < 100)
   }
   catch {
     return false
@@ -90,7 +119,7 @@ export async function claimCodexReset(
     }, signal)
     if (response.statusCode < 200 || response.statusCode >= 300)
       return 'failed'
-    const code = parseBody(response.body)?.code
+    const code = asJsonValue(ConsumeBodySchema, response.body)?.code
     if (code === 'reset' || code === 'already_redeemed')
       return 'success'
     if (code === 'nothing_to_reset')
@@ -104,15 +133,17 @@ export async function claimCodexReset(
   }
 }
 
-function toCodexAccount(entry: Record<string, unknown>): Array<CodexResetOption['account']> {
-  if (string(entry.provider ?? entry.type).toLowerCase() !== 'codex')
+function toCodexAccount(entry: AuthFileRaw): Array<CodexResetOption['account']> {
+  if ((entry.provider ?? entry.type ?? '').trim().toLowerCase() !== 'codex')
     return []
-  const authIndex = string(entry.auth_index)
+  const authIndex = entry.auth_index?.trim() ?? ''
   if (authIndex === '')
     return []
-  const label = string(entry.email) || string(entry.label) || string(entry.name) || 'Codex account'
-  const idToken = isPlainObject(entry.id_token) ? entry.id_token : undefined
-  const accountId = string(entry.chatgpt_account_id) || string(entry.account_id) || string(idToken?.chatgpt_account_id)
+  const label = entry.email?.trim() ?? entry.label?.trim() ?? entry.name?.trim() ?? 'Codex account'
+  const accountId = entry.chatgpt_account_id?.trim()
+    ?? entry.account_id?.trim()
+    ?? entry.id_token?.chatgpt_account_id?.trim()
+    ?? ''
   return [{ authIndex, label, ...(accountId === '' ? {} : { accountId }) }]
 }
 
@@ -126,13 +157,14 @@ function headers(account: CodexResetOption['account']): Record<string, string> {
   }
 }
 
-function parseCredits(value: unknown): Array<CodexResetOption['credit']> {
-  if (!Array.isArray(value))
+function parseCredits(value: unknown[] | undefined): Array<CodexResetOption['credit']> {
+  if (value === undefined)
     return []
-  return value.flatMap((raw) => {
-    if (!isPlainObject(raw) || (typeof raw.status === 'string' && raw.status !== 'available'))
+  return value.flatMap((rawValue) => {
+    const raw = asValue(CreditSchema, rawValue)
+    if (raw === undefined || (raw.status !== undefined && raw.status !== 'available'))
       return []
-    const id = string(raw.id)
+    const id = raw.id?.trim() ?? ''
     if (id === '')
       return []
     const expiresAt = timestamp(raw.expires_at)
@@ -140,29 +172,9 @@ function parseCredits(value: unknown): Array<CodexResetOption['credit']> {
   }).sort((left, right) => (left.expiresAt ?? Number.POSITIVE_INFINITY) - (right.expiresAt ?? Number.POSITIVE_INFINITY))
 }
 
-function parseBody(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== 'string')
-    return undefined
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return isPlainObject(parsed) ? parsed : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-function timestamp(value: unknown): number | undefined {
-  if (typeof value !== 'string')
+function timestamp(value: string | undefined): number | undefined {
+  if (value === undefined)
     return undefined
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? undefined : parsed
-}
-
-function number(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
-
-function string(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }

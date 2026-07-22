@@ -1,30 +1,36 @@
-import { isPlainObject } from 'moderndash'
+import type { Static } from '@sinclair/typebox'
+import { Type } from '@sinclair/typebox'
+import { asValue } from '../shared/json'
+
+const CatalogPayloadSchema = Type.Object({}, { additionalProperties: true })
 
 const MODEL_CATALOG_URL = 'https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json'
 let catalogCache: Map<string, CatalogModel> | undefined
 
-interface CatalogThinking {
-  max?: number
-  zero_allowed?: boolean
-  dynamic_allowed?: boolean
-  levels?: string[]
-}
+const CatalogThinkingSchema = Type.Object({
+  max: Type.Optional(Type.Number()),
+  zero_allowed: Type.Optional(Type.Boolean()),
+  dynamic_allowed: Type.Optional(Type.Boolean()),
+  levels: Type.Optional(Type.Array(Type.String())),
+})
 
-export interface CatalogModel {
-  id: string
-  type?: string
-  display_name?: string
-  description?: string
-  version?: string
-  context_length?: number
-  max_completion_tokens?: number
-  inputTokenLimit?: number
-  outputTokenLimit?: number
-  supported_parameters?: string[]
-  supportedInputModalities?: string[]
-  supportedOutputModalities?: string[]
-  thinking?: CatalogThinking
-}
+const CatalogModelSchema = Type.Object({
+  id: Type.String(),
+  type: Type.Optional(Type.String()),
+  display_name: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  version: Type.Optional(Type.String()),
+  context_length: Type.Optional(Type.Number()),
+  max_completion_tokens: Type.Optional(Type.Number()),
+  inputTokenLimit: Type.Optional(Type.Number()),
+  outputTokenLimit: Type.Optional(Type.Number()),
+  supported_parameters: Type.Optional(Type.Array(Type.String())),
+  supportedInputModalities: Type.Optional(Type.Array(Type.String())),
+  supportedOutputModalities: Type.Optional(Type.Array(Type.String())),
+  thinking: Type.Optional(CatalogThinkingSchema),
+})
+
+export type CatalogModel = Static<typeof CatalogModelSchema>
 
 export async function fetchCatalog(signal?: AbortSignal): Promise<Map<string, CatalogModel>> {
   if (catalogCache)
@@ -43,17 +49,18 @@ export async function fetchCatalog(signal?: AbortSignal): Promise<Map<string, Ca
 
 export function flattenCatalog(payload: unknown): Map<string, CatalogModel> {
   const result = new Map<string, CatalogModel>()
-  if (!isPlainObject(payload))
+  const root = asValue(CatalogPayloadSchema, payload)
+  if (root === undefined)
     return result
 
-  for (const value of Object.values(payload)) {
+  for (const value of Object.values(root)) {
     if (!Array.isArray(value))
       continue
     for (const candidate of value) {
-      if (!isPlainObject(candidate) || typeof candidate.id !== 'string')
+      const model = asValue(CatalogModelSchema, candidate)
+      if (model === undefined)
         continue
-      const current = result.get(candidate.id)
-      const model = candidate as unknown as CatalogModel
+      const current = result.get(model.id)
       if (!current || scoreCatalogModel(model) > scoreCatalogModel(current))
         result.set(model.id, model)
     }

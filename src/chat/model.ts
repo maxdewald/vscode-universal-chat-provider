@@ -1,27 +1,38 @@
+import type { Static } from '@sinclair/typebox'
 import type { LanguageModelChatInformation } from 'vscode'
 import type { CatalogModel } from './catalog'
+import { Type } from '@sinclair/typebox'
 import { capitalize, unique } from 'moderndash'
+import { matchCatalogModel } from './catalog-match'
 
-export interface ProxyModelListEntry {
-  id: string
-  owned_by?: string
-  context_length?: number
-  max_completion_tokens?: number
-}
+export const ProxyModelListEntrySchema = Type.Object({
+  id: Type.String(),
+  owned_by: Type.Optional(Type.String()),
+  context_length: Type.Optional(Type.Number()),
+  max_completion_tokens: Type.Optional(Type.Number()),
+}, { additionalProperties: true })
 
-export interface ProxyModelMetadata {
-  slug: string
-  display_name?: string
-  description?: string
-  context_window?: number
-  max_context_window?: number
-  visibility?: string
-  supported_in_api?: boolean
-  input_modalities?: string[]
-  supports_parallel_tool_calls?: boolean
-  supported_reasoning_levels?: { effort: string }[]
-  default_reasoning_level?: string
-}
+export type ProxyModelListEntry = Static<typeof ProxyModelListEntrySchema>
+
+const SupportedReasoningLevelSchema = Type.Object({
+  effort: Type.String(),
+}, { additionalProperties: true })
+
+export const ProxyModelMetadataSchema = Type.Object({
+  slug: Type.String(),
+  display_name: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  context_window: Type.Optional(Type.Number()),
+  max_context_window: Type.Optional(Type.Number()),
+  visibility: Type.Optional(Type.String()),
+  supported_in_api: Type.Optional(Type.Boolean()),
+  input_modalities: Type.Optional(Type.Array(Type.String())),
+  supports_parallel_tool_calls: Type.Optional(Type.Boolean()),
+  supported_reasoning_levels: Type.Optional(Type.Array(SupportedReasoningLevelSchema)),
+  default_reasoning_level: Type.Optional(Type.String()),
+}, { additionalProperties: true })
+
+export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
 
 export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string
@@ -50,7 +61,7 @@ export interface ModelMappingOptions {
   onCollision?: (message: string) => void
 }
 
-const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|auto)\)$/i
+const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
 
 interface ModelCandidate {
   entry: ProxyModelListEntry
@@ -80,7 +91,7 @@ export function mapProxyModels(
     seen.add(entry.id)
 
     const detail = metadataById.get(entry.id)
-    const catalogModel = catalog.get(entry.id)
+    const catalogModel = matchCatalogModel(entry.id, catalog)
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
@@ -90,22 +101,22 @@ export function mapProxyModels(
       catalogModel?.context_length,
       catalogModel?.inputTokenLimit,
     )
-    if (totalContext === undefined) {
-      options.onSkipped?.(entry.id, 'no context window reported by the proxy')
-      continue
-    }
-
     const outputTokens = firstPositiveInteger(
       entry.max_completion_tokens,
       catalogModel?.max_completion_tokens,
       catalogModel?.outputTokenLimit,
     )
-    if (outputTokens === undefined) {
-      options.onSkipped?.(entry.id, 'no output token limit reported by the proxy')
+    if (totalContext === undefined || outputTokens === undefined) {
+      options.onSkipped?.(
+        entry.id,
+        'model is not supported: context window and output tokens must be supplied manually',
+      )
       continue
     }
     const levels = resolveReasoning(detail, catalogModel)
-    const advertisedName = displayModelName(entry.id, detail, catalogModel)
+    const advertisedName = detail?.display_name !== undefined && detail.display_name !== entry.id
+      ? detail.display_name
+      : catalogModel?.display_name ?? humanizeModelId(entry.id)
     const baseName = normalizeReasoningModelName(advertisedName, levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     candidates.push({
@@ -203,7 +214,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
   return { ...baseModel, id: entry.id, name, reasoningLevels: levels }
 }
 
-const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, auto: 7 }
+const EFFORT_RANK: Record<string, number> = { none: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, ultra: 7, auto: 8 }
 
 function effortRank(level: string | undefined): number {
   return level === undefined ? -1 : EFFORT_RANK[level] ?? 99
@@ -298,10 +309,6 @@ function formatProviderName(value: string): string {
   const normalized = value.trim()
   return apps[normalized.toLowerCase()]
     ?? normalized.replace(/[a-z][\w'-]*/gi, word => capitalize(word))
-}
-
-function displayModelName(id: string, metadata: ProxyModelMetadata | undefined, catalog: CatalogModel | undefined): string {
-  return metadata?.display_name ?? catalog?.display_name ?? humanizeModelId(id)
 }
 
 function humanizeModelId(id: string): string {

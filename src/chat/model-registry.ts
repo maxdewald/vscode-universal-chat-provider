@@ -24,6 +24,7 @@ export class ModelRegistry {
   private previousCollisions = new Set<string>()
   private lastRefreshAt = 0
   private refreshPromise: Promise<ProviderModel[]> | undefined
+  private thinkingEnrichmentDone = false
 
   readonly onDidChange: Event<void> = this.changeEmitter.event
 
@@ -51,6 +52,7 @@ export class ModelRegistry {
     this.cachedFingerprint = ''
     this.previousCollisions.clear()
     this.lastRefreshAt = 0
+    this.thinkingEnrichmentDone = false
     this.changeEmitter.fire()
   }
 
@@ -84,10 +86,13 @@ export class ModelRegistry {
     const cancellation = token?.onCancellationRequested(() => controller.abort())
     try {
       const client = new CLIProxyClient(this.connection.baseUrl(), apiKey)
-      const [discovery, catalog] = await Promise.all([
-        client.discover(controller.signal),
-        fetchCatalog(controller.signal),
-      ])
+      const catalog = await fetchCatalog(controller.signal)
+      if (!this.thinkingEnrichmentDone && this.connection.enrichOpenAICompatibilityThinking) {
+        this.thinkingEnrichmentDone = true
+        if (await this.connection.enrichOpenAICompatibilityThinking(catalog))
+          this.output.appendLine('Enriched OpenAI-compatible thinking levels from the model catalog.')
+      }
+      const discovery = await client.discover(controller.signal)
       const collisions = new Set<string>()
       const models = mapProxyModels(discovery.available, discovery.metadata, catalog, {
         onSkipped: (id, reason) => this.output.appendLine(`Skipped model ${id}: ${reason}.`),

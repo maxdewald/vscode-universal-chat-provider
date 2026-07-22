@@ -14,14 +14,36 @@ import {
   LanguageModelToolResultPart,
 } from 'vscode'
 
+export interface ProxyFunctionTool {
+  type: 'function'
+  name: string
+  description: string
+  parameters: object
+  strict: boolean
+}
+
+export interface ProxyRequestBody {
+  model: string
+  input: ProxyRequestItem[]
+  stream: boolean
+  max_output_tokens: number
+  prompt_cache_key?: string
+  reasoning?: { effort: string, summary: string }
+  tools?: ProxyFunctionTool[]
+  tool_choice?: 'required' | 'auto'
+  parallel_tool_calls?: boolean
+}
+
+export type ProxyRequestItem = Record<string, unknown>
+
 export function buildRequest(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
   options: ProvideLanguageModelChatResponseOptions,
   reasoningEffort?: string,
-): Record<string, unknown> {
+): ProxyRequestBody {
   const promptCacheKey = buildPromptCacheKey(model, messages)
-  const request: Record<string, unknown> = {
+  const request: ProxyRequestBody = {
     model: model.proxyModelId,
     input: messages.flatMap(convertMessage),
     stream: true,
@@ -39,7 +61,7 @@ export function buildRequest(
     request.tools = options.tools.map((tool) => {
       const parameters = tool.inputSchema ?? { type: 'object', properties: {} }
       return {
-        type: 'function',
+        type: 'function' as const,
         name: tool.name,
         description: tool.description,
         parameters,
@@ -75,13 +97,13 @@ function isCacheControlPart(part: unknown): boolean {
   return part instanceof LanguageModelDataPart && part.mimeType === 'cache_control'
 }
 
-export function convertMessage(message: LanguageModelChatRequestMessage): Record<string, unknown>[] {
+export function convertMessage(message: LanguageModelChatRequestMessage): ProxyRequestItem[] {
   const messageRole: number = message.role
   const role = messageRole === LanguageModelChatMessageRole.Assistant
     ? 'assistant'
     : messageRole === 3 ? 'system' : 'user'
-  const content: Record<string, unknown>[] = []
-  const items: Record<string, unknown>[] = []
+  const content: ProxyRequestItem[] = []
+  const items: ProxyRequestItem[] = []
 
   for (const part of message.content) {
     if (isCacheControlPart(part))

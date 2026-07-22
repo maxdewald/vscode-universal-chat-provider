@@ -1,5 +1,5 @@
 import type { MarkdownString, ThemeColor } from 'vscode'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
 import { createStatusBar, updateStatusBar } from '../../src/extension/status-bar'
 import { resetVSCodeMock, statusBarItem, vscodeMock, window } from '../support/vscode'
@@ -10,10 +10,6 @@ function tooltipValue(): string {
 
 beforeEach(() => {
   resetVSCodeMock()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('status bar', () => {
@@ -88,8 +84,8 @@ describe('status bar', () => {
     const value = tooltipValue()
     expect(value).toContain('| Quota | Available | Left | | Resets |')
     expect(value).toContain('| **Codex** | | | | |')
-    expect(value).toContain('| 5h Quota | `████████` | 80% | | 3h 25m |')
-    expect(value).toContain('| 7d Quota | `█` | $(warning) 8% | | — |')
+    expect(value).toContain('| 5h Quota | `████████░░` | 80% | | 3h 25m |')
+    expect(value).toContain('| 7d Quota | `█░░░░░░░░░` | $(warning) 8% | | — |')
     expect(value).toContain('| | | | | |\n| **Antigravity** | | | | |')
     expect(value).toContain('| Gemini 3 Pro |  | ? | | — |')
     expect(value.match(/\*\*Codex\*\*/g)).toHaveLength(1)

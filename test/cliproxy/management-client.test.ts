@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOGIN_PROVIDERS, ManagementClient } from '../../src/cliproxy/management-client'
 
+const MANAGEMENT_URL = 'http://127.0.0.1:8317'
+const MANAGEMENT_KEY = 'mgmt-key'
+
+function createClient(): ManagementClient {
+  return new ManagementClient(MANAGEMENT_URL, MANAGEMENT_KEY)
+}
+
 beforeEach(() => {
   vi.restoreAllMocks()
 })
@@ -9,7 +16,7 @@ describe('management client', () => {
   it('requests an auth URL with the management bearer key', async () => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({ status: 'ok', url: 'https://login' }))
     vi.stubGlobal('fetch', fetchMock)
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+    const client = createClient()
 
     await expect(client.requestAuthUrl('codex-auth-url')).resolves.toBe('https://login')
     const request = fetchMock.mock.calls[0]![0]
@@ -22,7 +29,7 @@ describe('management client', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       files: [{ name: 'a.json', type: 'codex' }, { size: 1 }, { name: 'b.json' }],
     })))
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+    const client = createClient()
 
     await expect(client.listAuthFiles()).resolves.toEqual([
       { name: 'a.json', type: 'codex' },
@@ -30,26 +37,20 @@ describe('management client', () => {
     ])
   })
 
-  it('reads the running server version from the management response', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [] }, {
-      headers: { 'X-CPA-VERSION': '7.3.1' },
-    })))
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+  it.each([
+    ['reads the exposed server version', { 'X-CPA-VERSION': '7.3.1' }, '7.3.1'],
+    ['returns undefined without a version header', undefined, undefined],
+  ] as const)('%s', async (_name, headers, expected) => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [] }, headers === undefined ? {} : { headers })))
+    const client = createClient()
 
-    await expect(client.serverVersion()).resolves.toBe('7.3.1')
-  })
-
-  it('returns undefined when the server does not expose its version', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ files: [] })))
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
-
-    await expect(client.serverVersion()).resolves.toBeUndefined()
+    await expect(client.serverVersion()).resolves.toBe(expected)
   })
 
   it('encodes the account name when deleting', async () => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+    const client = createClient()
 
     await client.deleteAuthFile('my account.json')
     const request = fetchMock.mock.calls[0]![0]
@@ -59,7 +60,7 @@ describe('management client', () => {
 
   it('surfaces management errors with their message', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'invalid key' }, { status: 401 })))
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+    const client = createClient()
 
     await expect(client.listAuthFiles()).rejects.toMatchObject({ message: 'invalid key' })
   })
@@ -73,10 +74,11 @@ describe('management client', () => {
         : Response.json({ status_code: 200, body: '{}' })
     })
     vi.stubGlobal('fetch', fetchMock)
-    const client = new ManagementClient('http://127.0.0.1:8317', 'mgmt-key')
+    const client = createClient()
 
-    await expect(client.apiCall({ method: 'GET', url: 'https://example.com' })).resolves.toEqual({
+    await expect(client.apiCall({ auth_index: 'a1', method: 'GET', url: 'https://example.com' })).resolves.toEqual({
       statusCode: 200,
+      header: {},
       body: '{}',
     })
     expect(fetchMock).toHaveBeenCalledTimes(3)
@@ -91,5 +93,53 @@ describe('management client', () => {
       'xai-auth-url',
     ])
     expect(LOGIN_PROVIDERS.find(provider => provider.label === 'Anthropic Claude')?.endpoint).toBe('anthropic-auth-url')
+  })
+
+  it('lists and replaces openai-compatibility providers', async () => {
+    let putBody: unknown
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async (request) => {
+      if (request.method === 'GET') {
+        return Response.json({
+          'openai-compatibility': [
+            { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1', 'models': [{ name: 'gpt-5.5' }] },
+            { broken: true },
+          ],
+        })
+      }
+      if (request.method === 'PUT')
+        putBody = await request.json()
+      return Response.json({ status: 'ok' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = createClient()
+
+    await expect(client.listOpenAICompatibility()).resolves.toEqual([
+      { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1', 'models': [{ name: 'gpt-5.5' }] },
+    ])
+
+    await client.putOpenAICompatibility([
+      {
+        'name': 'opencode.ai',
+        'base-url': 'https://opencode.ai/v1',
+        'api-key-entries': [{ 'api-key': 'sk' }],
+        'models': [{ name: 'gpt-5.5' }],
+      },
+    ])
+    const put = fetchMock.mock.calls[1]![0]
+    expect(put.url).toBe('http://127.0.0.1:8317/v0/management/openai-compatibility')
+    expect(put.method).toBe('PUT')
+    expect(putBody).toEqual([
+      {
+        'name': 'opencode.ai',
+        'base-url': 'https://opencode.ai/v1',
+        'api-key-entries': [{ 'api-key': 'sk' }],
+        'models': [{ name: 'gpt-5.5' }],
+      },
+    ])
+
+    await client.deleteOpenAICompatibility('opencode.ai')
+    const del = fetchMock.mock.calls[2]![0]
+    expect(del.url).toBe('http://127.0.0.1:8317/v0/management/openai-compatibility?name=opencode.ai')
+    expect(del.method).toBe('DELETE')
   })
 })

@@ -1,8 +1,7 @@
-import type { ExtensionContext } from 'vscode'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   configCandidates,
   configureConnection,
@@ -10,16 +9,13 @@ import {
   findConfigPath,
   normalizeBaseUrl,
 } from '../../src/cliproxy/credentials'
-import { resetVSCodeMock, vscodeMock, window } from '../support/vscode'
+import { useTempDirectories } from '../support/temp'
+import { createExtensionContext, resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
-const tempDirectories: string[] = []
+const makeTempDirectory = useTempDirectories()
 
 beforeEach(() => {
   resetVSCodeMock()
-})
-
-afterEach(async () => {
-  await Promise.all(tempDirectories.splice(0).map(async path => rm(path, { recursive: true, force: true })))
 })
 
 describe('credentials', () => {
@@ -41,11 +37,11 @@ describe('credentials', () => {
   })
 
   it('finds the configured file and imports its first usable key', async () => {
-    const directory = await temporaryDirectory()
+    const directory = await makeTempDirectory('universal-chat-provider-credentials-')
     const configPath = join(directory, 'config.yaml')
     await writeFile(configPath, 'api-keys:\n  - imported-key\n')
     vscodeMock.settings.set('universalChatProvider.configPath', configPath)
-    const context = extensionContext()
+    const context = createExtensionContext()
     const store = new CredentialStore(context)
 
     await expect(findConfigPath()).resolves.toBe(configPath)
@@ -55,7 +51,7 @@ describe('credentials', () => {
   })
 
   it('reports missing, unusable, and malformed configs only when requested', async () => {
-    const context = extensionContext()
+    const context = createExtensionContext()
     const store = new CredentialStore(context)
     vscodeMock.settings.set('universalChatProvider.autoDetectConfig', false)
 
@@ -64,7 +60,7 @@ describe('credentials', () => {
       'No CLIProxyAPI config.yaml was found. Configure its path in settings.',
     )
 
-    const directory = await temporaryDirectory()
+    const directory = await makeTempDirectory('universal-chat-provider-credentials-')
     const configPath = join(directory, 'config.yaml')
     vscodeMock.settings.set('universalChatProvider.configPath', configPath)
     await writeFile(configPath, 'api-keys:\n  - your-api-key\n')
@@ -79,7 +75,7 @@ describe('credentials', () => {
   })
 
   it('prompts, trims, stores, retrieves, and clears secrets', async () => {
-    const context = extensionContext()
+    const context = createExtensionContext()
     const store = new CredentialStore(context)
     window.showInputBox.mockResolvedValueOnce('  entered-key  ')
 
@@ -110,25 +106,3 @@ describe('credentials', () => {
     expect(validation?.('https://proxy')).toBeUndefined()
   })
 })
-
-function extensionContext(): ExtensionContext {
-  return {
-    subscriptions: [],
-    secrets: {
-      get: async (key: string) => vscodeMock.secrets.get(key),
-      store: async (key: string, value: string) => {
-        vscodeMock.secrets.set(key, value)
-      },
-      delete: async (key: string) => {
-        vscodeMock.secrets.delete(key)
-      },
-      onDidChange: () => ({ dispose() {} }),
-    },
-  } as unknown as ExtensionContext
-}
-
-async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'universal-chat-provider-credentials-'))
-  tempDirectories.push(directory)
-  return directory
-}

@@ -1,30 +1,13 @@
-import type { ManagementClient } from '../../src/cliproxy/management-client'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { claimCodexReset, listCodexResets } from '../../src/cliproxy/codex-resets'
-
-interface ApiResponse { statusCode: number, body: unknown }
-
-function fakeClient(files: Record<string, unknown>[], responses: ApiResponse[]): {
-  client: ManagementClient
-  apiCall: ReturnType<typeof vi.fn<(payload: Record<string, unknown>, signal?: AbortSignal) => Promise<ApiResponse>>>
-} {
-  const apiCall = vi.fn(async (_payload: Record<string, unknown>, _signal?: AbortSignal) =>
-    responses.shift() ?? { statusCode: 500, body: '' })
-  return {
-    client: {
-      listAuthFilesRaw: vi.fn(async () => files),
-      apiCall,
-    } as unknown as ManagementClient,
-    apiCall,
-  }
-}
+import { createManagementClientFake, queuedApiCallResponses } from './support/management'
 
 describe('codex reset credits', () => {
   it('lists the soonest available reset for each Codex account', async () => {
-    const { client, apiCall } = fakeClient([
+    const { client, apiCall } = createManagementClientFake([
       { provider: 'codex', auth_index: 'codex-1', email: 'one@example.com', id_token: { chatgpt_account_id: 'acct-1' } },
       { type: 'claude', auth_index: 'claude-1' },
-    ], [{
+    ], queuedApiCallResponses([{
       statusCode: 200,
       body: JSON.stringify({
         available_count: 3,
@@ -43,7 +26,7 @@ describe('codex reset credits', () => {
           secondary_window: { used_percent: 100, limit_window_seconds: 604_800 },
         },
       }),
-    }])
+    }]))
 
     await expect(listCodexResets(client)).resolves.toEqual([{
       account: { authIndex: 'codex-1', label: 'one@example.com', accountId: 'acct-1' },
@@ -72,10 +55,10 @@ describe('codex reset credits', () => {
   })
 
   it('omits accounts without an explicit available credit', async () => {
-    const { client } = fakeClient([
+    const { client } = createManagementClientFake([
       { provider: 'codex', auth_index: 'codex-1', name: 'codex.json' },
       { provider: 'codex', name: 'missing-index.json' },
-    ], [{ statusCode: 200, body: '{"available_count":2,"credits":[]}' }])
+    ], queuedApiCallResponses([{ statusCode: 200, body: '{"available_count":2,"credits":[]}' }]))
 
     await expect(listCodexResets(client)).resolves.toEqual([])
   })
@@ -87,7 +70,9 @@ describe('codex reset credits', () => {
     ['no_credit', 'noCredit'],
     ['unknown', 'failed'],
   ] as const)('maps the %s consume response to %s', async (code, outcome) => {
-    const { client, apiCall } = fakeClient([], [{ statusCode: 200, body: JSON.stringify({ code }) }])
+    const { client, apiCall } = createManagementClientFake([], queuedApiCallResponses([
+      { statusCode: 200, body: JSON.stringify({ code }) },
+    ]))
     const option = {
       account: { authIndex: 'codex-1', label: 'one@example.com', accountId: 'acct-1' },
       credit: { id: 'credit-1' },
@@ -118,7 +103,11 @@ describe('codex reset credits', () => {
       credit: { id: 'credit-1' },
       availableCount: 1,
     }
-    await expect(claimCodexReset(fakeClient([], [{ statusCode: 503, body: '' }]).client, option, 'redeem-1')).resolves.toBe('failed')
-    await expect(claimCodexReset(fakeClient([], [{ statusCode: 200, body: 'nope' }]).client, option, 'redeem-1')).resolves.toBe('failed')
+    await expect(claimCodexReset(createManagementClientFake([], queuedApiCallResponses([
+      { statusCode: 503, body: '' },
+    ])).client, option, 'redeem-1')).resolves.toBe('failed')
+    await expect(claimCodexReset(createManagementClientFake([], queuedApiCallResponses([
+      { statusCode: 200, body: 'nope' },
+    ])).client, option, 'redeem-1')).resolves.toBe('failed')
   })
 })

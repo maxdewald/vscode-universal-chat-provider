@@ -1,9 +1,7 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { buildManagedConfig, generateSecret, managedPaths, setConfigPort, setProxyUrl } from '../../../src/cliproxy/managed/config'
+import { buildManagedConfig, generateSecret, managedPaths } from '../../../src/cliproxy/managed/config'
 
 describe('managed config', () => {
   it('derives all managed paths from a root directory', () => {
@@ -34,6 +32,10 @@ describe('managed config', () => {
       'auth-dir': '/tmp/store/auth',
       'api-keys': ['proxy-key'],
       'logging-to-file': false,
+      'routing': {
+        'strategy': 'round-robin',
+        'session-affinity': true,
+      },
       'remote-management': {
         'allow-remote': false,
         'secret-key': 'mgmt-key',
@@ -60,71 +62,5 @@ describe('managed config', () => {
     const b = generateSecret()
     expect(a).toMatch(/^[0-9a-f]{64}$/)
     expect(a).not.toBe(b)
-  })
-})
-
-describe('setConfigPort', () => {
-  let dir: string
-
-  afterEach(async () => {
-    if (dir !== undefined)
-      await rm(dir, { recursive: true, force: true })
-  })
-
-  it('rewrites only the port and preserves the keys', async () => {
-    dir = await mkdtemp(join(tmpdir(), 'ucp-config-'))
-    const configPath = join(dir, 'config.yaml')
-    await writeFile(configPath, buildManagedConfig({
-      host: '127.0.0.1',
-      port: 8317,
-      apiKey: 'proxy-key',
-      managementKey: 'mgmt-key',
-      authDir: join(dir, 'auth'),
-    }))
-
-    await setConfigPort(configPath, 51227)
-
-    expect(parse(await readFile(configPath, 'utf8'))).toEqual({
-      'host': '127.0.0.1',
-      'port': 51227,
-      'auth-dir': join(dir, 'auth'),
-      'api-keys': ['proxy-key'],
-      'logging-to-file': false,
-      'remote-management': {
-        'allow-remote': false,
-        'secret-key': 'mgmt-key',
-      },
-    })
-  })
-})
-
-describe('setProxyUrl', () => {
-  let dir: string
-
-  afterEach(async () => {
-    if (dir !== undefined)
-      await rm(dir, { recursive: true, force: true })
-  })
-
-  it('sets and clears the proxy URL without changing other config', async () => {
-    dir = await mkdtemp(join(tmpdir(), 'ucp-config-'))
-    const configPath = join(dir, 'config.yaml')
-    await writeFile(configPath, buildManagedConfig({
-      host: '127.0.0.1',
-      port: 8317,
-      apiKey: 'proxy-key',
-      managementKey: 'mgmt-key',
-      authDir: join(dir, 'auth'),
-    }))
-
-    await setProxyUrl(configPath, ' http://127.0.0.1:7890 ')
-    expect(parse(await readFile(configPath, 'utf8'))).toMatchObject({
-      'port': 8317,
-      'proxy-url': 'http://127.0.0.1:7890',
-    })
-
-    await setProxyUrl(configPath, '')
-    expect(parse(await readFile(configPath, 'utf8'))).toMatchObject({ port: 8317 })
-    expect(parse(await readFile(configPath, 'utf8'))).not.toHaveProperty('proxy-url')
   })
 })

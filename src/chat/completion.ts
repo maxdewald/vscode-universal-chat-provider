@@ -2,6 +2,7 @@ import type { CancellationToken } from 'vscode'
 import type { StreamCallbacks } from '../cliproxy/client'
 import type { ProxyConnection } from '../cliproxy/connection'
 import type { CredentialStore } from '../cliproxy/credentials'
+import type { ProxyRequestBody } from './request'
 import { LanguageModelError } from 'vscode'
 import { CLIProxyClient } from '../cliproxy/client'
 import { isProxyCredentialRejection, ProxyHttpError } from '../cliproxy/errors'
@@ -14,7 +15,7 @@ export interface CompletionDeps {
 
 export async function streamCompletion(
   deps: CompletionDeps,
-  body: Record<string, unknown>,
+  body: ProxyRequestBody,
   callbacks: StreamCallbacks,
   token?: CancellationToken,
 ): Promise<void> {

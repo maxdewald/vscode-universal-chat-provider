@@ -1,6 +1,6 @@
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import type { ManagedPaths } from './config'
-import { access, mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { RelativePattern, Uri, workspace } from 'vscode'
 import { SECRET_KEY } from '../credentials'
 import {
@@ -9,7 +9,6 @@ import {
   DEFAULT_PORT,
   generateSecret,
   managedPaths,
-  setProxyUrl,
 } from './config'
 import { claimLease } from './leases'
 import { ManagedServer } from './server'
@@ -42,8 +41,7 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   const apiKey = await ensureSecret(context, SECRET_KEY)
   const managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
 
-  if (!(await access(paths.configPath).then(() => true, () => false))) {
-    const port = context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT
+  const writeConfig = async (port: number): Promise<void> => {
     const proxyUrl = options.proxyUrl()
     await writeFile(paths.configPath, buildManagedConfig({
       host: DEFAULT_HOST,
@@ -55,9 +53,7 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
     }))
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)
   }
-  else {
-    await setProxyUrl(paths.configPath, options.proxyUrl())
-  }
+  await writeConfig(context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT)
 
   const server = new ManagedServer({
     paths,
@@ -66,14 +62,15 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
     requestedVersion: options.requestedVersion,
     getPort: () => context.globalState.get<number>(PORT_STATE_KEY),
     setPort: port => context.globalState.update(PORT_STATE_KEY, port),
+    writeConfig,
     inspectServer: options.inspectServer,
     onUnexpectedExit: options.onUnexpectedExit,
   })
   return { paths, server, managementKey }
 }
 
-export function watchAuthDir(authDir: string, onChange: () => void): Disposable[] {
-  const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(authDir), '**'))
+export function watchCredentialFiles(authDir: string, onChange: () => void): Disposable[] {
+  const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(authDir), '*.json'))
   return [
     watcher,
     watcher.onDidCreate(onChange),

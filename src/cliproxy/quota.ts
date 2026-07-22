@@ -1,6 +1,8 @@
-import type { ManagementClient } from './management-client'
-import { isPlainObject } from 'moderndash'
+import type { Static } from '@sinclair/typebox'
+import type { AuthFileRaw, ManagementClient } from './management-client'
+import { Type } from '@sinclair/typebox'
 import { errorMessage } from '../shared/errors'
+import { asJsonValue, asValue } from '../shared/json'
 
 export interface QuotaWindow {
   label: string
@@ -15,6 +17,7 @@ export interface QuotaReport {
   models?: Record<string, number> // antigravity: remaining percent keyed by proxy model id
   account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
   error?: string
+  retryAfter?: number // epoch ms the upstream asked us to wait until before retrying (from a 429 Retry-After)
 }
 
 const WHAM_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -33,8 +36,62 @@ interface QuotaSource {
   method: 'GET' | 'POST'
   url: string
   header: Record<string, string>
-  apply: (report: QuotaReport, data: Record<string, unknown>) => void
+  apply: (report: QuotaReport, data: unknown) => void
 }
+
+const GrokMetricSchema = Type.Object({
+  val: Type.Optional(Type.Number()),
+})
+
+const GrokConfigSchema = Type.Object({
+  used: Type.Optional(GrokMetricSchema),
+  monthlyLimit: Type.Optional(GrokMetricSchema),
+  billingPeriodEnd: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+})
+
+const GrokBodySchema = Type.Object({
+  config: Type.Optional(GrokConfigSchema),
+})
+
+const ClaudeWindowSchema = Type.Object({
+  utilization: Type.Optional(Type.Number()),
+  resets_at: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+  is_enabled: Type.Optional(Type.Boolean()),
+})
+
+const ClaudeBodySchema = Type.Object({
+  extra_usage: Type.Optional(ClaudeWindowSchema),
+}, { additionalProperties: true })
+
+const CodexWindowSchema = Type.Object({
+  used_percent: Type.Optional(Type.Number()),
+  limit_window_seconds: Type.Optional(Type.Number()),
+  reset_at: Type.Optional(Type.Union([Type.String(), Type.Number()])),
+  reset_after_seconds: Type.Optional(Type.Number()),
+})
+
+const CodexRateLimitSchema = Type.Object({
+  primary_window: Type.Optional(Type.Union([CodexWindowSchema, Type.Null()])),
+  secondary_window: Type.Optional(Type.Union([CodexWindowSchema, Type.Null()])),
+})
+
+const CodexBodySchema = Type.Object({
+  rate_limit: Type.Optional(CodexRateLimitSchema),
+})
+
+const AntigravityQuotaInfoSchema = Type.Object({
+  remainingFraction: Type.Optional(Type.Number()),
+})
+
+const AntigravityModelSchema = Type.Object({
+  quotaInfo: Type.Optional(AntigravityQuotaInfoSchema),
+})
+
+const AntigravityBodySchema = Type.Object({
+  models: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+})
+
+const ObjectSchema = Type.Object({}, { additionalProperties: true })
 
 const QUOTA_SOURCES = {
   codex: {
@@ -72,13 +129,29 @@ const QUOTA_SOURCES = {
   },
 } satisfies Record<QuotaReport['provider'], QuotaSource>
 
-export async function fetchQuotas(client: ManagementClient, signal?: AbortSignal): Promise<QuotaReport[]> {
+function isQuotaProvider(value: string): value is QuotaReport['provider'] {
+  return Object.hasOwn(QUOTA_SOURCES, value)
+}
+
+// backoff maps authIndex -> Retry-After deadline; an account still inside its window is echoed as an
+// error report (not fetched) so setQuotas keeps its last-good value without touching the upstream.
+export async function fetchQuotas(
+  client: ManagementClient,
+  signal?: AbortSignal,
+  backoff?: Map<string, number>,
+): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
-    const raw = str(entry.provider ?? entry.type).toLowerCase()
+    const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
     const provider = raw === 'xai' ? 'grok' : raw
-    const source = QUOTA_SOURCES[provider as QuotaReport['provider']]
-    return source === undefined ? [] : [fetchProviderQuota(provider as QuotaReport['provider'], source, client, entry, signal)]
+    if (!isQuotaProvider(provider))
+      return []
+    const retryAfter = backoff?.get(entry.auth_index?.trim() ?? '')
+    if (retryAfter !== undefined && retryAfter > Date.now()) {
+      const account = accountOf(entry)
+      return [Promise.resolve<QuotaReport>({ provider, windows: [], error: 'rate limited', retryAfter, ...(account === undefined ? {} : { account }) })]
+    }
+    return [fetchProviderQuota(provider, QUOTA_SOURCES[provider], client, entry, signal)]
   })
   return Promise.all(tasks)
 }
@@ -142,29 +215,31 @@ async function fetchProviderQuota(
   provider: QuotaReport['provider'],
   source: QuotaSource,
   client: ManagementClient,
-  entry: Record<string, unknown>,
+  entry: AuthFileRaw,
   signal?: AbortSignal,
 ): Promise<QuotaReport> {
   const account = accountOf(entry)
   const report: QuotaReport = { provider, windows: [], ...(account === undefined ? {} : { account }) }
-  const authIndex = str(entry.auth_index)
+  const authIndex = entry.auth_index?.trim() ?? ''
   if (authIndex === '')
     return { ...report, error: 'missing auth_index' }
   // Antigravity is the only source with a request payload: its models endpoint takes the project.
-  const projectId = str(entry.project_id)
+  const projectId = entry.project_id?.trim() ?? ''
   if (provider === 'antigravity' && projectId === '')
     return { ...report, error: 'missing project_id' }
   try {
-    const { statusCode, body } = await client.apiCall({
+    const { statusCode, header, body } = await client.apiCall({
       auth_index: authIndex,
       method: source.method,
       url: source.url,
       header: source.header,
       ...(provider === 'antigravity' ? { data: JSON.stringify({ project: projectId }) } : {}),
     }, signal)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode}` }
-    const data = parseBody(body)
+    if (statusCode < 200 || statusCode >= 300) {
+      const retryAfter = parseRetryAfter(header)
+      return { ...report, error: `HTTP ${statusCode}`, ...(retryAfter === undefined ? {} : { retryAfter }) }
+    }
+    const data = asJsonValue(ObjectSchema, body)
     if (data === undefined)
       return { ...report, error: 'invalid quota payload' }
     source.apply(report, data)
@@ -177,33 +252,36 @@ async function fetchProviderQuota(
 
 // Grok Build/SuperGrok bills in monthly credits; report the single account-level window as
 // remaining percent of the monthly credit allowance.
-function parseGrokWindows(data: Record<string, unknown>): QuotaWindow[] {
-  const config = isPlainObject(data.config) ? data.config : undefined
-  const used = num(isPlainObject(config?.used) ? config.used.val : undefined)
-  const limit = num(isPlainObject(config?.monthlyLimit) ? config.monthlyLimit.val : undefined)
-  if (used === undefined || limit === undefined || limit <= 0)
+function parseGrokWindows(data: unknown): QuotaWindow[] {
+  const config = asValue(GrokBodySchema, data)?.config
+  const used = config?.used?.val
+  const limit = config?.monthlyLimit?.val
+  if (config === undefined || used === undefined || limit === undefined || limit <= 0)
     return []
-  const resetsAt = parseReset(config?.billingPeriodEnd)
+  const resetsAt = parseReset(config.billingPeriodEnd)
   return [{ label: 'Credits', remainingPercent: clamp(100 - (used / limit) * 100, 0, 100), ...(resetsAt === undefined ? {} : { resetsAt }) }]
 }
 
 // Account-level utilization (percent used) per window, plus optional extra-usage credits.
-function parseClaudeWindows(data: Record<string, unknown>): QuotaWindow[] {
+function parseClaudeWindows(data: unknown): QuotaWindow[] {
+  const body = asValue(ClaudeBodySchema, data)
+  if (body === undefined)
+    return []
   const windows: QuotaWindow[] = []
-  for (const [key, raw] of Object.entries(data)) {
-    if (!isPlainObject(raw))
+  for (const [key, rawValue] of Object.entries(body)) {
+    const raw = asValue(ClaudeWindowSchema, rawValue)
+    if (raw === undefined)
       continue
     const label = claudeWindowLabel(key)
     if (label === undefined)
       continue
-    const used = num(raw.utilization)
+    const used = raw.utilization
     const resetsAt = parseReset(raw.resets_at)
     windows.push({ key, label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
   }
-  const extra = isPlainObject(data.extra_usage) ? data.extra_usage : undefined
-  const extraUsed = num(extra?.utilization)
-  if (extra?.is_enabled === true && extraUsed !== undefined)
-    windows.push({ key: 'extra_usage', label: 'Extra Usage', remainingPercent: clamp(100 - extraUsed, 0, 100) })
+  const extra = body.extra_usage
+  if (extra?.is_enabled === true && extra.utilization !== undefined)
+    windows.push({ key: 'extra_usage', label: 'Extra Usage', remainingPercent: clamp(100 - extra.utilization, 0, 100) })
   return windows
 }
 
@@ -216,16 +294,16 @@ function claudeWindowLabel(key: string): string | undefined {
   return family === undefined ? undefined : `7d ${family.charAt(0).toUpperCase()}${family.slice(1)}`
 }
 
-function parseCodexWindows(data: Record<string, unknown>): QuotaWindow[] {
-  const rateLimit = isPlainObject(data.rate_limit) ? data.rate_limit : undefined
+function parseCodexWindows(data: unknown): QuotaWindow[] {
+  const rateLimit = asValue(CodexBodySchema, data)?.rate_limit
   if (rateLimit === undefined)
     return []
   const windows: QuotaWindow[] = []
   for (const raw of [rateLimit.primary_window, rateLimit.secondary_window]) {
-    if (!isPlainObject(raw))
+    if (raw === undefined || raw === null)
       continue
-    const used = num(raw.used_percent)
-    const label = codexWindowLabel(num(raw.limit_window_seconds))
+    const used = raw.used_percent
+    const label = codexWindowLabel(raw.limit_window_seconds)
     const resetsAt = parseCodexReset(raw)
     // exactOptionalPropertyTypes forbids assigning explicit undefined, so omit when unknown.
     windows.push({ label, ...(used === undefined ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
@@ -234,11 +312,11 @@ function parseCodexWindows(data: Record<string, unknown>): QuotaWindow[] {
 }
 
 // Codex gives an absolute reset_at (epoch seconds); when absent, reset_after_seconds is relative to now.
-function parseCodexReset(window: Record<string, unknown>): number | undefined {
+function parseCodexReset(window: Static<typeof CodexWindowSchema>): number | undefined {
   const absolute = parseReset(window.reset_at)
   if (absolute !== undefined)
     return absolute
-  const after = num(window.reset_after_seconds)
+  const after = window.reset_after_seconds
   return after === undefined ? undefined : Date.now() + after * 1000
 }
 
@@ -248,54 +326,47 @@ function codexWindowLabel(windowSeconds?: number): string {
 
 // Antigravity exposes per-model remaining keyed by the same model id the proxy serves,
 // so the menu can show each model its own quota.
-function parseAntigravityModels(data: Record<string, unknown>): Record<string, number> {
-  const models = isPlainObject(data.models) ? data.models : undefined
+function parseAntigravityModels(data: unknown): Record<string, number> {
+  const models = asValue(AntigravityBodySchema, data)?.models
   if (models === undefined)
     return {}
   const out: Record<string, number> = {}
-  for (const [id, raw] of Object.entries(models)) {
-    if (!isPlainObject(raw))
-      continue
-    const quotaInfo = isPlainObject(raw.quotaInfo) ? raw.quotaInfo : undefined
-    const fraction = num(quotaInfo?.remainingFraction)
+  for (const [id, rawValue] of Object.entries(models)) {
+    const fraction = asValue(AntigravityModelSchema, rawValue)?.quotaInfo?.remainingFraction
     if (fraction !== undefined)
       out[id] = clamp(fraction * 100, 0, 100)
   }
   return out
 }
 
-function parseBody(body: unknown): Record<string, unknown> | undefined {
-  if (typeof body !== 'string')
+// Retry-After (RFC 7231) is either delta-seconds or an HTTP date. CLIProxyAPI forwards Go's
+// canonicalized http.Header, so the key is "Retry-After" and each value is a string array.
+function parseRetryAfter(header: Record<string, string[]> | undefined): number | undefined {
+  const raw = Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === 'retry-after')?.[1]?.[0]?.trim()
+  if (raw === undefined || raw === '')
     return undefined
-  try {
-    const parsed: unknown = JSON.parse(body)
-    return isPlainObject(parsed) ? parsed : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-// Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.
-function parseReset(value: unknown): number | undefined {
-  const ms = typeof value === 'string' ? Date.parse(value) : (num(value) ?? Number.NaN) * 1000
+  const seconds = Number(raw)
+  const ms = Number.isNaN(seconds) ? Date.parse(raw) : Date.now() + seconds * 1000
   return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
 }
 
-function num(value: unknown): number | undefined {
-  return typeof value === 'number' && !Number.isNaN(value) ? value : undefined
+// Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.
+function parseReset(value: string | number | undefined): number | undefined {
+  if (value === undefined)
+    return undefined
+  const ms = typeof value === 'string' ? Date.parse(value) : value * 1000
+  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
 }
 
-function str(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
-}
-
-function accountOf(entry: Record<string, unknown>): QuotaReport['account'] | undefined {
-  const authIndex = str(entry.auth_index)
+function accountOf(entry: AuthFileRaw): QuotaReport['account'] | undefined {
+  const authIndex = entry.auth_index?.trim() ?? ''
   if (authIndex === '')
     return undefined
-  const idToken = isPlainObject(entry.id_token) ? entry.id_token : undefined
-  const label = str(entry.email) || str(idToken?.email) || str(entry.label) || str(entry.name) || `Account ${authIndex}`
+  const label = entry.email?.trim()
+    ?? entry.id_token?.email?.trim()
+    ?? entry.label?.trim()
+    ?? entry.name?.trim()
+    ?? `Account ${authIndex}`
   return { authIndex, label }
 }
 

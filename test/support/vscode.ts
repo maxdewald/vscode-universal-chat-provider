@@ -1,4 +1,5 @@
 import type * as vscode from 'vscode'
+import type { ExtensionContext } from 'vscode'
 import { createVSCodeMock } from 'jest-mock-vscode'
 import { vi } from 'vitest'
 
@@ -113,47 +114,121 @@ const settings = new Map<string, unknown>()
 const secrets = new Map<string, string>()
 const commandHandlers = new Map<string, (...args: unknown[]) => unknown>()
 
+export interface MockOutputChannel {
+  name: string
+  appendLine: ReturnType<typeof vi.fn>
+  show: ReturnType<typeof vi.fn>
+  dispose: ReturnType<typeof vi.fn>
+}
+
+export interface MockStatusBarItem {
+  text: string
+  tooltip: string | vscode.MarkdownString | undefined
+  command: string | undefined
+  backgroundColor: vscode.ThemeColor | undefined
+  show: ReturnType<typeof vi.fn>
+  hide: ReturnType<typeof vi.fn>
+  dispose: ReturnType<typeof vi.fn>
+}
+
+export interface MockQuickPick {
+  title: string
+  placeholder: string
+  busy: boolean
+  items: unknown[]
+  activeItems: unknown[]
+  show: ReturnType<typeof vi.fn>
+  hide: ReturnType<typeof vi.fn>
+  dispose: ReturnType<typeof vi.fn>
+  onDidAccept: ReturnType<typeof vi.fn>
+  onDidTriggerItemButton: ReturnType<typeof vi.fn>
+  onDidHide: ReturnType<typeof vi.fn>
+}
+
+export function createOutputChannelMock(name = 'Test Output'): MockOutputChannel {
+  return {
+    name,
+    appendLine: vi.fn(),
+    show: vi.fn(),
+    dispose: vi.fn(),
+  }
+}
+
+export function createStatusBarItemMock(): MockStatusBarItem {
+  return {
+    text: '',
+    tooltip: '',
+    command: undefined,
+    backgroundColor: undefined,
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  }
+}
+
+export function createQuickPickMock(): MockQuickPick {
+  return {
+    title: '',
+    placeholder: '',
+    busy: false,
+    items: [],
+    activeItems: [],
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+    onDidAccept: vi.fn(),
+    onDidTriggerItemButton: vi.fn(),
+    onDidHide: vi.fn(),
+  }
+}
+
+const outputChannels: MockOutputChannel[] = []
+const statusBarItems: Array<{ alignment: number | undefined, priority: number | undefined, item: MockStatusBarItem }> = []
+const quickPicks: MockQuickPick[] = []
+
 export const vscodeMock = {
   settings,
   secrets,
   commandHandlers,
   registeredProviders: [] as Array<{ vendor: string, provider: unknown }>,
-  output: {
-    appendLine: vi.fn(),
-    show: vi.fn(),
-    dispose: vi.fn(),
-  },
+  output: createOutputChannelMock(),
+  outputChannels,
+  statusBarItems,
+  quickPicks,
 }
 
-export const statusBarItem = {
-  text: '',
-  tooltip: '' as string | vscode.MarkdownString | undefined,
-  command: undefined as string | undefined,
-  backgroundColor: undefined as vscode.ThemeColor | undefined,
-  show: vi.fn(),
-  hide: vi.fn(),
-  dispose: vi.fn(),
+export const statusBarItem = createStatusBarItemMock()
+export const quickPick = createQuickPickMock()
+
+export function outputChannelByName(name: string): MockOutputChannel | undefined {
+  return outputChannels.find(channel => channel.name === name)
 }
 
-export const quickPick = {
-  title: '',
-  placeholder: '',
-  busy: false,
-  items: [] as unknown[],
-  activeItems: [] as unknown[],
-  show: vi.fn(),
-  hide: vi.fn(),
-  dispose: vi.fn(),
-  onDidAccept: vi.fn(),
-  onDidTriggerItemButton: vi.fn(),
-  onDidHide: vi.fn(),
+export function statusBarItemByPriority(priority: number): MockStatusBarItem | undefined {
+  return statusBarItems.find(entry => entry.priority === priority)?.item
 }
 
-export async function triggerQuickPickItemButton(event: { item: unknown, button: unknown }): Promise<void> {
-  const listener: unknown = quickPick.onDidTriggerItemButton.mock.calls[0]?.[0]
+export function latestQuickPick(): MockQuickPick | undefined {
+  return quickPicks.at(-1)
+}
+
+export async function triggerQuickPickItemButton(
+  event: { item: unknown, button: unknown },
+  picker: MockQuickPick = latestQuickPick() ?? quickPick,
+): Promise<void> {
+  const listener: unknown = picker.onDidTriggerItemButton.mock.calls[0]?.[0]
   if (typeof listener !== 'function')
     throw new TypeError('No Quick Pick item-button listener was registered.')
   await (listener as (event: { item: unknown, button: unknown }) => unknown)(event)
+}
+
+export async function triggerQuickPickAccept(picker: MockQuickPick = latestQuickPick() ?? quickPick, item?: unknown): Promise<void> {
+  if (item !== undefined)
+    picker.activeItems = [item]
+  const listener: unknown = picker.onDidAccept.mock.calls[0]?.[0]
+  if (typeof listener !== 'function')
+    throw new TypeError('No Quick Pick accept listener was registered.')
+  await (listener as () => unknown)()
 }
 
 function createWatcher(): { onDidCreate: () => MockDisposable, onDidChange: () => MockDisposable, onDidDelete: () => MockDisposable, dispose: () => void } {
@@ -166,9 +241,21 @@ function createWatcher(): { onDidCreate: () => MockDisposable, onDidChange: () =
 }
 
 export const window = {
-  createOutputChannel: vi.fn((_name?: string, _options?: unknown) => vscodeMock.output),
-  createStatusBarItem: vi.fn((_alignment?: number, _priority?: number) => statusBarItem),
-  createQuickPick: vi.fn(() => quickPick),
+  createOutputChannel: vi.fn((name: string = 'Test Output', _options?: unknown) => {
+    const channel = createOutputChannelMock(name)
+    outputChannels.push(channel)
+    return channel
+  }),
+  createStatusBarItem: vi.fn((alignment?: number, priority?: number) => {
+    const item = createStatusBarItemMock()
+    statusBarItems.push({ alignment, priority, item })
+    return item
+  }),
+  createQuickPick: vi.fn(() => {
+    const picker = createQuickPickMock()
+    quickPicks.push(picker)
+    return picker
+  }),
   showInformationMessage: vi.fn(async (_message?: string, ..._items: unknown[]) => undefined as string | undefined),
   showWarningMessage: vi.fn(async (_message?: string, ..._items: unknown[]) => undefined as string | undefined),
   showErrorMessage: vi.fn(async (_message?: string, ..._items: unknown[]) => undefined as string | undefined),
@@ -224,27 +311,68 @@ export const lm = {
   }),
 }
 
+export function createExtensionContext(options: {
+  globalStoragePath?: string
+  globalState?: Map<string, unknown>
+  secrets?: Map<string, string>
+} = {}): ExtensionContext {
+  const globalState = options.globalState ?? new Map<string, unknown>()
+  const contextSecrets = options.secrets ?? secrets
+  return {
+    subscriptions: [],
+    globalStorageUri: options.globalStoragePath === undefined
+      ? undefined
+      : { fsPath: options.globalStoragePath },
+    globalState: {
+      get: <T>(key: string, fallback?: T): T => (globalState.get(key) ?? fallback) as T,
+      update: async (key: string, value: unknown) => {
+        globalState.set(key, value)
+      },
+    },
+    secrets: {
+      get: async (key: string) => contextSecrets.get(key),
+      store: async (key: string, value: string) => {
+        contextSecrets.set(key, value)
+      },
+      delete: async (key: string) => {
+        contextSecrets.delete(key)
+      },
+      onDidChange: () => new MockDisposable(),
+    },
+  } as unknown as ExtensionContext
+}
+
 export function resetVSCodeMock(): void {
   settings.clear()
   secrets.clear()
   commandHandlers.clear()
   vscodeMock.registeredProviders.length = 0
+  outputChannels.length = 0
+  statusBarItems.length = 0
+  quickPicks.length = 0
+  for (const mock of [vscodeMock.output.appendLine, vscodeMock.output.show, vscodeMock.output.dispose])
+    mock.mockReset()
   for (const value of Object.values(window))
     value.mockReset()
-  window.createOutputChannel.mockReturnValue(vscodeMock.output)
-  window.createStatusBarItem.mockReturnValue(statusBarItem)
-  window.createQuickPick.mockReturnValue(quickPick)
+  window.createOutputChannel.mockImplementation((name: string = 'Test Output') => {
+    const channel = createOutputChannelMock(name)
+    outputChannels.push(channel)
+    return channel
+  })
+  window.createStatusBarItem.mockImplementation((alignment?: number, priority?: number) => {
+    const item = createStatusBarItemMock()
+    statusBarItems.push({ alignment, priority, item })
+    return item
+  })
+  window.createQuickPick.mockImplementation(() => {
+    const picker = createQuickPickMock()
+    quickPicks.push(picker)
+    return picker
+  })
   window.withProgress.mockImplementation(async (_options, task) =>
     task({ report: vi.fn() }, { isCancellationRequested: false, onCancellationRequested: () => new MockDisposable() }))
-  statusBarItem.text = ''
-  statusBarItem.tooltip = ''
-  statusBarItem.command = undefined
-  statusBarItem.backgroundColor = undefined
-  quickPick.title = ''
-  quickPick.placeholder = ''
-  quickPick.busy = false
-  quickPick.items = []
-  quickPick.activeItems = []
+  Object.assign(statusBarItem, createStatusBarItemMock())
+  Object.assign(quickPick, createQuickPickMock())
   workspace.fs.stat.mockReset()
   workspace.fs.readFile.mockReset()
   workspace.fs.stat.mockResolvedValue({ size: 0 })
