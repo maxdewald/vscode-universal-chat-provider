@@ -10,13 +10,13 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  quality:
+  lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -24,25 +24,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up project
+        uses: ./.github/actions/setup
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+      - name: Lint
+        run: pnpm lint
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Check
-        run: pnpm run check
-
-      - name: Package extension
-        run: pnpm ext:package
-
-  test-platforms:
+  test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -54,17 +45,91 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Set up project
+        uses: ./.github/actions/setup
 
       - name: Test
         run: pnpm test
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up project
+        uses: ./.github/actions/setup
+
+      - name: Test with coverage
+        run: pnpm test:coverage
+
+      - name: Report coverage
+        if: ${{ always() }}
+        uses: davelosert/vitest-coverage-report-action@v2
+
+  test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up project
+        uses: ./.github/actions/setup
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package extension
+        run: pnpm ext:package
+
+  release:
+    if: ${{ github.event_name == 'push' }}
+    needs: [lint, test, test-coverage, test-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up project
+        if: ${{ steps.release.outputs.release_created }}
+        uses: ./.github/actions/setup
+
+      - name: Package extension
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm ext:package
+
+      - name: Publish to Open VSX
+        if: ${{ steps.release.outputs.release_created }}
+        run: npx --yes ovsx@1.0.2 publish ./*.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Publish extension to VSC Marketplace
+        if: ${{ steps.release.outputs.release_created }}
+        run: pnpm exec vsce publish --packagePath ./*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
