@@ -1,4 +1,4 @@
-import type { CatalogModel } from '../chat/catalog'
+import type { CatalogModel } from '../chat/models/catalog'
 
 export interface ProxyConnection {
   ensureReady: (interactive: boolean) => Promise<void>

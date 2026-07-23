@@ -1,5 +1,5 @@
 import type { SecretStorage } from 'vscode'
-import type { OpenAICompatibilityProvider } from '../management-client'
+import type { OpenAICompatibilityProvider } from '../api/management-client'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '../../shared/json'
 

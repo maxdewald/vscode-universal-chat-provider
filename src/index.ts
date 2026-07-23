@@ -2,10 +2,10 @@ import type { ExtensionContext } from 'vscode'
 import type { ServerStatus } from './cliproxy/controller'
 import { lm, window, workspace } from 'vscode'
 import { UniversalChatProvider } from './chat/provider'
-import { maybeSuggestUtilityModel } from './chat/utility-model-nudge'
 import { ServerController } from './cliproxy/controller'
 import { registerCommands } from './extension/commands'
-import { createStatusBar, updateStatusBar } from './extension/status-bar'
+import { createStatusBar, updateStatusBar } from './extension/ui/status-bar'
+import { maybeSuggestUtilityModel } from './extension/utility-model-nudge'
 import { setJsonValidationErrorReporter } from './shared/json'
 
 let provider: UniversalChatProvider | undefined

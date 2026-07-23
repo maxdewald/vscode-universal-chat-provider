@@ -1,4 +1,4 @@
-import type { AuthFileRaw, ManagementClient } from '../../../src/cliproxy/management-client'
+import type { AuthFileRaw, ManagementClient } from '../../../src/cliproxy/api/management-client'
 import { vi } from 'vitest'
 
 export interface ManagementApiResponse {

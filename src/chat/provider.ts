@@ -11,22 +11,22 @@ import type {
   ProvideLanguageModelChatResponseOptions,
 } from 'vscode'
 import type { ProxyConnection } from '../cliproxy/connection'
-import type { QuotaReport } from '../cliproxy/quota'
-import type { CompletionDeps } from './completion'
-import type { ProviderModel } from './model'
+import type { QuotaReport } from '../cliproxy/quota/quota'
+import type { ProviderModel } from './models/model'
+import type { CompletionDeps } from './requests/completion'
 import * as vscode from 'vscode'
 import {
   LanguageModelTextPart,
   LanguageModelToolCallPart,
 } from 'vscode'
-import { CredentialStore } from '../cliproxy/credentials'
-import { remainingForModel } from '../cliproxy/quota'
-import { CacheMetricsTracker, createContextUsagePart } from './cache-metrics'
-import { streamCompletion } from './completion'
-import { CredentialFlows } from './credential-flows'
-import { estimateTokens } from './estimate'
-import { ModelRegistry } from './model-registry'
-import { buildRequest } from './request'
+import { CredentialStore } from '../cliproxy/configuration/credentials'
+import { remainingForModel } from '../cliproxy/quota/quota'
+import { CredentialFlows } from './credentials/credential-flows'
+import { CacheMetricsTracker, createContextUsagePart } from './diagnostics/cache-metrics'
+import { ModelRegistry } from './models/model-registry'
+import { streamCompletion } from './requests/completion'
+import { estimateTokens } from './requests/estimate'
+import { buildRequest } from './requests/request-builder'
 
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 

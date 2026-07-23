@@ -2,7 +2,7 @@ import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import type { ManagedPaths } from './config'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { RelativePattern, Uri, workspace } from 'vscode'
-import { SECRET_KEY } from '../credentials'
+import { SECRET_KEY } from '../configuration/credentials'
 import {
   buildManagedConfig,
   DEFAULT_HOST,
