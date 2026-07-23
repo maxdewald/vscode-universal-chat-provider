@@ -1,18 +1,15 @@
 import type { CatalogModel } from '@src/chat/models/catalog'
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
-import { Type } from '@sinclair/typebox'
-import { fetchCatalog } from '@src/chat/models/catalog'
+import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { enrichOpenAICompatibilityProviders } from '@src/cliproxy/accounts/openai-compat-thinking'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
-import { asValue } from '@src/shared/json'
 import { sleep } from 'moderndash'
 import { env, ProgressLocation, Uri, window } from 'vscode'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
-const LAST_OPENAI_BASE_URL_KEY = 'universalChatProvider.lastOpenAIBaseUrl'
 
 export interface AccountsDeps {
   resolveManagement: (start: boolean) => Promise<ManagementEndpoint | undefined>
@@ -149,78 +146,23 @@ export class AccountsService {
   }
 
   private async addOpenAIEndpoint(client: ManagementClient): Promise<void> {
-    const baseUrl = await window.showInputBox({
-      title: 'OpenAI-compatible base URL',
-      value: this.deps.state?.get<string>(LAST_OPENAI_BASE_URL_KEY) ?? '',
-      prompt: 'Must include the /v1 path when the provider uses one (e.g. https://openrouter.ai/api/v1).',
-      placeHolder: 'https://openrouter.ai/api/v1',
-      ignoreFocusOut: true,
-      validateInput: value => value.trim() === '' || !isHttpUrl(value.trim())
-        ? 'Enter an http(s) base URL.'
-        : undefined,
-    })
-    if (baseUrl === undefined)
+    const draft = await promptOpenAICompatibilityEndpoint(this.deps.state)
+    if (draft === undefined)
       return
-    await this.deps.state?.update(LAST_OPENAI_BASE_URL_KEY, baseUrl.trim())
-
-    const apiKey = await window.showInputBox({
-      title: 'API key',
-      prompt: 'Provider API key (stored in CLIProxyAPI config, not VS Code SecretStorage).',
-      password: true,
-      ignoreFocusOut: true,
-      validateInput: value => value.trim() === '' ? 'API key is required.' : undefined,
-    })
-    if (apiKey === undefined)
-      return
-
-    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
-    const [discovered, catalog] = await window.withProgress(
-      { location: ProgressLocation.Notification, title: 'Fetching models from endpoint…' },
-      async () => Promise.all([
-        discoverUpstreamModels(normalizedBaseUrl, apiKey.trim()),
-        fetchCatalog(),
-      ]),
-    )
-
-    let modelIds = discovered
-    if (modelIds.length === 0) {
-      const modelsRaw = await window.showInputBox({
-        title: 'Models',
-        prompt: 'Endpoint did not list models. Enter comma-separated model IDs.',
-        placeHolder: 'claude-opus-4-8, gpt-5.5',
-        ignoreFocusOut: true,
-        validateInput: value => parseModelIds(value).length === 0
-          ? 'Enter at least one model ID.'
-          : undefined,
-      })
-      if (modelsRaw === undefined)
-        return
-      modelIds = parseModelIds(modelsRaw)
-      if (modelIds.length === 0)
-        return
-    }
 
     try {
       const existing = await client.listOpenAICompatibility()
-      const baseName = new URL(normalizedBaseUrl).hostname.replace(/^www\./, '')
-      const providerName = uniqueProviderName(baseName, existing.map(entry => entry.name))
-      const models = modelIds.map(name => ({ name, alias: `${providerName}/${name}` }))
-      const provider: OpenAICompatibilityProvider = {
-        'name': providerName,
-        'base-url': normalizedBaseUrl,
-        'api-key-entries': [{ 'api-key': apiKey.trim() }],
-        models,
-      }
-      enrichOpenAICompatibilityProviders([provider], catalog)
+      const provider = buildOpenAICompatibilityProvider(draft, existing)
       const updated = [...existing, provider]
+      const expectedModelIds = draft.modelIds.map(modelId => `${provider.name}/${modelId}`)
       await client.putOpenAICompatibility(updated)
       try {
         await this.deps.persistOpenAICompatibility?.(updated)
       }
       finally {
-        await this.deps.onAccountsChanged(models.map(model => model.alias))
+        await this.deps.onAccountsChanged(expectedModelIds)
       }
-      void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${models.length} models).`)
+      void window.showInformationMessage(`OpenAI-compatible endpoint “${provider.name}” added (${draft.modelIds.length} models).`)
     }
     catch (error) {
       void window.showErrorMessage(`Could not add OpenAI-compatible endpoint: ${errorMessage(error)}`)
@@ -327,55 +269,5 @@ export class AccountsService {
         await this.login()
     }
     catch {}
-  }
-}
-
-const UpstreamModelsSchema = Type.Object({
-  data: Type.Optional(Type.Array(Type.Object({
-    id: Type.Optional(Type.String()),
-  }, { additionalProperties: true }))),
-}, { additionalProperties: true })
-
-async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<string[]> {
-  try {
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!response.ok)
-      return []
-    const payload = asValue(UpstreamModelsSchema, await response.json())
-    const ids = (payload?.data ?? [])
-      .map(model => model.id?.trim())
-      .filter((id): id is string => id !== undefined && id.length > 0)
-    return [...new Set(ids)]
-  }
-  catch {
-    return []
-  }
-}
-
-function parseModelIds(value: string): string[] {
-  return [...new Set(value.split(/[\n,]/).map(part => part.trim()).filter(Boolean))]
-}
-
-function uniqueProviderName(base: string, existing: readonly string[]): string {
-  const taken = new Set(existing.map(name => name.toLowerCase()))
-  if (!taken.has(base.toLowerCase()))
-    return base
-  for (let index = 2; ; index++) {
-    const candidate = `${base}-${index}`
-    if (!taken.has(candidate.toLowerCase()))
-      return candidate
-  }
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  }
-  catch {
-    return false
   }
 }

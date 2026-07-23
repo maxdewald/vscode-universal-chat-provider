@@ -234,6 +234,34 @@ describe('openai-compatible endpoint', () => {
     ])
   })
 
+  it('normalizes discovered model ids while preserving their order', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{ id: ' gpt-5.5 ' }, { id: '' }, { id: 'claude-opus-4-8' }, { id: 'gpt-5.5' }],
+    })))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.login()
+
+    expect(put.mock.calls[0]?.[0]?.[0]?.models?.map(model => model.name)).toEqual([
+      'gpt-5.5',
+      'claude-opus-4-8',
+    ])
+    expect(onAccountsChanged).toHaveBeenCalledWith([
+      'openrouter.ai/gpt-5.5',
+      'openrouter.ai/claude-opus-4-8',
+    ])
+  })
+
   it('refreshes models when persistence fails after the live endpoint update', async () => {
     window.showQuickPick.mockResolvedValue({
       label: 'OpenAI-compatible endpoint',
@@ -252,6 +280,27 @@ describe('openai-compatible endpoint', () => {
 
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
     expect(window.showErrorMessage).toHaveBeenCalledWith('Could not add OpenAI-compatible endpoint: storage full')
+  })
+
+  it('does not persist or refresh when the live endpoint update fails', async () => {
+    window.showQuickPick.mockResolvedValue({
+      label: 'OpenAI-compatible endpoint',
+      account: 'openai-compatibility',
+    })
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'gpt-5.5' }] })))
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockRejectedValue(new Error('write failed'))
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
+
+    await service.login()
+
+    expect(persistOpenAICompatibility).not.toHaveBeenCalled()
+    expect(onAccountsChanged).not.toHaveBeenCalled()
+    expect(window.showErrorMessage).toHaveBeenCalledWith('Could not add OpenAI-compatible endpoint: write failed')
   })
 
   it('enriches existing openai-compatible providers missing thinking levels', async () => {
