@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.1...v0.30.2) (2026-07-23)
+
+
+### Refactoring
+
+* support displaying used balance in quota menu ([1dee37d](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1dee37d335bfd734fe68194addcb4df42359e685))
+
 ## [0.30.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.0...v0.30.1) (2026-07-23)
 
 
