@@ -71,6 +71,9 @@ jobs:
       - name: Report coverage
         if: ${{ always() }}
         uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          json-summary-path: ./test/coverage/coverage-summary.json
+          json-final-path: ./test/coverage/coverage-final.json
 
   test-build:
     runs-on: ubuntu-latest
