@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.28.1...v0.29.0) (2026-07-22)
+
+
+### Features
+
+* update CLIProxyAPI version to 7.2.94 and refine account auth flow ([feb97c2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/feb97c2988daa8ad0055a86f3d9b01e160d82136))
+
 ## [0.28.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.28.0...v0.28.1) (2026-07-22)
 
 
