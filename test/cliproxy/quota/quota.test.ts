@@ -120,11 +120,11 @@ describe('fetchQuotas', () => {
       { key: 'seven_day', label: '7d Quota', remainingPercent: 95, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
       { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
       { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } },
+      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } },
     ])
   })
 
-  it('ignores unavailable claude extra usage utilization', async () => {
+  it('keeps claude used credits when no monthly limit is available', async () => {
     const body = JSON.stringify({
       five_hour: { utilization: 20, resets_at: null },
       seven_day_sonnet: null,
@@ -150,7 +150,10 @@ describe('fetchQuotas', () => {
 
     const report = (await fetchQuotas(client))[0]!
 
-    expect(report.windows).toEqual([{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }])
+    expect(report.windows).toEqual([
+      { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
+      { key: 'extra_usage', label: 'Extra Usage', balance: { amount: 7.55, currency: 'EUR', suffix: 'used' } },
+    ])
   })
 
   it('parses grok monthly credit usage as a single window', async () => {

@@ -91,8 +91,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   // Structured quota for the menu: Codex/Claude/Grok as account windows (5h/7d/credits), Antigravity per model.
-  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, remainingBalance?: { amount: number, currency: string }, resetsAt?: number }> }> {
-    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, remainingBalance?: { amount: number, currency: string }, resetsAt?: number }> }> = []
+  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
+    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
     for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
       const reports = this.quotaReports.filter(r => r.provider === provider && r.error === undefined && r.windows.length > 0)
       const multiple = reports.length > 1
@@ -102,7 +102,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           entries: report.windows.map(window => ({
             name: window.label,
             remainingPercent: window.remainingPercent,
-            ...(window.remainingBalance === undefined ? {} : { remainingBalance: window.remainingBalance }),
+            ...(window.balance === undefined ? {} : { balance: window.balance }),
             ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
           })),
         })

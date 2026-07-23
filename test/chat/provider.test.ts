@@ -289,11 +289,11 @@ describe('language model provider', () => {
     const provider = createProvider()
     provider.setQuotas([{
       provider: 'claude',
-      windows: [{ key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }],
+      windows: [{ key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } }],
     }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }] },
+      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } }] },
     ])
   })
 

@@ -7,7 +7,7 @@ import { env, QuickPickItemKind, window } from 'vscode'
 export interface QuotaEntry {
   name: string
   remainingPercent: number | undefined
-  remainingBalance?: { amount: number, currency: string }
+  balance?: { amount: number, currency: string, suffix: 'left' | 'used' }
   resetsAt?: number
 }
 
@@ -104,10 +104,15 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
 
 function formatRemaining(entry: QuotaEntry): string {
   const percent = entry.remainingPercent === undefined ? undefined : `${formatPercent(entry.remainingPercent)} left`
-  if (entry.remainingBalance === undefined)
-    return percent ?? 'unknown'
-  const balance = `${new Intl.NumberFormat(env.language, { style: 'currency', currency: entry.remainingBalance.currency }).format(entry.remainingBalance.amount)} left`
-  return percent === undefined ? balance : `${balance} (${percent})`
+  if (entry.balance !== undefined) {
+    const balance = `${formatCurrency(entry.balance)} ${entry.balance.suffix}`
+    return percent === undefined || entry.balance.suffix === 'used' ? balance : `${balance} (${percent})`
+  }
+  return percent ?? 'unknown'
+}
+
+function formatCurrency(balance: { amount: number, currency: string }): string {
+  return new Intl.NumberFormat(env.language, { style: 'currency', currency: balance.currency }).format(balance.amount)
 }
 
 function formatExpiration(expiresAt: number): string {

@@ -7,7 +7,7 @@ import { asJsonValue, asValue } from '@src/shared/json'
 export interface QuotaWindow {
   label: string
   remainingPercent?: number
-  remainingBalance?: { amount: number, currency: string }
+  balance?: { amount: number, currency: string, suffix: 'left' | 'used' }
   key?: string // claude: window id; remainingForModel scopes family caps by it
   resetsAt?: number // epoch ms when the window refreshes; omitted when unknown or already past
 }
@@ -288,19 +288,21 @@ function parseClaudeWindows(data: unknown): QuotaWindow[] {
   }
   const extra = body.extra_usage
   if (extra?.is_enabled === true) {
-    const remainingBalance = extra.used_credits === undefined || extra.monthly_limit == null || extra.currency === undefined
+    const divisor = 10 ** (extra.decimal_places ?? 0)
+    const balance = extra.used_credits === undefined || extra.currency === undefined
       ? undefined
       : {
-          amount: Math.max(extra.monthly_limit - extra.used_credits, 0) / 10 ** (extra.decimal_places ?? 0),
+          amount: (extra.monthly_limit == null ? extra.used_credits : Math.max(extra.monthly_limit - extra.used_credits, 0)) / divisor,
           currency: extra.currency,
+          suffix: extra.monthly_limit == null ? 'used' as const : 'left' as const,
         }
-    if (extra.utilization == null && remainingBalance === undefined)
+    if (extra.utilization == null && balance === undefined)
       return windows
     windows.push({
       key: 'extra_usage',
       label: 'Extra Usage',
       ...(extra.utilization == null ? {} : { remainingPercent: clamp(100 - extra.utilization, 0, 100) }),
-      ...(remainingBalance === undefined ? {} : { remainingBalance }),
+      ...(balance === undefined ? {} : { balance }),
     })
   }
   return windows

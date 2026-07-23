@@ -57,7 +57,10 @@ describe('showQuotaMenu', () => {
     vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
     await showQuotaMenu(source([
       { title: 'Codex', entries: [{ name: 'Unknown', remainingPercent: undefined }, { name: 'Rounded', remainingPercent: 42.6 }] },
-      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }] },
+      { title: 'Claude', entries: [
+        { name: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } },
+        { name: 'Extra Usage', remainingPercent: undefined, balance: { amount: 7.55, currency: 'EUR', suffix: 'used' } },
+      ] },
       { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-07-12T03:25:00Z') }] },
     ]), async () => {})
 
@@ -66,6 +69,7 @@ describe('showQuotaMenu', () => {
       'Codex · Rounded — 43% left',
       '',
       'Claude · Extra Usage — €15.00 left (75% left)',
+      'Claude · Extra Usage — €7.55 used',
       '',
       'Grok · Credits — 75% left',
     ])
