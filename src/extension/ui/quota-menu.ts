@@ -1,8 +1,8 @@
 import type { CodexResetOption, CodexResetOutcome } from '@src/cliproxy/quota/codex-resets'
-import type { QuickInputButton, QuickPickItem } from 'vscode'
+import type { QuickPickItem } from 'vscode'
 import { randomUUID } from 'node:crypto'
 import { formatPercent, formatResetCountdown } from '@src/cliproxy/quota/quota'
-import { env, QuickPickItemKind, ThemeIcon, window } from 'vscode'
+import { env, QuickPickItemKind, window } from 'vscode'
 
 export interface QuotaEntry {
   name: string
@@ -23,32 +23,23 @@ export interface CodexResetActions {
 
 type QuotaPickerItem = QuickPickItem & { reset?: CodexResetOption }
 
-const USE_RESET_BUTTON: QuickInputButton = {
-  iconPath: new ThemeIcon('debug-restart'),
-  tooltip: 'Use next reset',
-}
-
-// Opens instantly with a loading spinner, then fills in once the refresh resolves — so the
-// menu never blocks on the per-account network round-trips and never shows stale numbers.
 export async function showQuotaMenu(
   getSections: () => QuotaSection[],
   refresh: () => Promise<void>,
   resets?: CodexResetActions,
 ): Promise<void> {
-  const picker = window.createQuickPick<QuotaPickerItem>()
-  picker.title = 'Model Quota'
-  picker.placeholder = 'Loading quota…'
-  picker.busy = true
-  picker.show()
-  let open = true
-  let resetOptions: CodexResetOption[] = []
-  let claiming = false
+  await refresh().catch(() => {})
+  let resetOptions = await loadResets(resets)
   const retries = new Map<string, { creditId: string, redeemRequestId: string }>()
-  const useReset = async (item: QuotaPickerItem): Promise<void> => {
-    if (item.reset === undefined || claiming)
+
+  while (true) {
+    const item = await window.showQuickPick(buildItems(getSections(), resetOptions), {
+      title: 'Model Quota',
+      placeHolder: 'Select a Codex reset or press Escape to close',
+    })
+    const option = item?.reset
+    if (option === undefined)
       return
-    claiming = true
-    const option = item.reset
     const confirmAction = option.hasRemainingUsage ? 'Use Reset Anyway' : 'Use Reset'
     const confirm = await window.showWarningMessage(
       option.hasRemainingUsage
@@ -57,13 +48,8 @@ export async function showQuotaMenu(
       { modal: true },
       confirmAction,
     )
-    if (confirm !== confirmAction) {
-      claiming = false
-      return
-    }
-
-    if (open)
-      picker.busy = true
+    if (confirm !== confirmAction)
+      continue
     const previous = retries.get(option.account.authIndex)
     const attempt = previous?.creditId === option.credit.id
       ? previous
@@ -74,11 +60,6 @@ export async function showQuotaMenu(
       retries.delete(option.account.authIndex)
     if (outcome === 'success' || outcome === 'noCredit')
       resetOptions = await loadResets(resets)
-    if (open) {
-      picker.items = buildItems(getSections(), resetOptions)
-      picker.busy = false
-    }
-    claiming = false
 
     if (outcome === 'success')
       void window.showInformationMessage(`Codex usage reset for ${option.account.label}.`)
@@ -89,26 +70,6 @@ export async function showQuotaMenu(
     else
       void window.showErrorMessage(`Could not reset Codex usage for ${option.account.label}. Try again.`)
   }
-  picker.onDidAccept(() => {
-    const item = picker.activeItems[0]
-    if (item?.reset !== undefined)
-      void useReset(item)
-    else
-      picker.hide()
-  })
-  picker.onDidTriggerItemButton(async ({ item }) => useReset(item))
-  picker.onDidHide(() => {
-    open = false
-    picker.dispose()
-  })
-
-  await refresh().catch(() => {})
-  resetOptions = await loadResets(resets)
-  if (!open)
-    return
-  picker.items = buildItems(getSections(), resetOptions)
-  picker.placeholder = 'Remaining quota'
-  picker.busy = false
 }
 
 async function loadResets(actions: CodexResetActions | undefined): Promise<CodexResetOption[]> {
@@ -130,7 +91,6 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   codex.push(...resets.map(option => ({
     label: `Codex · ${option.account.label} — ${option.availableCount} ${option.availableCount === 1 ? 'reset' : 'resets'} available`,
     description: option.credit.expiresAt === undefined ? 'Next reset does not expire' : `Next reset expires ${formatExpiration(option.credit.expiresAt)}`,
-    buttons: [USE_RESET_BUTTON],
     reset: option,
   })))
   if (codex.length > 0)

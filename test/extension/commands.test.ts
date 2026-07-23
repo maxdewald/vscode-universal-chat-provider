@@ -1,15 +1,13 @@
 import type { UniversalChatProvider } from '@src/chat/provider'
-import type { ServerController, ServerStatusSnapshot } from '@src/cliproxy/controller'
+import type { ServerController, ServerMode, ServerStatusSnapshot } from '@src/cliproxy/controller'
 import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
 import { readFileSync } from 'node:fs'
 import { registerCommands } from '@src/extension/commands'
-import { manageProvider } from '@src/extension/ui/manage-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   commands,
   createOutputChannelMock,
-  latestQuickPick,
   resetVSCodeMock,
   vscodeMock,
   window,
@@ -67,7 +65,7 @@ describe('registerCommands', () => {
 
     expect(controller.refreshQuotas).toHaveBeenCalledTimes(1)
     expect(controller.listCodexResets).toHaveBeenCalledTimes(1)
-    expect(latestQuickPick()?.items).toEqual([
+    expect(window.showQuickPick.mock.calls[0]?.[0]).toEqual([
       expect.objectContaining({ label: 'Codex · 5h Quota — 75% left' }),
     ])
   })
@@ -132,9 +130,12 @@ describe('manageProvider', () => {
       absent: '$(debug-restart) Restart Server',
     },
   ] as const)('shows $mode actions', async ({ mode, snapshot, present, absent }) => {
+    const { controller } = createCommandHarness()
+    controller.mode.mockReturnValue(mode)
+    controller.statusSnapshot.mockResolvedValue(snapshot)
     window.showQuickPick.mockResolvedValueOnce(undefined)
 
-    await manageProvider(menuController(mode, snapshot))
+    await commands.executeCommand('universalChatProvider.manage')
 
     const labels = quickPickLabels()
     expect(labels).toEqual(expect.arrayContaining([...present]))
@@ -145,9 +146,12 @@ describe('manageProvider', () => {
     ['managed', { mode: 'managed', status: 'running', baseUrl: 'http://127.0.0.1:8317' }, 'universalChatProvider.showServerLogs'],
     ['external', { mode: 'external', status: 'external', baseUrl: 'http://127.0.0.1:8317' }, 'universalChatProvider.showLogs'],
   ] as const)('dispatches the %s status row', async (mode, snapshot, command) => {
+    const { controller } = createCommandHarness()
+    controller.mode.mockReturnValue(mode)
+    controller.statusSnapshot.mockResolvedValue(snapshot)
     window.showQuickPick.mockImplementationOnce(async items => (items as QuickPickItem[])[0])
 
-    await manageProvider(menuController(mode, snapshot))
+    await commands.executeCommand('universalChatProvider.manage')
 
     expect(commands.executeCommand).toHaveBeenCalledWith(command)
   })
@@ -165,8 +169,8 @@ function createCommandHarness() {
     clearCredentials: vi.fn(async () => {}),
   }
   const controller = {
-    mode: vi.fn(() => 'managed' as const),
-    statusSnapshot: vi.fn(async () => ({ mode: 'managed', status: 'running', baseUrl: 'http://127.0.0.1:8317' } as const)),
+    mode: vi.fn<() => ServerMode>(() => 'managed'),
+    statusSnapshot: vi.fn<() => Promise<ServerStatusSnapshot>>(async () => ({ mode: 'managed', status: 'running', baseUrl: 'http://127.0.0.1:8317' })),
     login: vi.fn(async () => {}),
     manageAccounts: vi.fn(async () => {}),
     refreshQuotas: vi.fn(async () => {}),
@@ -188,13 +192,6 @@ function createCommandHarness() {
 }
 
 type CommandHarness = ReturnType<typeof createCommandHarness>
-
-function menuController(mode: 'managed' | 'external', snapshot: ServerStatusSnapshot): ServerController {
-  return {
-    mode: () => mode,
-    statusSnapshot: async () => snapshot,
-  } as unknown as ServerController
-}
 
 function quickPickLabels(): string[] {
   return (window.showQuickPick.mock.calls[0]?.[0] as QuickPickItem[]).map(item => item.label)

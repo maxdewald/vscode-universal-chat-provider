@@ -3,24 +3,12 @@ import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
 import { showQuotaMenu } from '@src/extension/ui/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { QuickPickItemKind } from 'vscode'
-import { env, latestQuickPick, resetVSCodeMock, triggerQuickPickAccept, triggerQuickPickItemButton, window } from '../../support/vscode'
+import { env, QuickPickItemKind } from 'vscode'
+import { resetVSCodeMock, window } from '../../support/vscode'
 
 beforeEach(() => {
   resetVSCodeMock()
 })
-
-function source(sections: QuotaSection[]): () => QuotaSection[] {
-  return () => sections
-}
-
-function labels(): string[] {
-  return (picker().items as QuickPickItem[]).map(item => item.label)
-}
-
-function picker() {
-  return latestQuickPick()!
-}
 
 const RESET = {
   account: { authIndex: 'codex-1', label: 'one@example.com', accountId: 'acct-1' },
@@ -28,19 +16,25 @@ const RESET = {
   availableCount: 2,
 } satisfies CodexResetOption
 
-async function clickReset(): Promise<void> {
-  const item = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
-  await triggerQuickPickItemButton({ item, button: item.buttons![0] })
+function source(sections: QuotaSection[]): () => QuotaSection[] {
+  return () => sections
 }
 
-async function acceptReset(): Promise<void> {
-  const item = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(candidate => candidate.reset !== undefined)!
-  await triggerQuickPickAccept(picker(), item)
-  await vi.waitFor(() => expect(window.showWarningMessage).toHaveBeenCalled())
+function shownItems(call = 0): Array<QuickPickItem & { reset?: CodexResetOption }> {
+  return window.showQuickPick.mock.calls[call]?.[0] as Array<QuickPickItem & { reset?: CodexResetOption }>
+}
+
+function chooseReset(times = 1): void {
+  let remaining = times
+  window.showQuickPick.mockImplementation(async (items) => {
+    if (remaining-- <= 0)
+      return undefined
+    return (items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(item => item.reset !== undefined)
+  })
 }
 
 describe('showQuotaMenu', () => {
-  it('opens immediately, runs the refresh, then fills the picker from fresh data', async () => {
+  it('refreshes before showing fresh quota rows', async () => {
     let refreshed = false
     await showQuotaMenu(source([
       { title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 99 }, { name: '7d Quota', remainingPercent: 51 }] },
@@ -49,63 +43,41 @@ describe('showQuotaMenu', () => {
       refreshed = true
     })
 
-    expect(picker().show).toHaveBeenCalled()
     expect(refreshed).toBe(true)
-    expect(labels()).toEqual([
+    expect(shownItems().map(item => item.label)).toEqual([
       'Codex · 5h Quota — 99% left',
       'Codex · 7d Quota — 51% left',
       '',
       'Antigravity · Claude Sonnet 4.6 — 100% left',
     ])
-    expect((picker().items as QuickPickItem[]).filter(item => item.kind === QuickPickItemKind.Separator).map(item => item.label)).toEqual([''])
-    expect(picker().busy).toBe(false)
+    expect(shownItems().filter(item => item.kind === QuickPickItemKind.Separator)).toHaveLength(1)
   })
 
-  it('shows a no-data row when there is no quota', async () => {
-    await showQuotaMenu(source([]), async () => {})
-    expect(labels()).toEqual(['No model quota information is available yet.'])
-  })
-
-  it.each([
-    ['unknown', undefined, 'unknown'],
-    ['rounded', 42.6, '43% left'],
-  ] as const)('shows a %s percentage', async (_name, remainingPercent, expected) => {
-    await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '7d Quota', remainingPercent }] }]), async () => {})
-    expect(labels()).toEqual([`Codex · 7d Quota — ${expected}`])
-  })
-
-  it('shows the remaining Claude balance alongside the percentage', async () => {
-    await showQuotaMenu(source([{
-      title: 'Claude',
-      entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }],
-    }]), async () => {})
-
-    expect(labels()).toEqual(['Claude · Extra Usage — €15.00 left (75% left)'])
-  })
-
-  it('appends a reset countdown when resetsAt is in the future', async () => {
+  it('formats missing, rounded, balance, and reset values', async () => {
     vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
-    const resetsAt = Date.parse('2026-07-12T03:25:00Z') // 3h 25m ahead
-    await showQuotaMenu(source([{ title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75, resetsAt }] }]), async () => {})
-    expect(labels()).toEqual(['Grok · Credits — 75% left'])
-    expect((picker().items as QuickPickItem[])[0]?.description).toBe('resets in 3h 25m')
-  })
-
-  it('omits the reset suffix when resetsAt is missing or in the past', async () => {
-    vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
-    const past = Date.parse('2026-07-11T00:00:00Z')
     await showQuotaMenu(source([
-      { title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 99, resetsAt: past }] },
-      { title: 'Codex', entries: [{ name: '7d Quota', remainingPercent: 51 }] },
+      { title: 'Codex', entries: [{ name: 'Unknown', remainingPercent: undefined }, { name: 'Rounded', remainingPercent: 42.6 }] },
+      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }] },
+      { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-07-12T03:25:00Z') }] },
     ]), async () => {})
-    expect(labels()).toEqual([
-      'Codex · 5h Quota — 99% left',
-      'Codex · 7d Quota — 51% left',
+
+    expect(shownItems().map(item => item.label)).toEqual([
+      'Codex · Unknown — unknown',
+      'Codex · Rounded — 43% left',
+      '',
+      'Claude · Extra Usage — €15.00 left (75% left)',
+      '',
+      'Grok · Credits — 75% left',
     ])
+    expect(shownItems().at(-1)?.description).toBe('resets in 3h 25m')
   })
 
-  it('shows one reset action per eligible account', async () => {
-    env.language = 'de-DE'
+  it('shows a no-data row when there is no quota or reset', async () => {
+    await showQuotaMenu(source([]), async () => {})
+    expect(shownItems().map(item => item.label)).toEqual(['No model quota information is available yet.'])
+  })
+
+  it('shows one reset row per eligible account', async () => {
     await showQuotaMenu(source([]), async () => {}, {
       listCodexResets: async () => [RESET, {
         account: { authIndex: 'codex-2', label: 'two@example.com' },
@@ -115,104 +87,62 @@ describe('showQuotaMenu', () => {
       claimCodexReset: vi.fn(),
     })
 
-    expect(labels()).toEqual([
+    expect(shownItems().map(item => item.label)).toEqual([
       'Codex · one@example.com — 2 resets available',
       'Codex · two@example.com — 1 reset available',
     ])
-    const resetItems = (picker().items as Array<QuickPickItem & { reset?: CodexResetOption }>).filter(item => item.reset !== undefined)
-    expect(resetItems.map(item => item.description)).toEqual([
-      `Next reset expires ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt)}`,
+    expect(shownItems().map(item => item.description)).toEqual([
+      `Next reset expires ${new Intl.DateTimeFormat(env.language, { dateStyle: 'medium', timeStyle: 'short' }).format(RESET.credit.expiresAt)}`,
       'Next reset does not expire',
     ])
-    expect(resetItems.every(item => item.buttons?.[0]?.tooltip === 'Use next reset')).toBe(true)
   })
 
-  it.each([
-    ['button', clickReset],
-    ['row', acceptReset],
-  ])('never claims a reset when the %s confirmation is cancelled', async (_name, trigger) => {
+  it('does not claim a reset when confirmation is cancelled', async () => {
     const claim = vi.fn()
+    chooseReset()
     window.showWarningMessage.mockResolvedValueOnce(undefined)
+
     await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [RESET], claimCodexReset: claim })
 
-    await trigger()
-
-    expect(picker().hide).not.toHaveBeenCalled()
-    expect(window.showWarningMessage).toHaveBeenCalledWith(
-      expect.stringContaining('consumes one reset credit'),
-      { modal: true },
-      'Use Reset',
-    )
+    expect(window.showWarningMessage).toHaveBeenCalledWith(expect.stringContaining('consumes one reset credit'), { modal: true }, 'Use Reset')
     expect(claim).not.toHaveBeenCalled()
   })
 
-  it('gives a stronger warning when the account still has usage remaining', async () => {
-    const claim = vi.fn()
-    const resetWithUsage = {
-      ...RESET,
-      hasRemainingUsage: true,
-    } satisfies CodexResetOption
+  it('warns before discarding remaining usage', async () => {
+    const option = { ...RESET, hasRemainingUsage: true }
+    chooseReset()
     window.showWarningMessage.mockResolvedValueOnce(undefined)
-    await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [resetWithUsage], claimCodexReset: claim })
 
-    await clickReset()
+    await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [option], claimCodexReset: vi.fn() })
 
     expect(window.showWarningMessage).toHaveBeenCalledWith(
       'WARNING: one@example.com still has usage remaining. Using a reset now discards that remaining usage and consumes one reset credit. This cannot be undone.',
       { modal: true },
       'Use Reset Anyway',
     )
-    expect(claim).not.toHaveBeenCalled()
   })
 
-  it('claims only after confirmation and refreshes the reset action', async () => {
+  it('claims after confirmation and reloads available resets', async () => {
     const claim = vi.fn(async () => 'success' as const)
-    const list = vi.fn()
-      .mockResolvedValueOnce([RESET])
-      .mockResolvedValueOnce([])
+    const list = vi.fn().mockResolvedValueOnce([RESET]).mockResolvedValueOnce([])
+    chooseReset()
     window.showWarningMessage.mockResolvedValueOnce('Use Reset')
+
     await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 100 }] }]), async () => {}, { listCodexResets: list, claimCodexReset: claim })
 
-    await clickReset()
-
     expect(claim).toHaveBeenCalledWith(RESET, expect.any(String))
     expect(list).toHaveBeenCalledTimes(2)
-    expect(labels()).toEqual(['Codex · 5h Quota — 100% left'])
+    expect(shownItems(1).map(item => item.label)).toEqual(['Codex · 5h Quota — 100% left'])
     expect(window.showInformationMessage).toHaveBeenCalledWith('Codex usage reset for one@example.com.')
   })
 
-  it('still claims when the modal confirmation hides the picker', async () => {
-    const claim = vi.fn(async () => 'success' as const)
-    const list = vi.fn()
-      .mockResolvedValueOnce([RESET])
-      .mockResolvedValueOnce([])
-    window.showWarningMessage.mockImplementationOnce(async () => {
-      const hide: unknown = picker().onDidHide.mock.calls[0]?.[0]
-      if (typeof hide === 'function')
-        (hide as () => void)()
-      return 'Use Reset'
-    })
-    await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 0 }] }]), async () => {}, { listCodexResets: list, claimCodexReset: claim })
-
-    await clickReset()
-
-    expect(claim).toHaveBeenCalledWith(RESET, expect.any(String))
-    expect(list).toHaveBeenCalledTimes(2)
-    expect(window.showInformationMessage).toHaveBeenCalledWith('Codex usage reset for one@example.com.')
-    expect(picker().dispose).toHaveBeenCalled()
-  })
-
-  it('requires confirmation again while reusing the same idempotency key on retry', async () => {
-    const claim = vi.fn()
-      .mockResolvedValueOnce('failed')
-      .mockResolvedValueOnce('success')
+  it('reuses the idempotency key when a failed reset is retried', async () => {
+    const claim = vi.fn().mockResolvedValueOnce('failed').mockResolvedValueOnce('success')
+    chooseReset(2)
     window.showWarningMessage.mockResolvedValue('Use Reset')
+
     await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [RESET], claimCodexReset: claim })
 
-    await clickReset()
-    await clickReset()
-
-    expect(window.showWarningMessage).toHaveBeenCalledTimes(2)
     expect(claim).toHaveBeenCalledTimes(2)
     expect(claim.mock.calls[0]![1]).toBe(claim.mock.calls[1]![1])
   })

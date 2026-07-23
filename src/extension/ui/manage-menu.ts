@@ -2,97 +2,29 @@ import type { ServerController, ServerStatus, ServerStatusSnapshot } from '@src/
 import type { QuickPickItem } from 'vscode'
 import { commands, QuickPickItemKind, window } from 'vscode'
 
-interface ActionItem extends QuickPickItem { command: string }
+export interface ManageAction extends QuickPickItem {
+  command: string
+  group?: number
+  modes?: Array<'managed' | 'external'>
+}
+
 type Choice = QuickPickItem & { command?: string }
 
 function divider(): Choice {
   return { label: '', kind: QuickPickItemKind.Separator }
 }
 
-export async function manageProvider(controller: ServerController | undefined): Promise<void> {
-  const managed = controller?.mode() !== 'external'
+export async function manageProvider(controller: ServerController | undefined, actions: ManageAction[]): Promise<void> {
+  const mode = controller?.mode() ?? 'managed'
   const snapshot = await controller?.statusSnapshot()
-
-  const groups: ActionItem[][] = [
-    [
-      {
-        label: '$(account) Add Account (Login)',
-        description: 'Codex, Claude, Antigravity, and more',
-        command: 'universalChatProvider.login',
-      },
-      {
-        label: '$(organization) Manage Accounts',
-        description: 'List or remove connected accounts',
-        command: 'universalChatProvider.manageAccounts',
-      },
-      {
-        label: '$(pulse) Show Quota Usage',
-        description: 'Remaining quota for Codex and Antigravity accounts',
-        command: 'universalChatProvider.showQuota',
-      },
-    ],
-    [
-      {
-        label: '$(refresh) Refresh Models',
-        description: 'Reload models and capabilities',
-        command: 'universalChatProvider.refresh',
-      },
-      {
-        label: '$(sparkle) Set Utility Model',
-        description: 'Run Copilot\'s commit messages, titles & summaries on your models',
-        command: 'universalChatProvider.setUtilityModel',
-      },
-    ],
-    managed
-      ? [
-          {
-            label: '$(debug-restart) Restart Server',
-            description: 'Restart the managed server',
-            command: 'universalChatProvider.restartServer',
-          },
-          {
-            label: '$(cloud-download) Update Proxy Binary',
-            description: 'Check and apply the selected update policy',
-            command: 'universalChatProvider.updateBinary',
-          },
-          {
-            label: '$(discard) Reset Managed Server',
-            description: 'Recreate the config and keys',
-            command: 'universalChatProvider.resetServer',
-          },
-        ]
-      : [
-          {
-            label: '$(settings-gear) Configure Connection',
-            description: 'Set the proxy URL and config path',
-            command: 'universalChatProvider.configure',
-          },
-          {
-            label: '$(key) Import API Key from Config',
-            description: 'Load an API key from config.yaml',
-            command: 'universalChatProvider.importConfig',
-          },
-        ],
-    [
-      {
-        label: '$(gear) Open Settings',
-        description: 'Edit this extension\'s settings',
-        command: 'universalChatProvider.openSettings',
-      },
-      {
-        label: '$(output) Show Extension Logs',
-        description: 'Diagnostics from the extension itself',
-        command: 'universalChatProvider.showLogs',
-      },
-      {
-        label: '$(trash) Clear Stored API Key',
-        description: 'Remove the key from SecretStorage',
-        command: 'universalChatProvider.clearCredentials',
-      },
-    ],
-  ]
-
-  const body = groups.flatMap((group, index) => (index === 0 ? group : [divider(), ...group]))
+  let previousGroup: number | undefined
+  const body = actions
+    .filter(action => action.modes === undefined || action.modes.includes(mode))
+    .flatMap((action) => {
+      const separated = previousGroup !== undefined && action.group !== previousGroup
+      previousGroup = action.group
+      return separated ? [divider(), action] : [action]
+    })
   const choices: Choice[] = snapshot !== undefined
     ? [statusEntry(snapshot), divider(), ...body]
     : body
