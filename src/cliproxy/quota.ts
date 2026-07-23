@@ -7,6 +7,7 @@ import { asJsonValue, asValue } from '../shared/json'
 export interface QuotaWindow {
   label: string
   remainingPercent?: number
+  remainingBalance?: { amount: number, currency: string }
   key?: string // claude: window id; remainingForModel scopes family caps by it
   resetsAt?: number // epoch ms when the window refreshes; omitted when unknown or already past
 }
@@ -57,6 +58,10 @@ const ClaudeWindowSchema = Type.Object({
   utilization: Type.Optional(Type.Union([Type.Number(), Type.Null()])),
   resets_at: Type.Optional(Type.Union([Type.String(), Type.Number(), Type.Null()])),
   is_enabled: Type.Optional(Type.Boolean()),
+  used_credits: Type.Optional(Type.Number()),
+  monthly_limit: Type.Optional(Type.Union([Type.Number(), Type.Null()])),
+  currency: Type.Optional(Type.String()),
+  decimal_places: Type.Optional(Type.Number()),
 })
 
 const ClaudeWindowValueSchema = Type.Union([ClaudeWindowSchema, Type.Null()])
@@ -282,8 +287,22 @@ function parseClaudeWindows(data: unknown): QuotaWindow[] {
     windows.push({ key, label, ...(used == null ? {} : { remainingPercent: clamp(100 - used, 0, 100) }), ...(resetsAt === undefined ? {} : { resetsAt }) })
   }
   const extra = body.extra_usage
-  if (extra?.is_enabled === true && extra.utilization != null)
-    windows.push({ key: 'extra_usage', label: 'Extra Usage', remainingPercent: clamp(100 - extra.utilization, 0, 100) })
+  if (extra?.is_enabled === true) {
+    const remainingBalance = extra.used_credits === undefined || extra.monthly_limit == null || extra.currency === undefined
+      ? undefined
+      : {
+          amount: Math.max(extra.monthly_limit - extra.used_credits, 0) / 10 ** (extra.decimal_places ?? 0),
+          currency: extra.currency,
+        }
+    if (extra.utilization == null && remainingBalance === undefined)
+      return windows
+    windows.push({
+      key: 'extra_usage',
+      label: 'Extra Usage',
+      ...(extra.utilization == null ? {} : { remainingPercent: clamp(100 - extra.utilization, 0, 100) }),
+      ...(remainingBalance === undefined ? {} : { remainingBalance }),
+    })
+  }
   return windows
 }
 

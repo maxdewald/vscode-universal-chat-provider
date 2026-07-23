@@ -7,6 +7,7 @@ import { formatPercent, formatResetCountdown } from '../cliproxy/quota'
 export interface QuotaEntry {
   name: string
   remainingPercent: number | undefined
+  remainingBalance?: { amount: number, currency: string }
   resetsAt?: number
 }
 
@@ -119,7 +120,7 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   for (const section of sections) {
     const items = grouped.get(section.title) ?? []
     items.push(...section.entries.map((entry) => {
-      const remaining = entry.remainingPercent === undefined ? 'unknown' : `${formatPercent(entry.remainingPercent)} left`
+      const remaining = formatRemaining(entry)
       const countdown = formatResetCountdown(entry.resetsAt)
       return { label: `${section.title} · ${entry.name} — ${remaining}`, ...(countdown === undefined ? {} : { description: `resets in ${countdown}` }) }
     }))
@@ -139,6 +140,14 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
     ...entries,
   ])
   return items.length > 0 ? items : [{ label: 'No model quota information is available yet.' }]
+}
+
+function formatRemaining(entry: QuotaEntry): string {
+  const percent = entry.remainingPercent === undefined ? undefined : `${formatPercent(entry.remainingPercent)} left`
+  if (entry.remainingBalance === undefined)
+    return percent ?? 'unknown'
+  const balance = `${new Intl.NumberFormat(env.language, { style: 'currency', currency: entry.remainingBalance.currency }).format(entry.remainingBalance.amount)} left`
+  return percent === undefined ? balance : `${balance} (${percent})`
 }
 
 function formatExpiration(expiresAt: number): string {

@@ -24,7 +24,7 @@ const CLAUDE_BODY = JSON.stringify({
   seven_day: { utilization: 5, resets_at: '2026-07-01T00:00:00Z' },
   seven_day_sonnet: { utilization: 60, resets_at: '2026-07-01T00:00:00Z' },
   seven_day_opus: { utilization: 90, resets_at: '2026-07-01T00:00:00Z' },
-  extra_usage: { is_enabled: true, utilization: 25, used_credits: 5, monthly_limit: 20 },
+  extra_usage: { is_enabled: true, utilization: 25, used_credits: 500, monthly_limit: 2000, currency: 'EUR', decimal_places: 2 },
 })
 
 const GROK_BODY = JSON.stringify({
@@ -120,7 +120,7 @@ describe('fetchQuotas', () => {
       { key: 'seven_day', label: '7d Quota', remainingPercent: 95, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
       { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
       { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75 },
+      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } },
     ])
   })
 
@@ -128,7 +128,14 @@ describe('fetchQuotas', () => {
     const body = JSON.stringify({
       five_hour: { utilization: 20, resets_at: null },
       seven_day_sonnet: null,
-      extra_usage: null,
+      extra_usage: {
+        is_enabled: true,
+        monthly_limit: null,
+        used_credits: 755,
+        utilization: null,
+        currency: 'EUR',
+        decimal_places: 2,
+      },
       unknown_limit: null,
       rate_limits: [
         { kind: 'session', percent: 0, resets_at: null, is_active: false },

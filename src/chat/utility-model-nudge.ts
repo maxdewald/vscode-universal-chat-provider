@@ -58,7 +58,7 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
     })),
     {
       title: 'Set Utility Model',
-      placeHolder: 'Model Copilot uses for commit messages, chat titles and summaries (clear to undo)',
+      placeHolder: 'Choose a small, fast and inexpensive model for utility tasks and Explore',
       matchOnDescription: true,
     },
   )
@@ -70,10 +70,11 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
     return
 
   const value = UCP_PREFIX + selected.model.id
+  const exploreValue = `${selected.model.name} (universal-chat-provider)`
   await provider.updateUtilityEffort(selected.model.id, effort)
   await chat.update('utilityModel', value, ConfigurationTarget.Global)
   await chat.update('utilitySmallModel', value, ConfigurationTarget.Global)
-  await workspace.getConfiguration('github.copilot.chat').update('exploreAgent.model', value, ConfigurationTarget.Global)
+  await chat.update('exploreAgent.defaultModel', exploreValue, ConfigurationTarget.Global)
   void window.showInformationMessage(
     `Copilot's utility tasks and Explore agent now use ${selected.model.name}${effort !== undefined ? ` (${formatEffort(effort)})` : ''}.`,
   )

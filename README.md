@@ -59,12 +59,12 @@ Manage everything from the status bar item or the *Universal Chat Provider: Mana
 
 ## Commit messages, titles, and summaries
 
-Let your models write Copilot's commit messages, chat titles, and summaries. Run *Universal Chat Provider: Set Utility Model* (or use the status bar menu), pick a model (and thinking effort), done. Clear it to undo.
+Let your models handle Copilot's light background tasks and Explore searches. Run *Universal Chat Provider: Set Utility Model* (or use the status bar menu), pick a model (and thinking effort), done. A small, fast, inexpensive model is usually the best fit. Clear it to undo.
 
 <details>
 <summary>How it works</summary>
 
-The command points Copilot's `chat.utilityModel` and `chat.utilitySmallModel` settings at your selected model, so those background flows run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
+The command points Copilot's `chat.utilityModel`, `chat.utilitySmallModel`, and `chat.exploreAgent.defaultModel` settings at your selected model, so commit messages, chat titles, summaries, and Explore searches run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
 
 </details>
 

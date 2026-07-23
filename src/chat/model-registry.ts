@@ -27,8 +27,6 @@ export class ModelRegistry {
   private previousCollisions = new Set<string>()
   private lastRefreshAt = 0
   private refreshPromise: Promise<ProviderModel[]> | undefined
-  private refreshQueued = false
-  private queuedInteractiveRefresh = false
   private thinkingEnrichmentDone = false
 
   readonly onDidChange: Event<void> = this.changeEmitter.event
@@ -62,17 +60,18 @@ export class ModelRegistry {
       return this.refreshPromise
     if (Date.now() - this.lastRefreshAt < REFRESH_TTL_MS)
       return this.cachedModels
-    return this.startRefresh(interactive, token)
+
+    this.refreshPromise = this.discoverModels(interactive, token).finally(() => {
+      this.refreshPromise = undefined
+    })
+    return this.refreshPromise
   }
 
   async forceRefresh(interactive = true, expectedProxyModelIds: readonly string[] = []): Promise<ProviderModel[]> {
     const expected = new Set(expectedProxyModelIds)
     const deadline = Date.now() + MODEL_READY_TIMEOUT_MS
     while (true) {
-      this.refreshQueued = true
-      this.queuedInteractiveRefresh ||= interactive
-      this.lastRefreshAt = 0
-      const models = await (this.refreshPromise ?? this.startRefresh(false))
+      const models = await this.refreshNow(interactive)
       const missing = [...expected].filter(id => !models.some(model => model.proxyModelId === id))
       if (missing.length === 0)
         return models
@@ -85,26 +84,14 @@ export class ModelRegistry {
     }
   }
 
-  private async startRefresh(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
-    this.refreshPromise = this.runRefreshes(interactive, token).finally(() => {
-      this.refreshPromise = undefined
-    })
-    return this.refreshPromise
+  private async refreshNow(interactive: boolean): Promise<ProviderModel[]> {
+    if (this.refreshPromise !== undefined)
+      await this.refreshPromise
+    this.lastRefreshAt = 0
+    return this.refresh(interactive)
   }
 
-  private async runRefreshes(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
-    do {
-      this.refreshQueued = false
-      interactive ||= this.queuedInteractiveRefresh
-      this.queuedInteractiveRefresh = false
-      await this.doRefresh(interactive, token)
-      interactive = false
-      token = undefined
-    } while (this.refreshQueued)
-    return this.cachedModels
-  }
-
-  private async doRefresh(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
+  private async discoverModels(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
     await this.connection.ensureReady(interactive)
     let apiKey = await this.credentials.get()
     if (apiKey === undefined && interactive)

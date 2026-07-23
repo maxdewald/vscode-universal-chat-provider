@@ -74,6 +74,15 @@ describe('showQuotaMenu', () => {
     expect(labels()).toEqual([`Codex · 7d Quota — ${expected}`])
   })
 
+  it('shows the remaining Claude balance alongside the percentage', async () => {
+    await showQuotaMenu(source([{
+      title: 'Claude',
+      entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }],
+    }]), async () => {})
+
+    expect(labels()).toEqual(['Claude · Extra Usage — €15.00 left (75% left)'])
+  })
+
   it('appends a reset countdown when resetsAt is in the future', async () => {
     vi.useFakeTimers({ now: new Date('2026-07-12T00:00:00Z') })
     const resetsAt = Date.parse('2026-07-12T03:25:00Z') // 3h 25m ahead

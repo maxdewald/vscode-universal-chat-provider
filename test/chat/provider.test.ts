@@ -285,6 +285,18 @@ describe('language model provider', () => {
     ])
   })
 
+  it('threads the remaining Claude extra-usage balance through quotaSections', () => {
+    const provider = createProvider()
+    provider.setQuotas([{
+      provider: 'claude',
+      windows: [{ key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }],
+    }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, remainingBalance: { amount: 15, currency: 'EUR' } }] },
+    ])
+  })
+
   it('shows windows for every account when a provider has more than one', () => {
     const provider = createProvider()
     provider.setQuotas([{
