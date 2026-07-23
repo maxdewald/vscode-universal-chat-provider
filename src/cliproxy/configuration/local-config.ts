@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { Type } from '@sinclair/typebox'
+import { asValue } from '@src/shared/json'
 import { parseDocument } from 'yaml'
-import { asValue } from '../../shared/json'
 
 const PLACEHOLDER_KEY = /^your-api-key(?:-\d+)?$/i
 

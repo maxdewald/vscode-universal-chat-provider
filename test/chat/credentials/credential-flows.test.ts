@@ -1,5 +1,5 @@
+import { CredentialFlows } from '@src/chat/credentials/credential-flows'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CredentialFlows } from '../../../src/chat/credentials/credential-flows'
 import { resetVSCodeMock, vscodeMock, window } from '../../support/vscode'
 
 beforeEach(() => {

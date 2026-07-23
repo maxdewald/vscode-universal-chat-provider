@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
 import { describe, expect, it } from 'vitest'
-import { readLocalProxyConfig } from '../../../src/cliproxy/configuration/local-config'
 import { useTempDirectories } from '../../support/temp'
 
 const makeTempDirectory = useTempDirectories()

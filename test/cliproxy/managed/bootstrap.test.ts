@@ -1,5 +1,5 @@
+import { watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
 import { describe, expect, it, vi } from 'vitest'
-import { watchCredentialFiles } from '../../../src/cliproxy/managed/bootstrap'
 import { workspace } from '../../support/vscode'
 
 describe('managed bootstrap', () => {

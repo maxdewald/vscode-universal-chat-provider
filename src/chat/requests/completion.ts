@@ -1,11 +1,11 @@
+import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
+import type { StreamCallbacks } from '@src/cliproxy/api/proxy-client'
+import type { CredentialStore } from '@src/cliproxy/configuration/credentials'
+import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { CancellationToken } from 'vscode'
-import type { StreamCallbacks } from '../../cliproxy/api/proxy-client'
-import type { CredentialStore } from '../../cliproxy/configuration/credentials'
-import type { ProxyConnection } from '../../cliproxy/connection'
-import type { ProxyRequestBody } from './request-builder'
+import { isProxyCredentialRejection, ProxyHttpError } from '@src/cliproxy/api/errors'
+import { CLIProxyClient } from '@src/cliproxy/api/proxy-client'
 import { LanguageModelError } from 'vscode'
-import { isProxyCredentialRejection, ProxyHttpError } from '../../cliproxy/api/errors'
-import { CLIProxyClient } from '../../cliproxy/api/proxy-client'
 
 export interface CompletionDeps {
   connection: ProxyConnection

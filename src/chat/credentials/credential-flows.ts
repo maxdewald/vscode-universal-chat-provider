@@ -1,10 +1,10 @@
+import type { ModelRegistry } from '@src/chat/models/model-registry'
+import type { CredentialStore } from '@src/cliproxy/configuration/credentials'
+import type { LocalProxyConfig } from '@src/cliproxy/configuration/local-config'
 import type { OutputChannel } from 'vscode'
-import type { CredentialStore } from '../../cliproxy/configuration/credentials'
-import type { LocalProxyConfig } from '../../cliproxy/configuration/local-config'
-import type { ModelRegistry } from '../models/model-registry'
+import { configureConnection } from '@src/cliproxy/configuration/credentials'
+import { errorMessage } from '@src/shared/errors'
 import { window } from 'vscode'
-import { configureConnection } from '../../cliproxy/configuration/credentials'
-import { errorMessage } from '../../shared/errors'
 
 export class CredentialFlows {
   private onboardingShown = false

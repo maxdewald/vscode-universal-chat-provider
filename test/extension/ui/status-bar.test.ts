@@ -1,7 +1,7 @@
 import type { MarkdownString, ThemeColor } from 'vscode'
+import { createStatusBar, updateStatusBar } from '@src/extension/ui/status-bar'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StatusBarAlignment } from 'vscode'
-import { createStatusBar, updateStatusBar } from '../../../src/extension/ui/status-bar'
 import { resetVSCodeMock, statusBarItem, vscodeMock, window } from '../../support/vscode'
 
 function tooltipValue(): string {

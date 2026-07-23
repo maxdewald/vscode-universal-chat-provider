@@ -1,14 +1,14 @@
 import { writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
 import {
   configCandidates,
   configureConnection,
   CredentialStore,
   findConfigPath,
   normalizeBaseUrl,
-} from '../../../src/cliproxy/configuration/credentials'
+} from '@src/cliproxy/configuration/credentials'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useTempDirectories } from '../../support/temp'
 import { createExtensionContext, resetVSCodeMock, vscodeMock, window } from '../../support/vscode'
 

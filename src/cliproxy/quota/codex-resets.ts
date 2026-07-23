@@ -1,6 +1,6 @@
-import type { AuthFileRaw, ManagementClient } from '../api/management-client'
+import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
 import { Type } from '@sinclair/typebox'
-import { asJsonValue, asValue } from '../../shared/json'
+import { asJsonValue, asValue } from '@src/shared/json'
 
 const RESET_CREDITS_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits'
 const CONSUME_RESET_CREDIT_URL = `${RESET_CREDITS_URL}/consume`

@@ -1,8 +1,8 @@
 import type { Static } from '@sinclair/typebox'
-import type { AuthFileRaw, ManagementClient } from '../api/management-client'
+import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
 import { Type } from '@sinclair/typebox'
-import { errorMessage } from '../../shared/errors'
-import { asJsonValue, asValue } from '../../shared/json'
+import { errorMessage } from '@src/shared/errors'
+import { asJsonValue, asValue } from '@src/shared/json'
 
 export interface QuotaWindow {
   label: string

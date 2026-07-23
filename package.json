@@ -267,6 +267,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",
+    "@dword-design/eslint-plugin-import-alias": "^8.1.8",
     "@tsconfig/strictest": "^2.0.8",
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",

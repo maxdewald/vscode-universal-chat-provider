@@ -1,5 +1,5 @@
+import { normalizeVersion } from '@src/cliproxy/managed/binary'
 import semver from 'semver'
-import { normalizeVersion } from './binary'
 
 export type UpdatePolicy = 'automatic' | 'suggestUpdates' | 'manual'
 

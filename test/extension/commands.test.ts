@@ -1,11 +1,11 @@
+import type { UniversalChatProvider } from '@src/chat/provider'
+import type { ServerController, ServerStatusSnapshot } from '@src/cliproxy/controller'
+import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
-import type { UniversalChatProvider } from '../../src/chat/provider'
-import type { ServerController, ServerStatusSnapshot } from '../../src/cliproxy/controller'
-import type { QuotaSection } from '../../src/extension/ui/quota-menu'
 import { readFileSync } from 'node:fs'
+import { registerCommands } from '@src/extension/commands'
+import { manageProvider } from '@src/extension/ui/manage-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { registerCommands } from '../../src/extension/commands'
-import { manageProvider } from '../../src/extension/ui/manage-menu'
 import {
   commands,
   createOutputChannelMock,

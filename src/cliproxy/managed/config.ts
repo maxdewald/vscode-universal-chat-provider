@@ -1,4 +1,4 @@
-import type { OpenAICompatibilityProvider } from '../api/management-client'
+import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { stringify } from 'yaml'

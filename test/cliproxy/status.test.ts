@@ -1,5 +1,5 @@
+import { countAccounts } from '@src/cliproxy/status'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { countAccounts } from '../../src/cliproxy/status'
 
 beforeEach(() => {
   vi.unstubAllGlobals()

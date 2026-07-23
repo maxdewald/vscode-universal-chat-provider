@@ -1,8 +1,8 @@
 import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
+import { managedPaths } from '@src/cliproxy/managed/config'
+import { ManagedServer } from '@src/cliproxy/managed/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { managedPaths } from '../../../src/cliproxy/managed/config'
-import { ManagedServer } from '../../../src/cliproxy/managed/server'
 import { useTempDirectories } from '../../support/temp'
 
 const makeTempDirectory = useTempDirectories()

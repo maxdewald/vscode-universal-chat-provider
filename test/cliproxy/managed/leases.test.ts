@@ -1,7 +1,7 @@
 import { readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { claimLease, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { claimLease, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '../../../src/cliproxy/managed/leases'
 import { useChildProcesses, waitForExit } from '../../support/process'
 import { useTempDirectories } from '../../support/temp'
 

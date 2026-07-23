@@ -11,6 +11,8 @@ trustPolicy: no-downgrade
 trustPolicyExclude:
   # Required by @vscode/vsce through parse-semver@1.1.1.
   - semver@5.7.2
+  # Required by @dword-design/eslint-plugin-import-alias through @babel/core.
+  - semver@6.3.1
 
 allowBuilds:
   '@vscode/vsce-sign': true

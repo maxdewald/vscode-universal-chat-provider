@@ -1,16 +1,16 @@
 import type { Static } from '@sinclair/typebox'
-import type { BeforeErrorHook, KyInstance } from 'ky'
 import type {
   ProxyModelListEntry,
   ProxyModelMetadata,
-} from '../../chat/models/model'
-import type { ProxyRequestBody } from '../../chat/requests/request-builder'
+} from '@src/chat/models/model'
+import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
+import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
+import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
+import { ProxyHttpError } from '@src/cliproxy/api/errors'
+import { asValue } from '@src/shared/json'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import ky, { isHTTPError } from 'ky'
-import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '../../chat/models/model'
-import { asValue } from '../../shared/json'
-import { ProxyHttpError } from './errors'
 
 export interface DiscoveryResult {
   available: ProxyModelListEntry[]

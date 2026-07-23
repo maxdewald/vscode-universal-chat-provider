@@ -1,5 +1,5 @@
+import { pickUpdate } from '@src/cliproxy/managed/update-policy'
 import { describe, expect, it } from 'vitest'
-import { pickUpdate } from '../../../src/cliproxy/managed/update-policy'
 
 describe('pickUpdate', () => {
   it.each([

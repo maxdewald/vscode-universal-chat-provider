@@ -1,5 +1,5 @@
+import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LOGIN_PROVIDERS, ManagementClient } from '../../../src/cliproxy/api/management-client'
 
 const MANAGEMENT_URL = 'http://127.0.0.1:8317'
 const MANAGEMENT_KEY = 'mgmt-key'

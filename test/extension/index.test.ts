@@ -1,7 +1,7 @@
+import { UniversalChatProvider } from '@src/chat/provider'
+import { ServerController } from '@src/cliproxy/controller'
+import { activate, deactivate } from '@src/index'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { UniversalChatProvider } from '../../src/chat/provider'
-import { ServerController } from '../../src/cliproxy/controller'
-import { activate, deactivate } from '../../src/index'
 import {
   createExtensionContext,
   outputChannelByName,

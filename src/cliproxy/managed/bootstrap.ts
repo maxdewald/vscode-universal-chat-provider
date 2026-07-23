@@ -1,18 +1,18 @@
+import type { ManagedPaths } from '@src/cliproxy/managed/config'
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
-import type { ManagedPaths } from './config'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { RelativePattern, Uri, workspace } from 'vscode'
-import { SECRET_KEY } from '../configuration/credentials'
+import { SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import {
   buildManagedConfig,
   DEFAULT_HOST,
   DEFAULT_PORT,
   generateSecret,
   managedPaths,
-} from './config'
-import { claimLease } from './leases'
-import { OpenAICompatibilityStore } from './openai-compatibility-store'
-import { ManagedServer } from './server'
+} from '@src/cliproxy/managed/config'
+import { claimLease } from '@src/cliproxy/managed/leases'
+import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
+import { ManagedServer } from '@src/cliproxy/managed/server'
+import { RelativePattern, Uri, workspace } from 'vscode'
 
 export const MGMT_KEY_SECRET = 'universalChatProvider.managementKey'
 export const PORT_STATE_KEY = 'universalChatProvider.managedPort'

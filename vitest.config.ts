@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   resolve: {
+    tsconfigPaths: true,
     alias: {
       vscode: fileURLToPath(new URL('./test/support/vscode.ts', import.meta.url)),
     },

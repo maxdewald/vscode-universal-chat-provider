@@ -1,5 +1,5 @@
+import type { ServerController, ServerStatus, ServerStatusSnapshot } from '@src/cliproxy/controller'
 import type { QuickPickItem } from 'vscode'
-import type { ServerController, ServerStatus, ServerStatusSnapshot } from '../../cliproxy/controller'
 import { commands, QuickPickItemKind, window } from 'vscode'
 
 interface ActionItem extends QuickPickItem { command: string }

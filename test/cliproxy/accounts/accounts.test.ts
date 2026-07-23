@@ -1,7 +1,7 @@
-import type { CatalogModel } from '../../../src/chat/models/catalog'
+import type { CatalogModel } from '@src/chat/models/catalog'
+import { AccountsService } from '@src/cliproxy/accounts/accounts'
+import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccountsService } from '../../../src/cliproxy/accounts/accounts'
-import { ManagementClient } from '../../../src/cliproxy/api/management-client'
 import { resetVSCodeMock, window } from '../../support/vscode'
 
 const catalogMocks = vi.hoisted(() => ({

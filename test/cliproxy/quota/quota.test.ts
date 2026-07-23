@@ -1,6 +1,6 @@
-import type { QuotaReport } from '../../../src/cliproxy/quota/quota'
+import type { QuotaReport } from '@src/cliproxy/quota/quota'
+import { fetchQuotas, formatResetCountdown, remainingForModel } from '@src/cliproxy/quota/quota'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchQuotas, formatResetCountdown, remainingForModel } from '../../../src/cliproxy/quota/quota'
 import { createManagementClientFake } from '../support/management'
 
 const CODEX_BODY = JSON.stringify({

@@ -1,8 +1,8 @@
 import type { Static } from '@sinclair/typebox'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
+import { asValue } from '@src/shared/json'
 import ky, { isHTTPError } from 'ky'
-import { asValue } from '../../shared/json'
 
 export const LOGIN_PROVIDERS = [
   { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },

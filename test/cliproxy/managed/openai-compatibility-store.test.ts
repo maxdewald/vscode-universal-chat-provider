@@ -1,5 +1,5 @@
+import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
 import { describe, expect, it } from 'vitest'
-import { OpenAICompatibilityStore } from '../../../src/cliproxy/managed/openai-compatibility-store'
 import { createExtensionContext } from '../../support/vscode'
 
 describe('openai compatibility store', () => {

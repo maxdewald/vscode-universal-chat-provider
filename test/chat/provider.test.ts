@@ -1,5 +1,7 @@
+import type { StreamCallbacks } from '@src/cliproxy/api/proxy-client'
 import type { OutputChannel } from 'vscode'
-import type { StreamCallbacks } from '../../src/cliproxy/api/proxy-client'
+import { UniversalChatProvider } from '@src/chat/provider'
+import { estimateTokens } from '@src/chat/requests/estimate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CancellationTokenSource,
@@ -8,8 +10,6 @@ import {
   LanguageModelTextPart,
   LanguageModelToolCallPart,
 } from 'vscode'
-import { UniversalChatProvider } from '../../src/chat/provider'
-import { estimateTokens } from '../../src/chat/requests/estimate'
 import { createProviderModel, decodeJsonDataPart, singleModelDiscovery, userTextMessage } from '../support/chat'
 import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock } from '../support/vscode'
 

@@ -1,5 +1,5 @@
+import { mapProxyModels } from '@src/chat/models/model'
 import { describe, expect, it } from 'vitest'
-import { mapProxyModels } from '../../../src/chat/models/model'
 
 describe('model mapping', () => {
   it('creates one entry with a reasoning-effort selector', () => {

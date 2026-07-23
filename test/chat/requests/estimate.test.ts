@@ -1,4 +1,5 @@
 import type { LanguageModelChatRequestMessage } from 'vscode'
+import { estimateTokens } from '@src/chat/requests/estimate'
 import { estimateTokenCount } from 'tokenx'
 import { describe, expect, it } from 'vitest'
 import {
@@ -8,7 +9,6 @@ import {
   LanguageModelToolCallPart,
   LanguageModelToolResultPart,
 } from 'vscode'
-import { estimateTokens } from '../../../src/chat/requests/estimate'
 
 const MESSAGE_BASE = 4
 const PART_BASE = 3

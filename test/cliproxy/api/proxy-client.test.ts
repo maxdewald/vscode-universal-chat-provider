@@ -1,4 +1,4 @@
-import type { ProxyRequestBody } from '../../../src/chat/requests/request-builder'
+import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const emptyBody = {} as ProxyRequestBody
@@ -17,7 +17,7 @@ describe('cLIProxyClient', () => {
       throw new Error(`Unexpected URL ${request.url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const client = new CLIProxyClient('http://proxy', 'secret')
 
     const result = await client.discover()
@@ -37,8 +37,8 @@ describe('cLIProxyClient', () => {
       return Response.json({ error: { message: 'bad key' } }, { status: 401 })
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
-    const { ProxyHttpError } = await import('../../../src/cliproxy/api/errors')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+    const { ProxyHttpError } = await import('@src/cliproxy/api/errors')
     const client = new CLIProxyClient('http://proxy', 'key')
 
     await expect(client.discover()).rejects.toMatchObject({
@@ -85,7 +85,7 @@ describe('cLIProxyClient', () => {
       headers: { 'content-type': 'text/event-stream' },
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
     const signal = new AbortController().signal
 
@@ -126,7 +126,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed' }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -143,7 +143,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed' }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -162,7 +162,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed' }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -180,7 +180,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed' }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -201,7 +201,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed' }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -214,7 +214,7 @@ describe('cLIProxyClient', () => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>()
       .mockResolvedValue(new Response(event({ type: 'response.completed' })))
     vi.stubGlobal('fetch', fetchMock)
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
 
     await new CLIProxyClient('http://proxy', 'key').streamResponse({ model: 'x', prompt_cache_key: 'universal-chat-provider-cache-key' } as ProxyRequestBody, callbacks(), new AbortController().signal)
 
@@ -239,7 +239,7 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.completed', response: {} }),
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
     await new CLIProxyClient('http://proxy', 'key')
@@ -251,7 +251,7 @@ describe('cLIProxyClient', () => {
 
   it('rejects empty streaming bodies', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null)))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const client = new CLIProxyClient('http://proxy', 'key')
 
     await expect(client.streamResponse(emptyBody, callbacks(), new AbortController().signal))
@@ -265,7 +265,7 @@ describe('cLIProxyClient', () => {
     ['top-level error', { type: 'error', message: 'upstream failed' }, 'upstream failed'],
   ])('surfaces the %s message', async (_name, payload, message) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(event(payload))))
-    const { CLIProxyClient } = await import('../../../src/cliproxy/api/proxy-client')
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
 
     await expect(new CLIProxyClient('http://proxy', 'key')
       .streamResponse(emptyBody, callbacks(), new AbortController().signal))

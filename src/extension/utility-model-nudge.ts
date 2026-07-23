@@ -1,5 +1,5 @@
+import type { UniversalChatProvider } from '@src/chat/provider'
 import type { ExtensionContext } from 'vscode'
-import type { UniversalChatProvider } from '../chat/provider'
 import { commands, ConfigurationTarget, extensions, window, workspace } from 'vscode'
 
 const SHOWN_KEY = 'universalChatProvider.utilityModelNudgeShown'

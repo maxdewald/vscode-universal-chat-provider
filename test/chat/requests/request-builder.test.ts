@@ -1,3 +1,4 @@
+import { buildPromptCacheKey, buildRequest, convertMessage } from '@src/chat/requests/request-builder'
 import { describe, expect, it } from 'vitest'
 import {
   LanguageModelChatMessageRole,
@@ -7,7 +8,6 @@ import {
   LanguageModelToolCallPart,
   LanguageModelToolResultPart,
 } from 'vscode'
-import { buildPromptCacheKey, buildRequest, convertMessage } from '../../../src/chat/requests/request-builder'
 import { createProviderModel, userTextMessage } from '../../support/chat'
 
 const model = createProviderModel({

@@ -1,11 +1,11 @@
+import type { UniversalChatProvider } from '@src/chat/provider'
+import type { ServerController } from '@src/cliproxy/controller'
 import type { Disposable, OutputChannel } from 'vscode'
-import type { UniversalChatProvider } from '../chat/provider'
-import type { ServerController } from '../cliproxy/controller'
+import { manageProvider } from '@src/extension/ui/manage-menu'
+import { showQuotaMenu } from '@src/extension/ui/quota-menu'
+import { setUtilityModel } from '@src/extension/utility-model-nudge'
+import { extensionId } from '@src/generated/meta'
 import { commands, window } from 'vscode'
-import { extensionId } from '../generated/meta'
-import { manageProvider } from './ui/manage-menu'
-import { showQuotaMenu } from './ui/quota-menu'
-import { setUtilityModel } from './utility-model-nudge'
 
 export function registerCommands(
   provider: UniversalChatProvider,

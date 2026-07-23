@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox'
+import { asValue, setJsonValidationErrorReporter } from '@src/shared/json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { asValue, setJsonValidationErrorReporter } from '../../src/shared/json'
 
 describe('json schema validation', () => {
   const report = vi.fn()

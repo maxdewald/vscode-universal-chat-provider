@@ -1,4 +1,5 @@
 import type { LanguageModelChatRequestMessage } from 'vscode'
+import { serializeToolResult } from '@src/chat/requests/request-builder'
 import { estimateTokenCount } from 'tokenx'
 import {
   LanguageModelDataPart,
@@ -6,7 +7,6 @@ import {
   LanguageModelToolCallPart,
   LanguageModelToolResultPart,
 } from 'vscode'
-import { serializeToolResult } from './request-builder'
 
 const MESSAGE_BASE_TOKENS = 4
 const PART_BASE_TOKENS = 3

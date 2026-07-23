@@ -1,17 +1,17 @@
+import type { ManagedPaths } from '@src/cliproxy/managed/config'
 import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
-import type { ManagedPaths } from './config'
 import { spawn } from 'node:child_process'
 import { closeSync, openSync, rmSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
+import { acquireBinary, readInstalledVersion } from '@src/cliproxy/managed/binary'
+import { DEFAULT_PORT } from '@src/cliproxy/managed/config'
+import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
+import { errorMessage } from '@src/shared/errors'
 import getPort from 'get-port'
 import ky from 'ky'
 import { sleep } from 'moderndash'
-import { errorMessage } from '../../shared/errors'
-import { acquireBinary, readInstalledVersion } from './binary'
-import { DEFAULT_PORT } from './config'
-import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from './leases'
 
 const HEALTH_TIMEOUT_MS = 1500
 const RESTART_RETRIES = 2

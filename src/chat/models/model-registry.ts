@@ -1,14 +1,14 @@
+import type { ProviderModel } from '@src/chat/models/model'
+import type { CredentialStore } from '@src/cliproxy/configuration/credentials'
+import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { CancellationToken, Event, OutputChannel } from 'vscode'
-import type { CredentialStore } from '../../cliproxy/configuration/credentials'
-import type { ProxyConnection } from '../../cliproxy/connection'
-import type { ProviderModel } from './model'
+import { fetchCatalog } from '@src/chat/models/catalog'
+import { mapProxyModels } from '@src/chat/models/model'
+import { isProxyCredentialRejection } from '@src/cliproxy/api/errors'
+import { CLIProxyClient } from '@src/cliproxy/api/proxy-client'
+import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
 import { EventEmitter, window } from 'vscode'
-import { isProxyCredentialRejection } from '../../cliproxy/api/errors'
-import { CLIProxyClient } from '../../cliproxy/api/proxy-client'
-import { errorMessage } from '../../shared/errors'
-import { fetchCatalog } from './catalog'
-import { mapProxyModels } from './model'
 
 export interface ModelRegistryHooks {
   acquireApiKey: () => Promise<string | undefined>

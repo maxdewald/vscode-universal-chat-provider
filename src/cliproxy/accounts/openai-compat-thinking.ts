@@ -1,7 +1,7 @@
-import type { CatalogModel } from '../../chat/models/catalog'
-import type { OpenAICompatibilityProvider } from '../api/management-client'
+import type { CatalogModel } from '@src/chat/models/catalog'
+import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
+import { matchCatalogModel } from '@src/chat/models/catalog-match'
 import { unique } from 'moderndash'
-import { matchCatalogModel } from '../../chat/models/catalog-match'
 
 export function enrichOpenAICompatibilityProviders(
   providers: readonly OpenAICompatibilityProvider[],

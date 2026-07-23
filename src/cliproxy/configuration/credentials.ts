@@ -1,11 +1,11 @@
+import type { LocalProxyConfig } from '@src/cliproxy/configuration/local-config'
 import type { ExtensionContext } from 'vscode'
-import type { LocalProxyConfig } from './local-config'
 import { access } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join, normalize, resolve } from 'node:path'
+import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
+import { errorMessage } from '@src/shared/errors'
 import { ConfigurationTarget, window, workspace } from 'vscode'
-import { errorMessage } from '../../shared/errors'
-import { readLocalProxyConfig } from './local-config'
 
 export const SECRET_KEY = 'universalChatProvider.apiKey'
 

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
+import { buildManagedConfig, generateSecret, managedPaths } from '@src/cliproxy/managed/config'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { buildManagedConfig, generateSecret, managedPaths } from '../../../src/cliproxy/managed/config'
 
 describe('managed config', () => {
   it('derives all managed paths from a root directory', () => {

@@ -1,8 +1,8 @@
+import type { ServerStatus } from '@src/cliproxy/controller'
+import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { StatusBarItem } from 'vscode'
-import type { ServerStatus } from '../../cliproxy/controller'
-import type { QuotaSection } from './quota-menu'
+import { formatPercent, formatResetCountdown } from '@src/cliproxy/quota/quota'
 import { MarkdownString, StatusBarAlignment, ThemeColor, window, workspace } from 'vscode'
-import { formatPercent, formatResetCountdown } from '../../cliproxy/quota/quota'
 
 // Default remaining-quota percent below which the status bar warns; overridable per setting.
 const DEFAULT_LOW_PERCENT = 10

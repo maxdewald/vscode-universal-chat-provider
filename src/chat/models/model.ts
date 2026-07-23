@@ -1,9 +1,9 @@
 import type { Static } from '@sinclair/typebox'
+import type { CatalogModel } from '@src/chat/models/catalog'
 import type { LanguageModelChatInformation } from 'vscode'
-import type { CatalogModel } from './catalog'
 import { Type } from '@sinclair/typebox'
+import { matchCatalogModel } from '@src/chat/models/catalog-match'
 import { capitalize, unique } from 'moderndash'
-import { matchCatalogModel } from './catalog-match'
 
 export const ProxyModelListEntrySchema = Type.Object({
   id: Type.String(),

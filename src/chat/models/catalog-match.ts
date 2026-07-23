@@ -1,4 +1,4 @@
-import type { CatalogModel } from './catalog'
+import type { CatalogModel } from '@src/chat/models/catalog'
 
 const VARIANT_SUFFIX = /-(?:openai-compact|nothinking|thinking-\d+|thinking|internet|search|online|minimal|medium|xhigh|high|low|none|max|ultra|auto)$/i
 

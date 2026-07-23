@@ -1,5 +1,5 @@
+import { enrichOpenAICompatibilityProviders } from '@src/cliproxy/accounts/openai-compat-thinking'
 import { describe, expect, it } from 'vitest'
-import { enrichOpenAICompatibilityProviders } from '../../../src/cliproxy/accounts/openai-compat-thinking'
 
 const catalog = new Map([
   ['gpt-5.6-sol', {

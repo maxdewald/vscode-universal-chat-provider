@@ -1,14 +1,14 @@
+import type { CatalogModel } from '@src/chat/models/catalog'
+import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
-import type { CatalogModel } from '../../chat/models/catalog'
-import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '../api/management-client'
 import { Type } from '@sinclair/typebox'
+import { fetchCatalog } from '@src/chat/models/catalog'
+import { enrichOpenAICompatibilityProviders } from '@src/cliproxy/accounts/openai-compat-thinking'
+import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
+import { errorMessage } from '@src/shared/errors'
+import { asValue } from '@src/shared/json'
 import { sleep } from 'moderndash'
 import { env, ProgressLocation, Uri, window } from 'vscode'
-import { fetchCatalog } from '../../chat/models/catalog'
-import { errorMessage } from '../../shared/errors'
-import { asValue } from '../../shared/json'
-import { LOGIN_PROVIDERS, ManagementClient } from '../api/management-client'
-import { enrichOpenAICompatibilityProviders } from './openai-compat-thinking'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500

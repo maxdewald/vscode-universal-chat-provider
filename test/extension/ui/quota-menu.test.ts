@@ -1,9 +1,9 @@
+import type { CodexResetOption } from '@src/cliproxy/quota/codex-resets'
+import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
-import type { CodexResetOption } from '../../../src/cliproxy/quota/codex-resets'
-import type { QuotaSection } from '../../../src/extension/ui/quota-menu'
+import { showQuotaMenu } from '@src/extension/ui/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuickPickItemKind } from 'vscode'
-import { showQuotaMenu } from '../../../src/extension/ui/quota-menu'
 import { env, latestQuickPick, resetVSCodeMock, triggerQuickPickAccept, triggerQuickPickItemButton, window } from '../../support/vscode'
 
 beforeEach(() => {

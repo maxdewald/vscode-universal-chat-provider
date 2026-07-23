@@ -1,5 +1,5 @@
+import { setUtilityModel, shouldNudge } from '@src/extension/utility-model-nudge'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { setUtilityModel, shouldNudge } from '../../src/extension/utility-model-nudge'
 import { resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
 beforeEach(() => {

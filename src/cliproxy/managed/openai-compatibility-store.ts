@@ -1,7 +1,7 @@
+import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { SecretStorage } from 'vscode'
-import type { OpenAICompatibilityProvider } from '../api/management-client'
 import { Type } from '@sinclair/typebox'
-import { asValue } from '../../shared/json'
+import { asValue } from '@src/shared/json'
 
 export const OPENAI_COMPATIBILITY_SECRET = 'universalChatProvider.openAICompatibility'
 

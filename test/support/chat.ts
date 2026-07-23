@@ -1,5 +1,5 @@
+import type { ProviderModel } from '@src/chat/models/model'
 import type { LanguageModelChatMessage } from 'vscode'
-import type { ProviderModel } from '../../src/chat/models/model'
 import { LanguageModelChatMessageRole, LanguageModelTextPart } from 'vscode'
 
 export function createProviderModel(overrides: Partial<ProviderModel> = {}): ProviderModel {

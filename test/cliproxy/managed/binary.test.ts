@@ -1,9 +1,9 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '@src/cliproxy/managed/binary'
 import { zipSync } from 'fflate'
 import { createTarGzip } from 'nanotar'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '../../../src/cliproxy/managed/binary'
 import { useTempDirectories } from '../../support/temp'
 
 const makeTempDirectory = useTempDirectories()

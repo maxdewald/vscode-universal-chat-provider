@@ -1,8 +1,8 @@
+import type { ProviderModel } from '@src/chat/models/model'
 import type {
   LanguageModelChatRequestMessage,
   ProvideLanguageModelChatResponseOptions,
 } from 'vscode'
-import type { ProviderModel } from '../models/model'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import {

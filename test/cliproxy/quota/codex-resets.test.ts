@@ -1,5 +1,5 @@
+import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
 import { describe, expect, it } from 'vitest'
-import { claimCodexReset, listCodexResets } from '../../../src/cliproxy/quota/codex-resets'
 import { createManagementClientFake, queuedApiCallResponses } from '../support/management'
 
 describe('codex reset credits', () => {

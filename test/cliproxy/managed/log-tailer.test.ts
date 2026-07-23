@@ -1,8 +1,8 @@
 import type { OutputChannel } from 'vscode'
 import { appendFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { LogTailer } from '../../../src/cliproxy/managed/log-tailer'
 import { useTempDirectories } from '../../support/temp'
 
 const makeTempDirectory = useTempDirectories()

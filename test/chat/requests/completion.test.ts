@@ -1,9 +1,9 @@
-import type { CompletionDeps } from '../../../src/chat/requests/completion'
-import type { ProxyRequestBody } from '../../../src/chat/requests/request-builder'
+import type { CompletionDeps } from '@src/chat/requests/completion'
+import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
+import { streamCompletion } from '@src/chat/requests/completion'
+import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CancellationTokenSource } from 'vscode'
-import { streamCompletion } from '../../../src/chat/requests/completion'
-import { ProxyHttpError } from '../../../src/cliproxy/api/errors'
 
 const emptyBody = {} as ProxyRequestBody
 const clientMocks = vi.hoisted(() => ({

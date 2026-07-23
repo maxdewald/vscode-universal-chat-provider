@@ -1,6 +1,6 @@
 import type { Static } from '@sinclair/typebox'
 import { Type } from '@sinclair/typebox'
-import { asValue } from '../../shared/json'
+import { asValue } from '@src/shared/json'
 
 const CatalogPayloadSchema = Type.Object({}, { additionalProperties: true })
 

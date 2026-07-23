@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
+  tsconfig: true,
   entry: [
     'src/index.ts',
   ],

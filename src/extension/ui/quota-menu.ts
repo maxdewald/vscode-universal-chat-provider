@@ -1,8 +1,8 @@
+import type { CodexResetOption, CodexResetOutcome } from '@src/cliproxy/quota/codex-resets'
 import type { QuickInputButton, QuickPickItem } from 'vscode'
-import type { CodexResetOption, CodexResetOutcome } from '../../cliproxy/quota/codex-resets'
 import { randomUUID } from 'node:crypto'
+import { formatPercent, formatResetCountdown } from '@src/cliproxy/quota/quota'
 import { env, QuickPickItemKind, ThemeIcon, window } from 'vscode'
-import { formatPercent, formatResetCountdown } from '../../cliproxy/quota/quota'
 
 export interface QuotaEntry {
   name: string

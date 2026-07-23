@@ -1,6 +1,6 @@
-import type { CatalogModel } from '../../../src/chat/models/catalog'
+import type { CatalogModel } from '@src/chat/models/catalog'
+import { matchCatalogModel } from '@src/chat/models/catalog-match'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { matchCatalogModel } from '../../../src/chat/models/catalog-match'
 
 const catalogUrl = 'https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json'
 
@@ -21,7 +21,7 @@ describe('fetchCatalog', () => {
     const fetchMock = vi.fn(async (_url: string) =>
       Response.json({ provider: [{ id: 'model-a', context_length: 10 }] }))
     vi.stubGlobal('fetch', fetchMock)
-    const { fetchCatalog } = await import('../../../src/chat/models/catalog')
+    const { fetchCatalog } = await import('@src/chat/models/catalog')
 
     const first = await fetchCatalog()
     const second = await fetchCatalog()
@@ -35,14 +35,14 @@ describe('fetchCatalog', () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new Error('offline')
     }))
-    const { fetchCatalog } = await import('../../../src/chat/models/catalog')
+    const { fetchCatalog } = await import('@src/chat/models/catalog')
 
     await expect(fetchCatalog()).resolves.toEqual(new Map())
   })
 
   it('returns an empty catalog on a non-OK response', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })))
-    const { fetchCatalog } = await import('../../../src/chat/models/catalog')
+    const { fetchCatalog } = await import('@src/chat/models/catalog')
 
     await expect(fetchCatalog()).resolves.toEqual(new Map())
   })
@@ -50,7 +50,7 @@ describe('fetchCatalog', () => {
 
 describe('flattenCatalog', () => {
   it('prefers richer duplicate metadata', async () => {
-    const { flattenCatalog } = await import('../../../src/chat/models/catalog')
+    const { flattenCatalog } = await import('@src/chat/models/catalog')
 
     const catalog = flattenCatalog({
       openai: [{ id: 'shared', context_length: 128_000 }],
@@ -61,7 +61,7 @@ describe('flattenCatalog', () => {
   })
 
   it('ignores malformed catalog sections', async () => {
-    const { flattenCatalog } = await import('../../../src/chat/models/catalog')
+    const { flattenCatalog } = await import('@src/chat/models/catalog')
 
     expect(flattenCatalog(null)).toEqual(new Map())
     expect(flattenCatalog({

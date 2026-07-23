@@ -1,5 +1,5 @@
-import type { ManagementEndpoint } from './api/management-client'
-import { ManagementClient } from './api/management-client'
+import type { ManagementEndpoint } from '@src/cliproxy/api/management-client'
+import { ManagementClient } from '@src/cliproxy/api/management-client'
 
 const STATUS_PROBE_TIMEOUT_MS = 1500
 

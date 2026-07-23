@@ -1,6 +1,6 @@
+import { ModelRegistry } from '@src/chat/models/model-registry'
+import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ModelRegistry } from '../../../src/chat/models/model-registry'
-import { ProxyHttpError } from '../../../src/cliproxy/api/errors'
 import { singleModelDiscovery } from '../../support/chat'
 import { resetVSCodeMock, vscodeMock, window } from '../../support/vscode'
 
