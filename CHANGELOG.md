@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.29.0...v0.30.0) (2026-07-23)
+
+
+### Features
+
+* display Claude extra usage balance and update utility model settings ([0bc4262](https://github.com/maxdewald/vscode-universal-chat-provider/commit/0bc4262b75e1a33cab8ff1e7b3f2810633d7b296))
+
 ## [0.29.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.28.1...v0.29.0) (2026-07-22)
 
 
