@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.30.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.0...v0.30.1) (2026-07-23)
+
+
+### Refactoring
+
+* reorganize source and test files into subdirectories ([8f0e556](https://github.com/maxdewald/vscode-universal-chat-provider/commit/8f0e556f9b8da1d8ec713257c42b2dca16560c08))
+* simplify command and quota quick pick menus ([50ebe1c](https://github.com/maxdewald/vscode-universal-chat-provider/commit/50ebe1c8ad09d90a9937760b2db052988bcad80c))
+* use [@src](https://github.com/src) path alias for source imports ([77c52b3](https://github.com/maxdewald/vscode-universal-chat-provider/commit/77c52b39807991e87d0c964232addfc69cd3e2b0))
+
 ## [0.30.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.29.0...v0.30.0) (2026-07-23)
 
 
