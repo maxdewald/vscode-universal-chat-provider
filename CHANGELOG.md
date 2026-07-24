@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.2...v0.30.3) (2026-07-24)
+
+
+### Refactoring
+
+* display balance info in status bar quota tooltip ([7d56b5e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7d56b5eecb11a9ead1e3572bdc6b27480725266d))
+
 ## [0.30.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.1...v0.30.2) (2026-07-23)
 
 
