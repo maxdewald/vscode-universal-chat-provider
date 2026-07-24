@@ -81,7 +81,7 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   for (const section of sections) {
     const items = grouped.get(section.title) ?? []
     items.push(...section.entries.map((entry) => {
-      const remaining = formatRemaining(entry)
+      const remaining = formatQuotaRemaining(entry)
       const countdown = formatResetCountdown(entry.resetsAt)
       return { label: `${section.title} · ${entry.name} — ${remaining}`, ...(countdown === undefined ? {} : { description: `resets in ${countdown}` }) }
     }))
@@ -102,13 +102,13 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   return items.length > 0 ? items : [{ label: 'No model quota information is available yet.' }]
 }
 
-function formatRemaining(entry: QuotaEntry): string {
-  const percent = entry.remainingPercent === undefined ? undefined : `${formatPercent(entry.remainingPercent)} left`
+export function formatQuotaRemaining(entry: QuotaEntry, fallback = 'unknown', percentSuffix = ' left'): string {
+  const percent = entry.remainingPercent === undefined ? undefined : `${formatPercent(entry.remainingPercent)}${percentSuffix}`
   if (entry.balance !== undefined) {
     const balance = `${formatCurrency(entry.balance)} ${entry.balance.suffix}`
     return percent === undefined || entry.balance.suffix === 'used' ? balance : `${balance} (${percent})`
   }
-  return percent ?? 'unknown'
+  return percent ?? fallback
 }
 
 function formatCurrency(balance: { amount: number, currency: string }): string {

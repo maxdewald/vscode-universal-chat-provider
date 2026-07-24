@@ -78,6 +78,10 @@ describe('status bar', () => {
         { name: '5h Quota', remainingPercent: 80, resetsAt: Date.parse('2026-07-12T03:25:00Z') },
         { name: '7d Quota', remainingPercent: 8 },
       ] },
+      { title: 'Claude', entries: [
+        { name: 'Extra Usage', remainingPercent: undefined, balance: { amount: 7.55, currency: 'EUR', suffix: 'used' } },
+        { name: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } },
+      ] },
       { title: 'Antigravity', entries: [{ name: 'Gemini 3 Pro', remainingPercent: undefined }] },
     ])
 
@@ -86,6 +90,9 @@ describe('status bar', () => {
     expect(value).toContain('| **Codex** | | | | |')
     expect(value).toContain('| 5h Quota | `████████░░` | 80% | | 3h 25m |')
     expect(value).toContain('| 7d Quota | `█░░░░░░░░░` | $(warning) 8% | | — |')
+    expect(value).toContain('| | | | | |\n| **Claude** | | | | |')
+    expect(value).toContain('| Extra Usage |  | €7.55 used | | — |')
+    expect(value).toContain('| Extra Usage | `████████░░` | €15.00 left (75%) | | — |')
     expect(value).toContain('| | | | | |\n| **Antigravity** | | | | |')
     expect(value).toContain('| Gemini 3 Pro |  | ? | | — |')
     expect(value.match(/\*\*Codex\*\*/g)).toHaveLength(1)

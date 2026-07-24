@@ -2,6 +2,7 @@ import type { ServerStatus } from '@src/cliproxy/controller'
 import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type { StatusBarItem } from 'vscode'
 import { formatPercent, formatResetCountdown } from '@src/cliproxy/quota/quota'
+import { formatQuotaRemaining } from '@src/extension/ui/quota-menu'
 import { MarkdownString, StatusBarAlignment, ThemeColor, window, workspace } from 'vscode'
 
 // Default remaining-quota percent below which the status bar warns; overridable per setting.
@@ -64,7 +65,7 @@ function buildTooltip(icon: string, header: string | undefined, sections: QuotaS
     for (const entry of section.entries) {
       const warn = threshold !== undefined && entry.remainingPercent !== undefined && entry.remainingPercent < threshold ? '$(warning) ' : ''
       const reset = formatResetCountdown(entry.resetsAt) ?? '—'
-      md.appendMarkdown(`| ${escapeTableCell(entry.name)} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatPercent(entry.remainingPercent)} | | ${reset} |\n`)
+        md.appendMarkdown(`| ${escapeTableCell(entry.name)} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatQuotaRemaining(entry, '?', '')} | | ${reset} |\n`)
     }
   }
   return md
