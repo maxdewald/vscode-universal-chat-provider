@@ -2,11 +2,7 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -93,7 +89,7 @@ jobs:
         run: pnpm ext:package
 
   release:
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [lint, test, test-coverage, test-build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
