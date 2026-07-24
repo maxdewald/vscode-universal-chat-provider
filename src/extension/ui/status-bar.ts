@@ -65,7 +65,7 @@ function buildTooltip(icon: string, header: string | undefined, sections: QuotaS
     for (const entry of section.entries) {
       const warn = threshold !== undefined && entry.remainingPercent !== undefined && entry.remainingPercent < threshold ? '$(warning) ' : ''
       const reset = formatResetCountdown(entry.resetsAt) ?? '—'
-        md.appendMarkdown(`| ${escapeTableCell(entry.name)} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatQuotaRemaining(entry, '?', '')} | | ${reset} |\n`)
+      md.appendMarkdown(`| ${escapeTableCell(entry.name)} | ${gaugeBar(entry.remainingPercent)} | ${warn}${formatQuotaRemaining(entry, '?', '')} | | ${reset} |\n`)
     }
   }
   return md
