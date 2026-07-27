@@ -264,6 +264,15 @@ describe('language model provider', () => {
     ])
   })
 
+  it('keeps a pending row for an account whose quota has not loaded yet', () => {
+    const provider = createProvider()
+    provider.setQuotas([{ provider: 'claude', windows: [], error: 'rate limited' }])
+
+    expect(provider.quotaSections()).toEqual([
+      { title: 'Claude', entries: [{ name: 'Quota', remainingPercent: undefined }] },
+    ])
+  })
+
   it('threads resetsAt through quotaSections for account-window providers', () => {
     const provider = createProvider()
     provider.setQuotas([{ provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] }])

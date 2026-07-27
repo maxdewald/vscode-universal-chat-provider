@@ -342,7 +342,8 @@ export class ServerController implements ProxyConnection {
 
   private async notifyAccountsChanged(expectedModelIds?: readonly string[]): Promise<void> {
     await this.refreshListener?.(expectedModelIds)
-    void this.refreshQuotas()
+    // Throttled: CPA rewrites auth files on every token refresh, which would otherwise sweep every account.
+    this.scheduleQuotaRefresh()
   }
 
   // Refreshes quota and notifies the listener. Triggered on server/account events and when
@@ -367,17 +368,14 @@ export class ServerController implements ProxyConnection {
         this.quotaBackoff,
       )
       for (const report of reports) {
-        const authIndex = report.account?.authIndex
-        if (authIndex === undefined)
-          continue
-        if (report.retryAfter !== undefined)
-          this.quotaBackoff.set(authIndex, report.retryAfter)
-        else if (report.error === undefined)
-          this.quotaBackoff.delete(authIndex)
+        if (report.error !== undefined)
+          this.output.appendLine(`Quota fetch failed for ${report.provider}${report.account === undefined ? '' : ` (${report.account.label})`}: ${report.error}`)
       }
       this.quotaListener?.(reports)
     }
-    catch {}
+    catch (error) {
+      this.output.appendLine(`Quota refresh failed: ${errorMessage(error)}`)
+    }
   }
 
   private async resolveManagement(start: boolean): Promise<ManagementEndpoint | undefined> {

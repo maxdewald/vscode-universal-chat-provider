@@ -183,8 +183,19 @@ describe('fetchQuotas', () => {
     )
 
     const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ provider: 'codex', error: 'HTTP 401', windows: [] })
+    expect(report).toMatchObject({ provider: 'codex', error: expect.stringContaining('HTTP 401') as string, windows: [] })
     expect(apiCall).toHaveBeenCalledTimes(1)
+  })
+
+  it('includes the upstream url and error body in the reported error', async () => {
+    const { client } = createManagementClientFake(
+      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
+      () => ({ statusCode: 429, body: '{"error":{"type":"rate_limit_error"}}' }),
+    )
+
+    const report = (await fetchQuotas(client))[0]!
+    expect(report.error).toContain('https://api.anthropic.com/api/oauth/usage')
+    expect(report.error).toContain('rate_limit_error')
   })
 
   it('captures the upstream Retry-After from a 429 as an epoch deadline', async () => {
@@ -192,9 +203,51 @@ describe('fetchQuotas', () => {
       [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
       () => ({ statusCode: 429, body: '', header: { 'Retry-After': ['238'] } }),
     )
+    const backoff = new Map<string, number>()
 
-    const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ provider: 'claude', error: 'HTTP 429', retryAfter: Date.now() + 238_000 })
+    const report = (await fetchQuotas(client, undefined, backoff))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: expect.stringContaining('HTTP 429') as string })
+    expect(backoff.get('x1')).toBe(Date.now() + 238_000)
+  })
+
+  it('falls back to a floor deadline when a 429 carries no Retry-After', async () => {
+    const { client } = createManagementClientFake(
+      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
+      () => ({ statusCode: 429, body: '' }),
+    )
+    const backoff = new Map<string, number>()
+
+    const report = (await fetchQuotas(client, undefined, backoff))[0]!
+    expect(report).toMatchObject({ provider: 'claude', error: expect.stringContaining('HTTP 429') as string })
+    expect(backoff.get('x1')).toBe(Date.now() + 300_000)
+  })
+
+  it('backs off from an exhausted unified rate limit on a successful response', async () => {
+    const reset = new Date(Date.now() + 90_000).toISOString()
+    const { client } = createManagementClientFake(
+      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
+      () => ({
+        statusCode: 200,
+        body: CLAUDE_BODY,
+        header: {
+          'Anthropic-Ratelimit-Unified-Remaining': ['0'],
+          'Anthropic-Ratelimit-Unified-Reset': [reset],
+        },
+      }),
+    )
+    const backoff = new Map<string, number>()
+
+    const report = (await fetchQuotas(client, undefined, backoff))[0]!
+    expect(report.error).toBeUndefined()
+    expect(backoff.get('x1')).toBe(Date.parse(reset))
+  })
+
+  it('clears the backoff once the upstream stops rate limiting', async () => {
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const backoff = new Map([['x1', Date.now() - 1]])
+
+    await fetchQuotas(client, undefined, backoff)
+    expect(backoff.has('x1')).toBe(false)
   })
 
   it('skips the upstream call while an account is inside its Retry-After window', async () => {
@@ -202,7 +255,7 @@ describe('fetchQuotas', () => {
     const until = Date.now() + 60_000
 
     const report = (await fetchQuotas(client, undefined, new Map([['x1', until]])))[0]!
-    expect(report).toMatchObject({ provider: 'claude', error: 'rate limited', retryAfter: until })
+    expect(report).toMatchObject({ provider: 'claude', error: 'rate limited' })
     expect(apiCall).not.toHaveBeenCalled()
   })
 

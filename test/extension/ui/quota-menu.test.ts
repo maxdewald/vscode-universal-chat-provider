@@ -65,7 +65,7 @@ describe('showQuotaMenu', () => {
     ]), async () => {})
 
     expect(shownItems().map(item => item.label)).toEqual([
-      'Codex · Unknown — unknown',
+      'Codex · Unknown — loading…',
       'Codex · Rounded — 43% left',
       '',
       'Claude · Extra Usage — €15.00 left (75% left)',

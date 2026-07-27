@@ -94,17 +94,20 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
     const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
     for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
-      const reports = this.quotaReports.filter(r => r.provider === provider && r.error === undefined && r.windows.length > 0)
+      const reports = this.quotaReports.filter(r => r.provider === provider)
       const multiple = reports.length > 1
       for (const report of reports) {
         sections.push({
           title: multiple && report.account !== undefined ? `${title} (${report.account.label})` : title,
-          entries: report.windows.map(window => ({
-            name: window.label,
-            remainingPercent: window.remainingPercent,
-            ...(window.balance === undefined ? {} : { balance: window.balance }),
-            ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
-          })),
+          // An account whose quota has not loaded yet still gets a row, so the menu shows it as pending.
+          entries: report.windows.length === 0
+            ? [{ name: 'Quota', remainingPercent: undefined }]
+            : report.windows.map(window => ({
+                name: window.label,
+                remainingPercent: window.remainingPercent,
+                ...(window.balance === undefined ? {} : { balance: window.balance }),
+                ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
+              })),
         })
       }
     }

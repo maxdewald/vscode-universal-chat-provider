@@ -102,7 +102,7 @@ function buildItems(sections: QuotaSection[], resets: CodexResetOption[]): Quota
   return items.length > 0 ? items : [{ label: 'No model quota information is available yet.' }]
 }
 
-export function formatQuotaRemaining(entry: QuotaEntry, fallback = 'unknown', percentSuffix = ' left'): string {
+export function formatQuotaRemaining(entry: QuotaEntry, fallback = 'loading…', percentSuffix = ' left'): string {
   const percent = entry.remainingPercent === undefined ? undefined : `${formatPercent(entry.remainingPercent)}${percentSuffix}`
   if (entry.balance !== undefined) {
     const balance = `${formatCurrency(entry.balance)} ${entry.balance.suffix}`

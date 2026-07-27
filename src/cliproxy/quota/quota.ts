@@ -18,7 +18,6 @@ export interface QuotaReport {
   models?: Record<string, number> // antigravity: remaining percent keyed by proxy model id
   account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
   error?: string
-  retryAfter?: number // epoch ms the upstream asked us to wait until before retrying (from a 429 Retry-After)
 }
 
 const WHAM_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -140,12 +139,13 @@ function isQuotaProvider(value: string): value is QuotaReport['provider'] {
   return Object.hasOwn(QUOTA_SOURCES, value)
 }
 
-// backoff maps authIndex -> Retry-After deadline; an account still inside its window is echoed as an
-// error report (not fetched) so setQuotas keeps its last-good value without touching the upstream.
+// backoff maps authIndex -> deadline and is owned here: fetchProviderQuota writes it from the
+// response headers, and an account still inside its window is echoed as an error report (not
+// fetched) so setQuotas keeps its last-good value without touching the upstream.
 export async function fetchQuotas(
   client: ManagementClient,
   signal?: AbortSignal,
-  backoff?: Map<string, number>,
+  backoff: Map<string, number> = new Map(),
 ): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
@@ -153,12 +153,11 @@ export async function fetchQuotas(
     const provider = raw === 'xai' ? 'grok' : raw
     if (!isQuotaProvider(provider))
       return []
-    const retryAfter = backoff?.get(entry.auth_index?.trim() ?? '')
-    if (retryAfter !== undefined && retryAfter > Date.now()) {
+    if ((backoff.get(entry.auth_index?.trim() ?? '') ?? 0) > Date.now()) {
       const account = accountOf(entry)
-      return [Promise.resolve<QuotaReport>({ provider, windows: [], error: 'rate limited', retryAfter, ...(account === undefined ? {} : { account }) })]
+      return [Promise.resolve<QuotaReport>({ provider, windows: [], error: 'rate limited', ...(account === undefined ? {} : { account }) })]
     }
-    return [fetchProviderQuota(provider, QUOTA_SOURCES[provider], client, entry, signal)]
+    return [fetchProviderQuota(provider, QUOTA_SOURCES[provider], client, entry, signal, backoff)]
   })
   return Promise.all(tasks)
 }
@@ -223,7 +222,8 @@ async function fetchProviderQuota(
   source: QuotaSource,
   client: ManagementClient,
   entry: AuthFileRaw,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  backoff: Map<string, number>,
 ): Promise<QuotaReport> {
   const account = accountOf(entry)
   const report: QuotaReport = { provider, windows: [], ...(account === undefined ? {} : { account }) }
@@ -242,13 +242,16 @@ async function fetchProviderQuota(
       header: source.header,
       ...(provider === 'antigravity' ? { data: JSON.stringify({ project: projectId }) } : {}),
     }, signal)
-    if (statusCode < 200 || statusCode >= 300) {
-      const retryAfter = parseRetryAfter(header)
-      return { ...report, error: `HTTP ${statusCode}`, ...(retryAfter === undefined ? {} : { retryAfter }) }
-    }
+    const retryAfter = parseRetryAfter(header, statusCode)
+    if (retryAfter === undefined)
+      backoff.delete(authIndex)
+    else
+      backoff.set(authIndex, retryAfter)
+    if (statusCode < 200 || statusCode >= 300)
+      return { ...report, error: `HTTP ${statusCode} from ${source.url} — ${describeBody(body)}` }
     const data = asJsonValue(ObjectSchema, body)
     if (data === undefined)
-      return { ...report, error: 'invalid quota payload' }
+      return { ...report, error: `invalid quota payload from ${source.url} — ${describeBody(body)}` }
     source.apply(report, data)
     return report
   }
@@ -258,15 +261,19 @@ async function fetchProviderQuota(
 }
 
 // Grok Build/SuperGrok bills in monthly credits; report the single account-level window as
-// remaining percent of the monthly credit allowance.
+// remaining percent of the monthly allowance, or as spend-to-date when unified billing
+// publishes no cap (monthlyLimit 0) and `used` cents are the only signal left.
 function parseGrokWindows(data: unknown): QuotaWindow[] {
   const config = asValue(GrokBodySchema, data)?.config
   const used = config?.used?.val
   const limit = config?.monthlyLimit?.val
-  if (config === undefined || used === undefined || limit === undefined || limit <= 0)
+  if (used === undefined)
     return []
-  const resetsAt = parseReset(config.billingPeriodEnd)
-  return [{ label: 'Credits', remainingPercent: clamp(100 - (used / limit) * 100, 0, 100), ...(resetsAt === undefined ? {} : { resetsAt }) }]
+  const resetsAt = parseReset(config?.billingPeriodEnd)
+  const measure = limit === undefined || limit <= 0
+    ? { balance: { amount: used / 100, currency: 'USD', suffix: 'used' as const } }
+    : { remainingPercent: clamp(100 - (used / limit) * 100, 0, 100) }
+  return [{ label: 'Credits', ...measure, ...(resetsAt === undefined ? {} : { resetsAt }) }]
 }
 
 // Account-level utilization (percent used) per window, plus optional extra-usage credits.
@@ -362,15 +369,31 @@ function parseAntigravityModels(data: unknown): Record<string, number> {
   return out
 }
 
-// Retry-After (RFC 7231) is either delta-seconds or an HTTP date. CLIProxyAPI forwards Go's
-// canonicalized http.Header, so the key is "Retry-After" and each value is a string array.
-function parseRetryAfter(header: Record<string, string[]> | undefined): number | undefined {
-  const raw = Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === 'retry-after')?.[1]?.[0]?.trim()
-  if (raw === undefined || raw === '')
-    return undefined
-  const seconds = Number(raw)
-  const ms = Number.isNaN(seconds) ? Date.parse(raw) : Date.now() + seconds * 1000
-  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
+// Upstream error bodies carry the useful detail (rate_limit_error, invalid_token, …).
+function describeBody(body: unknown): string {
+  const text = typeof body === 'string' ? body : JSON.stringify(body)
+  return text === undefined || text.trim() === '' ? 'empty body' : text
+}
+
+// How long to sit out a 429 that carried no usable deadline, so we never hot-loop the upstream.
+const RATE_LIMIT_FLOOR_MS = 5 * 60_000
+
+// Deadline to wait until before hitting this account again, in order of trust: Retry-After
+// (RFC 7231 delta-seconds or HTTP date), then Anthropic's -unified-reset once its -remaining
+// hits 0, then a floor for bare 429s.
+function parseRetryAfter(header: Record<string, string[]> | undefined, statusCode: number): number | undefined {
+  const retryAfter = headerValue(header, 'retry-after')
+  const seconds = Number(retryAfter)
+  return parseReset(Number.isNaN(seconds) ? retryAfter : Date.now() / 1000 + seconds)
+    ?? (headerValue(header, 'anthropic-ratelimit-unified-remaining') === '0'
+      ? parseReset(headerValue(header, 'anthropic-ratelimit-unified-reset'))
+      : undefined)
+    ?? (statusCode === 429 ? Date.now() + RATE_LIMIT_FLOOR_MS : undefined)
+}
+
+// CLIProxyAPI forwards Go's canonicalized http.Header, so values arrive as string arrays.
+function headerValue(header: Record<string, string[]> | undefined, name: string): string | undefined {
+  return Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === name)?.[1]?.[0]?.trim()
 }
 
 // Accepts an ISO-8601 string or epoch seconds and returns epoch ms, dropping values already in the past.

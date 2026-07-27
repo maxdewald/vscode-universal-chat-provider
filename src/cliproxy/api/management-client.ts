@@ -200,7 +200,8 @@ export class ManagementClient {
     const json = asValue(ApiCallResponseSchema, await this.fetcher.post('/api-call', {
       json: payload,
       signal: signal ?? null,
-      retry: { limit: 2, methods: ['post'], statusCodes: [408, 429, 500, 502, 503, 504] },
+      // 429/408 must reach the caller so it can honor the upstream's backoff instead of re-hitting it.
+      retry: { limit: 2, methods: ['post'], statusCodes: [500, 502, 503, 504] },
     }).json())
     return { statusCode: json?.status_code ?? json?.statusCode ?? 0, header: json?.header ?? {}, body: json?.body }
   }
