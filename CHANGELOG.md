@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.31.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.3...v0.31.0) (2026-07-27)
+
+
+### Features
+
+* **quota:** modularize quota providers and add kimi support ([12cab17](https://github.com/maxdewald/vscode-universal-chat-provider/commit/12cab17c08865085f4f5b0a60a72578943585a93))
+
+
+### Bug Fixes
+
+* **quota:** refine rate-limit backoff and quota menu display, fix grok and claude quotas ([cb4f1da](https://github.com/maxdewald/vscode-universal-chat-provider/commit/cb4f1dab7b72311c66d31fc078bb0eaa300ef6c6))
+
 ## [0.30.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.2...v0.30.3) (2026-07-24)
 
 
