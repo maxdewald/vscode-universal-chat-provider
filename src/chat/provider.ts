@@ -93,7 +93,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   // Structured quota for the menu: Codex/Claude/Grok as account windows (5h/7d/credits), Antigravity per model.
   quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
     const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
-    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok']] as const) {
+    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok'], ['kimi', 'Kimi']] as const) {
       const reports = this.quotaReports.filter(r => r.provider === provider)
       const multiple = reports.length > 1
       for (const report of reports) {
@@ -117,7 +117,10 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     if (models !== undefined) {
       const entries = this.registry.snapshot()
         .filter(model => model.proxyOwner.toLowerCase() === 'antigravity' && models[model.proxyModelId] !== undefined)
-        .map(model => ({ name: model.name, remainingPercent: models[model.proxyModelId]! }))
+        .map((model) => {
+          const quota = models[model.proxyModelId]!
+          return { name: model.name, remainingPercent: quota.remainingPercent, ...(quota.resetsAt === undefined ? {} : { resetsAt: quota.resetsAt }) }
+        })
         .sort((a, b) => (a.remainingPercent ?? 101) - (b.remainingPercent ?? 101))
       if (entries.length > 0)
         sections.push({ title: 'Antigravity', entries })

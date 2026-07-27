@@ -13,7 +13,7 @@ const CODEX_BODY = JSON.stringify({
 
 const ANTIGRAVITY_BODY = JSON.stringify({
   models: {
-    'claude-sonnet-4-6': { displayName: 'Claude Sonnet 4.6', quotaInfo: { remainingFraction: 0.1 } },
+    'claude-sonnet-4-6': { displayName: 'Claude Sonnet 4.6', quotaInfo: { remainingFraction: 0.1, resetTime: '2026-06-02T00:00:00Z' } },
     'gemini-pro-agent': { displayName: 'Gemini 3.1 Pro (High)', quotaInfo: { remainingFraction: 1 } },
     'chat_001': { quotaInfo: null },
   },
@@ -36,6 +36,14 @@ const GROK_BODY = JSON.stringify({
   },
 })
 
+const KIMI_BODY = JSON.stringify({
+  usage: { limit: '100', used: '64', remaining: '36', resetTime: '2026-06-04T06:02:56.054721Z' },
+  limits: [
+    { window: { duration: 300, timeUnit: 'TIME_UNIT_MINUTE' }, detail: { limit: '100', used: '4', remaining: '96' } },
+  ],
+  totalQuota: { limit: '100', remaining: '99' },
+})
+
 function respondOk(url: string) {
   if (url.includes('wham/usage'))
     return { statusCode: 200, body: CODEX_BODY }
@@ -45,6 +53,8 @@ function respondOk(url: string) {
     return { statusCode: 200, body: CLAUDE_BODY }
   if (url.includes('grok.com/v1/billing'))
     return { statusCode: 200, body: GROK_BODY }
+  if (url.includes('api.kimi.com/coding/v1/usages'))
+    return { statusCode: 200, body: KIMI_BODY }
   return { statusCode: 404, body: '' }
 }
 
@@ -104,8 +114,8 @@ describe('fetchQuotas', () => {
     const report = (await fetchQuotas(client))[0]!
 
     expect(report.models).toEqual({
-      'claude-sonnet-4-6': 10,
-      'gemini-pro-agent': 100,
+      'claude-sonnet-4-6': { remainingPercent: 10, resetsAt: Date.parse('2026-06-02T00:00:00Z') },
+      'gemini-pro-agent': { remainingPercent: 100 },
     })
   })
 
@@ -164,16 +174,115 @@ describe('fetchQuotas', () => {
     expect(report.provider).toBe('grok')
     expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-08-01T00:00:00Z') }])
     expect(apiCall.mock.calls[0]![0]).toMatchObject({
-      url: 'https://cli-chat-proxy.grok.com/v1/billing',
+      url: 'https://cli-chat-proxy.grok.com/v1/billing?format=credits',
       header: { 'X-XAI-Token-Auth': 'xai-grok-cli' },
     })
   })
 
-  it('skips providers without a known quota endpoint', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'x1' }], respondOk)
+  it('prefers the unified credit pool percent and its period end', async () => {
+    const body = JSON.stringify({
+      config: {
+        creditUsagePercent: 40,
+        used: { val: 30 },
+        monthlyLimit: { val: 120 },
+        currentPeriod: { start: '2026-05-25T00:00:00Z', end: '2026-06-08T00:00:00Z' },
+        onDemandCap: { val: 50 },
+        onDemandUsed: { val: 5 },
+        billingPeriodEnd: '2026-08-01T00:00:00Z',
+      },
+    })
+    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
 
-    await expect(fetchQuotas(client)).resolves.toEqual([])
-    expect(apiCall).not.toHaveBeenCalled()
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([
+      { label: 'Credits', remainingPercent: 60, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
+      { label: 'On-Demand', remainingPercent: 90, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
+    ])
+  })
+
+  it('parses kimi windows, labelling each from its own duration', async () => {
+    const { client, apiCall } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], respondOk)
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.provider).toBe('kimi')
+    expect(report.windows).toEqual([
+      { label: 'Weekly Quota', remainingPercent: 36, resetsAt: Date.parse('2026-06-04T06:02:56.054721Z') },
+      { label: '5h Quota', remainingPercent: 96 },
+      { label: 'Total', remainingPercent: 99 },
+    ])
+    expect(apiCall.mock.calls[0]![0]).toMatchObject({ url: 'https://api.kimi.com/coding/v1/usages' })
+  })
+
+  it('drops kimi windows without a usable limit', async () => {
+    const body = JSON.stringify({
+      usage: { limit: '0', used: '12', remaining: '0' },
+      limits: [{ detail: { limit: 'bad', used: '1' } }],
+      totalQuota: { limit: '100', remaining: '25' },
+    })
+    const { client } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([{ label: 'Total', remainingPercent: 25 }])
+  })
+
+  it('parses codex spark and purchased credit windows', async () => {
+    const body = JSON.stringify({
+      rate_limit: {
+        primary_window: { used_percent: 1, limit_window_seconds: 18_000 },
+      },
+      additional_rate_limits: [
+        { limit_name: 'gpt-5-spark', rate_limit: { primary_window: { used_percent: 25, limit_window_seconds: 18_000 } } },
+        { limit_name: 'other', rate_limit: { primary_window: { used_percent: 90, limit_window_seconds: 18_000 } } },
+      ],
+      spend_control: { individual_limit: { limit: 2000, used: 500 } },
+    })
+    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([
+      { label: '5h Quota', remainingPercent: 99 },
+      { key: 'spark', label: 'Spark 5h Quota', remainingPercent: 75 },
+      { key: 'credits', label: 'Credits', remainingPercent: 75 },
+    ])
+  })
+
+  it('keeps codex windows when the optional sections arrive as null', async () => {
+    const body = JSON.stringify({
+      rate_limit: {
+        primary_window: { used_percent: 1, limit_window_seconds: 18_000, reset_at: null, reset_after_seconds: null },
+        secondary_window: null,
+      },
+      additional_rate_limits: null,
+      spend_control: { individual_limit: null },
+    })
+    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([{ label: '5h Quota', remainingPercent: 99 }])
+  })
+
+  it('parses claude model-scoped weekly caps, skipping legacy duplicates', async () => {
+    const body = JSON.stringify({
+      seven_day_opus: { utilization: 90, resets_at: '2026-07-01T00:00:00Z' },
+      limits: [
+        { kind: 'weekly_scoped', percent: 30, resets_at: '2026-07-02T00:00:00Z', scope: { model: { display_name: 'Fable' } } },
+        { kind: 'weekly_scoped', percent: 10, resets_at: '2026-07-01T00:00:00Z', scope: { model: { display_name: 'Opus' } } },
+        { kind: 'weekly_all', percent: 61, resets_at: '2026-07-01T00:00:00Z', scope: null },
+      ],
+    })
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([
+      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
+      { key: 'seven_day_fable', label: '7d Fable', remainingPercent: 70, resetsAt: Date.parse('2026-07-02T00:00:00Z') },
+    ])
   })
 
   it('reports an HTTP error instead of throwing', async () => {
@@ -278,9 +387,15 @@ describe('fetchQuotas', () => {
 
 describe('remainingForModel', () => {
   const reports: QuotaReport[] = [
-    { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 80 }, { label: '7d Quota', remainingPercent: 8 }] },
-    { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': 35 } },
+    { provider: 'codex', windows: [
+      { label: '5h Quota', remainingPercent: 80 },
+      { label: '7d Quota', remainingPercent: 8 },
+      { key: 'spark', label: 'Spark 5h Quota', remainingPercent: 2 },
+      { key: 'credits', label: 'Credits', remainingPercent: 1 },
+    ] },
+    { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 35 } } },
     { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] },
+    { provider: 'kimi', windows: [{ label: 'Weekly Quota', remainingPercent: 60 }, { label: '5h Quota', remainingPercent: 22 }] },
     { provider: 'claude', windows: [
       { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
       { key: 'seven_day', label: '7d Quota', remainingPercent: 50 },
@@ -294,8 +409,12 @@ describe('remainingForModel', () => {
     expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(35)
   })
 
-  it('returns the tightest codex window for any openai model', () => {
+  it('returns the tightest codex window for any openai model, ignoring spark and credits', () => {
     expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
+  })
+
+  it('returns the tightest kimi window for any moonshot model', () => {
+    expect(remainingForModel(reports, { proxyOwner: 'moonshot', proxyModelId: 'kimi-k2.5' })).toBe(22)
   })
 
   it('returns the grok credit window for any xai model', () => {
@@ -321,7 +440,7 @@ describe('remainingForModel', () => {
 
   it('is undefined for an untracked antigravity model, owner, or errored report', () => {
     expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'unknown' })).toBeUndefined()
-    expect(remainingForModel(reports, { proxyOwner: 'kimi', proxyModelId: 'k2' })).toBeUndefined()
+    expect(remainingForModel(reports, { proxyOwner: 'gemini', proxyModelId: 'gemini-3-pro' })).toBeUndefined()
     const errored: QuotaReport[] = [{ provider: 'codex', windows: [], error: 'HTTP 401' }]
     expect(remainingForModel(errored, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
   })
