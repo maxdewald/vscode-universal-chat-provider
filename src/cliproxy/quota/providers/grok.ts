@@ -3,8 +3,7 @@ import { Type } from '@sinclair/typebox'
 import { clamp, parseReset, percentOf } from '@src/cliproxy/quota/providers/types'
 import { asValue } from '@src/shared/json'
 
-// format=credits returns the unified pool (creditUsagePercent + currentPeriod) on top of the
-// legacy monthly counters, so one request covers both account shapes.
+// Current Grok billing exposes the shared premium pool through this endpoint.
 const BILLING_URL = 'https://cli-chat-proxy.grok.com/v1/billing?format=credits'
 
 const MetricSchema = Type.Object({
@@ -13,13 +12,13 @@ const MetricSchema = Type.Object({
 
 const BodySchema = Type.Object({
   config: Type.Optional(Type.Object({
-    used: Type.Optional(MetricSchema),
-    monthlyLimit: Type.Optional(MetricSchema),
-    billingPeriodEnd: Type.Optional(Type.Union([Type.String(), Type.Number()])),
     creditUsagePercent: Type.Optional(Type.Number()),
     currentPeriod: Type.Optional(Type.Object({
       end: Type.Optional(Type.Union([Type.String(), Type.Number()])),
     })),
+    productUsage: Type.Optional(Type.Array(Type.Object({
+      usagePercent: Type.Optional(Type.Number()),
+    }))),
     onDemandCap: Type.Optional(MetricSchema),
     onDemandUsed: Type.Optional(MetricSchema),
   })),
@@ -28,7 +27,7 @@ const BodySchema = Type.Object({
 export const grokProvider: QuotaProvider = {
   method: 'GET',
   url: BILLING_URL,
-  header: { 'Authorization': 'Bearer $TOKEN$', 'X-XAI-Token-Auth': 'xai-grok-cli', 'Accept': 'application/json' },
+  header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' },
   apply: (report, data) => {
     report.windows = parseWindows(data)
   },
@@ -37,23 +36,25 @@ export const grokProvider: QuotaProvider = {
   remaining: report => report.windows[0]?.remainingPercent,
 }
 
-// Grok bills from a shared credit pool. Unified accounts publish creditUsagePercent (and no
-// cap); older ones only expose monthly used/limit counters, so fall back to those and finally
-// to spend-to-date when there is no cap to divide by.
+// Grok bills from a shared credit pool. creditUsagePercent is authoritative; productUsage is
+// the same pool split by product, so sum it when the aggregate is absent.
 function parseWindows(data: unknown): QuotaWindow[] {
   const config = asValue(BodySchema, data)?.config
-  const used = config?.used?.val
-  const percentUsed = config?.creditUsagePercent ?? percentOf(used, config?.monthlyLimit?.val)
-  if (percentUsed === undefined && used === undefined)
+  const productUsage = config?.productUsage?.reduce<number | undefined>(
+    (sum, product) => product.usagePercent === undefined ? sum : (sum ?? 0) + product.usagePercent,
+    undefined,
+  )
+  const percentUsed = config?.creditUsagePercent ?? productUsage
+  if (percentUsed === undefined)
     return []
-  const reset = parseReset(config?.currentPeriod?.end) ?? parseReset(config?.billingPeriodEnd)
-  const resetsAt = reset === undefined ? {} : { resetsAt: reset }
-  const measure = percentUsed === undefined
-    ? { balance: { amount: (used ?? 0) / 100, currency: 'USD', suffix: 'used' as const } }
-    : { remainingPercent: clamp(100 - percentUsed, 0, 100) }
+  const resetsAt = parseReset(config?.currentPeriod?.end)
   const onDemandUsed = percentOf(config?.onDemandUsed?.val, config?.onDemandCap?.val)
   return [
-    { label: 'Credits', ...measure, ...resetsAt },
-    ...(onDemandUsed === undefined ? [] : [{ label: 'On-Demand', remainingPercent: clamp(100 - onDemandUsed, 0, 100), ...resetsAt }]),
+    window('Credits', percentUsed, resetsAt),
+    ...(onDemandUsed === undefined ? [] : [window('On-Demand', onDemandUsed, resetsAt)]),
   ]
+}
+
+function window(label: string, usedPercent: number, resetsAt: number | undefined): QuotaWindow {
+  return { label, remainingPercent: clamp(100 - usedPercent, 0, 100), ...(resetsAt === undefined ? {} : { resetsAt }) }
 }

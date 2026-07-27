@@ -29,10 +29,9 @@ const CLAUDE_BODY = JSON.stringify({
 
 const GROK_BODY = JSON.stringify({
   config: {
-    used: { val: 30 },
-    monthlyLimit: { val: 120 },
+    creditUsagePercent: 25,
     onDemandCap: { val: 0 },
-    billingPeriodEnd: '2026-08-01T00:00:00Z',
+    currentPeriod: { end: '2026-08-01T00:00:00Z' },
   },
 })
 
@@ -96,7 +95,7 @@ describe('fetchQuotas', () => {
 
   it('drops reset times that are already in the past', async () => {
     const body = JSON.stringify({
-      config: { used: { val: 10 }, monthlyLimit: { val: 100 }, billingPeriodEnd: '2025-01-01T00:00:00Z' },
+      config: { creditUsagePercent: 10, currentPeriod: { end: '2025-01-01T00:00:00Z' } },
     })
     const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({
       statusCode: 200,
@@ -166,7 +165,7 @@ describe('fetchQuotas', () => {
     ])
   })
 
-  it('parses grok monthly credit usage as a single window', async () => {
+  it('parses the grok premium credit pool as a single window', async () => {
     const { client, apiCall } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
@@ -175,7 +174,7 @@ describe('fetchQuotas', () => {
     expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-08-01T00:00:00Z') }])
     expect(apiCall.mock.calls[0]![0]).toMatchObject({
       url: 'https://cli-chat-proxy.grok.com/v1/billing?format=credits',
-      header: { 'X-XAI-Token-Auth': 'xai-grok-cli' },
+      header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' },
     })
   })
 
@@ -199,6 +198,34 @@ describe('fetchQuotas', () => {
       { label: 'Credits', remainingPercent: 60, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
       { label: 'On-Demand', remainingPercent: 90, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
     ])
+  })
+
+  it('sums grok product usage when the aggregate percent is absent', async () => {
+    const body = JSON.stringify({
+      config: {
+        currentPeriod: { end: '2026-06-08T00:00:00Z' },
+        productUsage: [
+          { product: 'GrokBuild', usagePercent: 17 },
+          { product: 'GrokChat', usagePercent: 1 },
+        ],
+      },
+    })
+    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([
+      { label: 'Credits', remainingPercent: 82, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
+    ])
+  })
+
+  it('ignores an empty grok product usage list', async () => {
+    const body = JSON.stringify({ config: { productUsage: [] } })
+    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([])
   })
 
   it('parses kimi windows, labelling each from its own duration', async () => {
