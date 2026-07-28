@@ -91,6 +91,9 @@ jobs:
     needs: [lint, test, test-coverage, test-build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
     permissions:
       contents: write
       issues: write
@@ -109,6 +112,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/checkout@v7
         with:
+          ref: ${{ steps.release.outputs.tag_name }}
           fetch-depth: 0
 
       - name: Set up project
@@ -126,7 +130,7 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
       - name: Publish extension to VSC Marketplace
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ !cancelled() && steps.release.outputs.release_created }}
         run: pnpm exec vsce publish --packagePath ./*.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
