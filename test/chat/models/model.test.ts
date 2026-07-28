@@ -111,6 +111,61 @@ describe('model mapping', () => {
     }])
   })
 
+  it('adds an advertised Fast variant while preserving canonical model identity', () => {
+    const models = mapProxyModels(
+      [{ id: 'gpt-5.6-sol', owned_by: 'openai', context_length: 372_000, max_completion_tokens: 128_000 }],
+      [{
+        slug: 'gpt-5.6-sol',
+        display_name: 'GPT-5.6 Sol',
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
+        default_reasoning_level: 'low',
+        service_tiers: [{ id: 'priority' }],
+      }],
+      new Map(),
+      {},
+    )
+
+    expect(models).toHaveLength(2)
+    expect(models.map(model => ({
+      id: model.id,
+      name: model.name,
+      detail: model.detail,
+      family: model.family,
+      proxyModelId: model.proxyModelId,
+      serviceTier: model.serviceTier,
+    }))).toEqual([
+      {
+        id: 'gpt-5.6-sol',
+        name: 'GPT-5.6 Sol',
+        detail: 'Codex',
+        family: 'gpt-5.6-sol',
+        proxyModelId: 'gpt-5.6-sol',
+        serviceTier: undefined,
+      },
+      {
+        id: 'gpt-5.6-sol:fast',
+        name: 'GPT-5.6 Sol (Fast Mode)',
+        detail: '1.5x usage · Codex',
+        family: 'gpt-5.6-sol',
+        proxyModelId: 'gpt-5.6-sol',
+        serviceTier: 'priority',
+      },
+    ])
+    expect(models[1]?.configurationSchema).toEqual(models[0]?.configurationSchema)
+    expect(models[1]?.reasoningLevels).toEqual(models[0]?.reasoningLevels)
+  })
+
+  it('does not add a Fast variant when metadata does not advertise it', () => {
+    const models = mapProxyModels(
+      [{ id: 'gpt-5.4-mini', owned_by: 'openai', context_length: 272_000, max_completion_tokens: 128_000 }],
+      [{ slug: 'gpt-5.4-mini', service_tiers: [] }],
+      new Map(),
+      {},
+    )
+
+    expect(models.map(model => model.id)).toEqual(['gpt-5.4-mini'])
+  })
+
   it('advertises exact model identities independently of provider categories', () => {
     const entries = [
       { id: 'gpt-5.6-sol', owned_by: 'openai', context_length: 372_000, max_completion_tokens: 128_000 },

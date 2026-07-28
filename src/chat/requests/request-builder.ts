@@ -27,6 +27,7 @@ export interface ProxyRequestBody {
   input: ProxyRequestItem[]
   stream: boolean
   max_output_tokens: number
+  service_tier?: string
   prompt_cache_key?: string
   reasoning?: { effort: string, summary: string }
   tools?: ProxyFunctionTool[]
@@ -48,6 +49,7 @@ export function buildRequest(
     input: messages.flatMap(convertMessage),
     stream: true,
     max_output_tokens: model.maxOutputTokens,
+    ...(model.serviceTier !== undefined ? { service_tier: model.serviceTier } : {}),
     ...(promptCacheKey !== undefined ? { prompt_cache_key: promptCacheKey } : {}),
   }
 

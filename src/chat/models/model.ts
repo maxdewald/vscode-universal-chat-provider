@@ -18,6 +18,10 @@ const SupportedReasoningLevelSchema = Type.Object({
   effort: Type.String(),
 }, { additionalProperties: true })
 
+const ServiceTierSchema = Type.Object({
+  id: Type.String(),
+}, { additionalProperties: true })
+
 export const ProxyModelMetadataSchema = Type.Object({
   slug: Type.String(),
   display_name: Type.Optional(Type.String()),
@@ -30,6 +34,7 @@ export const ProxyModelMetadataSchema = Type.Object({
   supports_parallel_tool_calls: Type.Optional(Type.Boolean()),
   supported_reasoning_levels: Type.Optional(Type.Array(SupportedReasoningLevelSchema)),
   default_reasoning_level: Type.Optional(Type.String()),
+  service_tiers: Type.Optional(Type.Array(ServiceTierSchema)),
 }, { additionalProperties: true })
 
 export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
@@ -37,6 +42,7 @@ export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
 export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string
   proxyOwner: string
+  serviceTier?: 'priority'
   reasoningLevels: readonly string[]
   reasoningEffort?: string
   supportsParallelToolCalls: boolean
@@ -141,13 +147,32 @@ export function mapProxyModels(
   }
 
   const ambiguousNames = ambiguousDisplayNames(candidates, options)
-  return candidates.map(candidate => toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate)))).sort((a, b) => {
-    const baseA = a.name.replace(REASONING_NAME_SUFFIX, '')
-    const baseB = b.name.replace(REASONING_NAME_SUFFIX, '')
-    return baseA === baseB
-      ? effortRank(a.reasoningEffort) - effortRank(b.reasoningEffort)
-      : baseA.localeCompare(baseB)
+  const models = candidates.map(candidate => ({
+    model: toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate))),
+    supportsFastMode: supportsFastMode(candidate.detail),
+  }))
+  models.sort((a, b) => {
+    const nameOrder = a.model.name.replace(REASONING_NAME_SUFFIX, '')
+      .localeCompare(b.model.name.replace(REASONING_NAME_SUFFIX, ''))
+    if (nameOrder !== 0)
+      return nameOrder
+    return effortRank(a.model.reasoningEffort) - effortRank(b.model.reasoningEffort)
   })
+  return models.flatMap(({ model, supportsFastMode }) => supportsFastMode ? [model, toFastModel(model)] : [model])
+}
+
+function supportsFastMode(metadata: ProxyModelMetadata | undefined): boolean {
+  return metadata?.service_tiers?.some(tier => tier.id.trim().toLowerCase() === 'priority') ?? false
+}
+
+function toFastModel(model: ProviderModel): ProviderModel {
+  return {
+    ...model,
+    id: `${model.id}:fast`,
+    name: `${model.name} (Fast Mode)`,
+    detail: `1.5x usage · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
+    serviceTier: 'priority',
+  }
 }
 
 function ambiguousDisplayNames(candidates: readonly ModelCandidate[], options: ModelMappingOptions): Set<string> {

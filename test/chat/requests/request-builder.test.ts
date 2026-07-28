@@ -157,6 +157,18 @@ describe('response request conversion', () => {
     })
   })
 
+  it('adds priority service tier only for Fast variants', () => {
+    const messages = [userTextMessage('hello')]
+    const options = { toolMode: LanguageModelChatToolMode.Auto }
+    const standard = buildRequest(model, messages, options)
+    const fast = buildRequest({ ...model, serviceTier: 'priority' }, messages, options)
+
+    expect(standard).not.toHaveProperty('service_tier')
+    expect(fast).toHaveProperty('service_tier', 'priority')
+    expect(fast.model).toBe('proxy-model')
+    expect(fast.prompt_cache_key).toBe(standard.prompt_cache_key)
+  })
+
   it('keeps prompt cache keys stable across turns in the same chat seed', () => {
     const firstTurn = [userTextMessage('hello')]
     const secondTurn = [
