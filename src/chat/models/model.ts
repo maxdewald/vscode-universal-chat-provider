@@ -45,7 +45,15 @@ export interface ProviderModel extends LanguageModelChatInformation {
 
 interface ModelConfigurationSchema {
   properties: {
-    reasoningEffort: {
+    contextSize: {
+      type: 'number'
+      enum: readonly number[]
+      enumItemLabels: readonly string[]
+      default: number
+      description: string
+      group: 'tokens'
+    }
+    reasoningEffort?: {
       type: 'string'
       enum: readonly string[]
       enumItemLabels: readonly string[]
@@ -170,6 +178,16 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     || (catalogModel?.supported_parameters?.includes('tools') ?? true)
   const description = detail?.description ?? catalogModel?.description
   const tooltip = buildTooltip(name, description, displayProviderName, outputTokens, imageInput, toolCalling)
+  const configurationProperties: ModelConfigurationSchema['properties'] = {
+    contextSize: {
+      type: 'number',
+      enum: [totalContext],
+      enumItemLabels: [formatTokens(totalContext)],
+      default: totalContext,
+      description: 'Context Size',
+      group: 'tokens',
+    },
+  }
 
   const baseModel = {
     proxyModelId: entry.id,
@@ -179,8 +197,9 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     maxInputTokens: totalContext,
     maxOutputTokens: outputTokens,
     supportsParallelToolCalls,
-    detail: `${formatTokens(totalContext)} context · ${displayProviderName}`,
+    detail: displayProviderName,
     tooltip,
+    configurationSchema: { properties: configurationProperties },
     capabilities: {
       imageInput,
       toolCalling,
@@ -190,24 +209,20 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
   if (levels.length >= 2) {
     const ordered = [...levels].sort((a, b) => effortRank(a) - effortRank(b))
     const defaultLevel = resolveDefaultLevel(detail?.default_reasoning_level, ordered)
+    configurationProperties.reasoningEffort = {
+      type: 'string',
+      enum: ordered,
+      enumItemLabels: ordered.map(formatLevel),
+      default: defaultLevel,
+      description: 'Thinking Effort',
+      group: 'navigation',
+    }
     return {
       ...baseModel,
       id: entry.id,
       name,
       reasoningLevels: ordered,
       reasoningEffort: defaultLevel,
-      configurationSchema: {
-        properties: {
-          reasoningEffort: {
-            type: 'string',
-            enum: ordered,
-            enumItemLabels: ordered.map(formatLevel),
-            default: defaultLevel,
-            description: 'Thinking Effort',
-            group: 'navigation',
-          },
-        },
-      },
     }
   }
 

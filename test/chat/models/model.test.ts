@@ -43,6 +43,14 @@ describe('model mapping', () => {
     })
     expect(models[0]?.configurationSchema).toEqual({
       properties: {
+        contextSize: {
+          type: 'number',
+          enum: [400_000],
+          enumItemLabels: ['400K'],
+          default: 400_000,
+          description: 'Context Size',
+          group: 'tokens',
+        },
         reasoningEffort: {
           type: 'string',
           enum: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
@@ -69,7 +77,7 @@ describe('model mapping', () => {
     )
 
     expect(model?.reasoningEffort).toBe('low')
-    expect(model?.configurationSchema?.properties.reasoningEffort.default).toBe('low')
+    expect(model?.configurationSchema?.properties.reasoningEffort?.default).toBe('low')
   })
 
   it('keeps every provider model while filtering media-only endpoints', () => {
@@ -244,6 +252,18 @@ describe('model mapping', () => {
 
     expect(model?.name).toBe('Fixed Model (High)')
     expect(model?.reasoningEffort).toBeUndefined()
+    expect(model?.configurationSchema).toEqual({
+      properties: {
+        contextSize: {
+          type: 'number',
+          enum: [128_000],
+          enumItemLabels: ['128K'],
+          default: 128_000,
+          description: 'Context Size',
+          group: 'tokens',
+        },
+      },
+    })
   })
 
   it('keeps distinct aliases when their reasoning choices differ', () => {
@@ -300,11 +320,11 @@ describe('model mapping', () => {
 
     const detail = Object.fromEntries(models.map(model => [model.id, model.detail]))
     expect(detail).toMatchObject({
-      gpt: '128K context · Codex',
-      atlas: '128K context · Antigravity',
-      sonnet: '128K context · Claude Code',
-      grok: '128K context · Grok',
-      mystery: '128K context · Acme-labs',
+      gpt: 'Codex',
+      atlas: 'Antigravity',
+      sonnet: 'Claude Code',
+      grok: 'Grok',
+      mystery: 'Acme-labs',
     })
     expect(models.find(model => model.id === 'gpt')?.tooltip).toContain('Codex via CLIProxyAPI')
   })
@@ -592,7 +612,7 @@ describe('catalog model mapping', () => {
       maxOutputTokens: 50_000,
       reasoningLevels: ['none', 'low', 'medium', 'high', 'auto'],
       reasoningEffort: 'high',
-      detail: '1M context · Vendor',
+      detail: 'Vendor',
       capabilities: {
         imageInput: true,
         toolCalling: false,
