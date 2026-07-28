@@ -1,0 +1,76 @@
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish
+        required: true
+        type: string
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up project
+        uses: ./.github/actions/setup
+
+      - name: Package extension
+        run: pnpm ext:package
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension
+          path: ./*.vsix
+
+  open-vsx:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v8
+        with:
+          name: extension
+
+      - name: Publish
+        run: npx --yes ovsx@1.0.2 publish ./*.vsix
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+  marketplace:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v8
+        with:
+          name: extension
+
+      - name: Publish
+        run: npx --yes @vscode/vsce@3.9.2 publish --packagePath ./*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

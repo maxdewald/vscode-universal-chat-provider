@@ -99,6 +99,9 @@ jobs:
       issues: write
       pull-requests: write
       id-token: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
 
     steps:
       - name: Run release-please
@@ -108,29 +111,10 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - name: Checkout
-        if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.release.outputs.tag_name }}
-          fetch-depth: 0
-
-      - name: Set up project
-        if: ${{ steps.release.outputs.release_created }}
-        uses: ./.github/actions/setup
-
-      - name: Package extension
-        if: ${{ steps.release.outputs.release_created }}
-        run: pnpm ext:package
-
-      - name: Publish to Open VSX
-        if: ${{ steps.release.outputs.release_created }}
-        run: npx --yes ovsx@1.0.2 publish ./*.vsix
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-
-      - name: Publish extension to VSC Marketplace
-        if: ${{ !cancelled() && steps.release.outputs.release_created }}
-        run: pnpm exec vsce publish --packagePath ./*.vsix
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+  publish:
+    needs: release
+    if: ${{ needs.release.outputs.created == 'true' }}
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit
