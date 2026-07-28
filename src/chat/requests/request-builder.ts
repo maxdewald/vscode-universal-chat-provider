@@ -37,11 +37,16 @@ export interface ProxyRequestBody {
 
 export type ProxyRequestItem = Record<string, unknown>
 
+interface BuildRequestOptions {
+  reasoningEffort?: string | undefined
+  omitTools?: boolean
+}
+
 export function buildRequest(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
   options: ProvideLanguageModelChatResponseOptions,
-  reasoningEffort?: string,
+  { reasoningEffort, omitTools }: BuildRequestOptions = {},
 ): ProxyRequestBody {
   const promptCacheKey = buildPromptCacheKey(model, messages)
   const request: ProxyRequestBody = {
@@ -59,7 +64,7 @@ export function buildRequest(
   if (effort !== undefined)
     request.reasoning = { effort, summary: 'detailed' }
 
-  if (options.tools !== undefined && options.tools.length > 0) {
+  if (!omitTools && options.tools !== undefined && options.tools.length > 0) {
     request.tools = options.tools.map((tool) => {
       const parameters = tool.inputSchema ?? { type: 'object', properties: {} }
       return {

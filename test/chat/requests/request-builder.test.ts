@@ -128,7 +128,7 @@ describe('response request conversion', () => {
           },
         }],
       },
-      'high',
+      { reasoningEffort: 'high' },
     )
 
     expect(request).toEqual({
@@ -194,7 +194,7 @@ describe('response request conversion', () => {
     const request = buildRequest(model, [], {
       toolMode: LanguageModelChatToolMode.Auto,
       tools: [{ name: 'empty', description: 'No input' }],
-    }, 'medium')
+    }, { reasoningEffort: 'medium' })
 
     expect(request).toHaveProperty('reasoning', { effort: 'low', summary: 'detailed' })
     expect(request).not.toHaveProperty('prompt_cache_key')
@@ -212,5 +212,17 @@ describe('response request conversion', () => {
     const request = buildRequest(plainModel, [], { toolMode: LanguageModelChatToolMode.Auto })
 
     expect(request).not.toHaveProperty('reasoning')
+  })
+
+  it('drops every tool field when tools are omitted', () => {
+    const request = buildRequest(model, [userTextMessage('hello')], {
+      toolMode: LanguageModelChatToolMode.Required,
+      tools: [{ name: 'lookup', description: 'Look up a value' }],
+    }, { reasoningEffort: 'low', omitTools: true })
+
+    expect(request).not.toHaveProperty('tools')
+    expect(request).not.toHaveProperty('tool_choice')
+    expect(request).not.toHaveProperty('parallel_tool_calls')
+    expect(request).toHaveProperty('reasoning', { effort: 'low', summary: 'detailed' })
   })
 })

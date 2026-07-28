@@ -17,6 +17,7 @@ import type {
 import { CredentialFlows } from '@src/chat/credentials/credential-flows'
 import { CacheMetricsTracker, createContextUsagePart } from '@src/chat/diagnostics/cache-metrics'
 import { ModelRegistry } from '@src/chat/models/model-registry'
+import { detectCompaction } from '@src/chat/requests/compaction'
 import { streamCompletion } from '@src/chat/requests/completion'
 import { estimateTokens } from '@src/chat/requests/estimate'
 import { buildRequest } from '@src/chat/requests/request-builder'
@@ -29,6 +30,7 @@ import {
 } from 'vscode'
 
 const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
+const UCP_PREFIX = 'universal-chat-provider/'
 
 interface HostChatResponseOptions {
   modelConfiguration?: { reasoningEffort?: string }
@@ -164,19 +166,20 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     progress: Progress<LanguageModelResponsePart>,
     token: CancellationToken,
   ): Promise<void> {
-    this.lastUsedModel = { proxyModelId: model.proxyModelId, proxyOwner: model.proxyOwner, name: model.name }
     // Host-only fields used by Copilot Chat; not in the public ProvideLanguageModelChatResponseOptions type.
     const requestOptions = options as HostChatResponseOptions
-    const storedUtilityEffort = this.getUtilityEffort(model.id)
-    const utilityEffort = storedUtilityEffort !== undefined && model.reasoningLevels.includes(storedUtilityEffort)
-      ? storedUtilityEffort
-      : model.reasoningLevels[0]
-    const chosenEffort = requestOptions.requestInitiator === 'core'
-      ? utilityEffort ?? requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
-      : requestOptions.modelConfiguration?.reasoningEffort ?? model.reasoningEffort
-    const request = buildRequest(model, messages, options, chosenEffort)
+    const compaction = detectCompaction(messages)
+    const targetModel = compaction === 'separate' ? this.compactionModel(model) : model
+    this.lastUsedModel = { proxyModelId: targetModel.proxyModelId, proxyOwner: targetModel.proxyOwner, name: targetModel.name }
+    const chosenEffort = compaction !== undefined
+      // Compaction is prose over a transcript-sized prompt, so the lowest level is what makes it fast.
+      ? targetModel.reasoningLevels[0]
+      : requestOptions.requestInitiator === 'core'
+        ? this.utilityEffort(targetModel) ?? requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
+        : requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
+    const request = buildRequest(targetModel, messages, options, { reasoningEffort: chosenEffort, omitTools: compaction !== undefined })
     const recordUsage = this.cacheMetrics.start({
-      model: model.proxyModelId,
+      model: targetModel.proxyModelId,
       promptCacheKey: request.prompt_cache_key,
       reasoningEffort: request.reasoning?.effort,
       inputItems: request.input,
@@ -232,6 +235,11 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return this.context.globalState.get<Record<string, string>>(UTILITY_EFFORTS_KEY, {})[modelId]
   }
 
+  private utilityEffort(model: ProviderModel): string | undefined {
+    const stored = this.getUtilityEffort(model.id)
+    return stored !== undefined && model.reasoningLevels.includes(stored) ? stored : model.reasoningLevels[0]
+  }
+
   async updateUtilityEffort(modelId: string, effort: string | undefined): Promise<void> {
     const next = { ...this.context.globalState.get<Record<string, string>>(UTILITY_EFFORTS_KEY, {}) }
     if (effort === undefined)
@@ -251,6 +259,15 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   async clearCredentials(): Promise<void> {
     return this.credentialFlows.clearCredentials()
+  }
+
+  // Falls back to the current model, which still gets the lowest reasoning level and no tools.
+  private compactionModel(current: ProviderModel): ProviderModel {
+    const configured = vscode.workspace.getConfiguration('chat').get<string>('utilityModel', '').trim()
+    if (!configured.startsWith(UCP_PREFIX))
+      return current
+    const utility = this.registry.snapshot().find(candidate => candidate.id === configured.slice(UCP_PREFIX.length))
+    return utility !== undefined && utility.maxInputTokens >= current.maxInputTokens ? utility : current
   }
 
   private completionDeps(): CompletionDeps {

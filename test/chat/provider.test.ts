@@ -1,5 +1,5 @@
 import type { StreamCallbacks } from '@src/cliproxy/api/proxy-client'
-import type { OutputChannel } from 'vscode'
+import type { LanguageModelChatMessageRole, OutputChannel } from 'vscode'
 import { UniversalChatProvider } from '@src/chat/provider'
 import { estimateTokens } from '@src/chat/requests/estimate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -343,6 +343,113 @@ describe('language model provider', () => {
     ])
   })
 })
+
+describe('conversation compaction', () => {
+  it('runs compaction on the utility model at the lowest effort without tools', async () => {
+    const provider = createProvider('secret')
+    clientMocks.discover.mockResolvedValue({
+      available: [
+        { id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
+        { id: 'cheap', owned_by: 'test', context_length: 200_000, max_completion_tokens: 20 },
+      ],
+      metadata: [{
+        slug: 'cheap',
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
+        default_reasoning_level: 'high',
+      }],
+    })
+    await provider.getModels(false)
+    vscodeMock.settings.set('chat.utilityModel', 'universal-chat-provider/cheap')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onUsage?.({ output_tokens: 1 })
+    })
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
+      compactionMessages(),
+      { ...options(), tools: [{ name: 'lookup', description: 'Look up' }] },
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'cheap',
+        reasoning: { effort: 'low', summary: 'detailed' },
+      }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(requestBody()).not.toHaveProperty('tools')
+    expect(requestBody()).not.toHaveProperty('tool_choice')
+  })
+
+  it('keeps the current model at the lowest effort when no utility model is set', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onUsage?.({ output_tokens: 1 })
+    })
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
+      compactionMessages(),
+      { ...options(), tools: [{ name: 'lookup', description: 'Look up' }] },
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'model-a',
+        reasoning: { effort: 'low', summary: 'detailed' },
+      }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(requestBody()).not.toHaveProperty('tools')
+  })
+
+  it('leaves ordinary requests on the selected model with tools intact', async () => {
+    const provider = createProvider('secret')
+    vscodeMock.settings.set('chat.utilityModel', 'universal-chat-provider/cheap')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onUsage?.({ output_tokens: 1 })
+    })
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
+      [userTextMessage('hello')],
+      { ...options(), tools: [{ name: 'lookup', description: 'Look up' }] },
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'model-a',
+        reasoning: { effort: 'high', summary: 'detailed' },
+      }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(requestBody()).toHaveProperty('tools')
+  })
+})
+
+function requestBody(): object {
+  return clientMocks.streamResponse.mock.calls[0]?.[0] as object
+}
+
+function compactionMessages() {
+  return [
+    {
+      role: 3 as LanguageModelChatMessageRole,
+      content: [new LanguageModelTextPart('Your task is to create a comprehensive, detailed summary of the entire conversation')],
+      name: undefined,
+    },
+    userTextMessage('Summarize the conversation history so far, paying special attention to the most recent agent commands and tool results.'),
+  ]
+}
 
 function createProvider(apiKey?: string, onSignIn?: () => Promise<void>): UniversalChatProvider {
   if (apiKey !== undefined)
