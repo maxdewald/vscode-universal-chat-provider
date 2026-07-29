@@ -51,6 +51,9 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
     'auth-dir': options.authDir,
     'api-keys': [options.apiKey],
     'logging-to-file': false,
+    'request-retry': 3,
+    'max-retry-interval': 30,
+    'transient-error-cooldown-seconds': -1,
     'routing': {
       'strategy': 'round-robin',
       'session-affinity': true,
