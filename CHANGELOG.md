@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.31.0...v0.32.0) (2026-07-28)
+
+
+### Features
+
+* **models:** expose context size in configuration schema ([fb7cba1](https://github.com/maxdewald/vscode-universal-chat-provider/commit/fb7cba17fed9a075fdabd85c49badc9a13caea47))
+* **models:** support fast mode model variants ([323b350](https://github.com/maxdewald/vscode-universal-chat-provider/commit/323b3505fe3edc0388213959ac0330f7dc495dee))
+
 ## [0.31.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.30.3...v0.31.0) (2026-07-27)
 
 
