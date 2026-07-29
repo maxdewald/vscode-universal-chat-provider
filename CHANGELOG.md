@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.32.0...v0.32.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **chat:** report utility model request failures ([705f39b](https://github.com/maxdewald/vscode-universal-chat-provider/commit/705f39b708bba30db9d00cd63a7bcbd6cf1f7a6e))
+* **json:** include invalid value in validation error reports ([82160e4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/82160e447cd2a9804778a31cf4636d95d4ded4d8))
+
 ## [0.32.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.31.0...v0.32.0) (2026-07-28)
 
 
