@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.32.1...v0.33.0) (2026-07-29)
+
+
+### Features
+
+* **cliproxy:** add default retry and cooldown settings ([93804ff](https://github.com/maxdewald/vscode-universal-chat-provider/commit/93804ff234ed6a5553b7aee3571e66d891f7812c))
+
 ## [0.32.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.32.0...v0.32.1) (2026-07-29)
 
 
