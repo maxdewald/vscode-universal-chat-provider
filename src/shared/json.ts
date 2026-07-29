@@ -12,7 +12,7 @@ export function asValue<T extends TSchema>(schema: T, value: unknown): Static<T>
     return value
 
   const errors = [...Value.Errors(schema, value)]
-  reportValidationError?.(`TypeBox validation failed: ${JSON.stringify(errors)}`)
+  reportValidationError?.(`TypeBox validation failed for ${JSON.stringify(value)}: ${JSON.stringify(errors)}`)
   return undefined
 }
 

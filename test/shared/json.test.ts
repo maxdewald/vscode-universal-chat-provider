@@ -15,7 +15,7 @@ describe('json schema validation', () => {
 
     expect(asValue(schema, { name: 42 })).toBeUndefined()
     expect(report).toHaveBeenCalledOnce()
-    expect(report.mock.calls[0]?.[0]).toContain('TypeBox validation failed:')
+    expect(report.mock.calls[0]?.[0]).toContain('TypeBox validation failed for {"name":42}:')
     expect(report.mock.calls[0]?.[0]).toContain('/name')
     expect(report.mock.calls[0]?.[0]).toContain('string')
   })
