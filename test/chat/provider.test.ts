@@ -11,7 +11,7 @@ import {
   LanguageModelToolCallPart,
 } from 'vscode'
 import { createProviderModel, decodeJsonDataPart, singleModelDiscovery, userTextMessage } from '../support/chat'
-import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock } from '../support/vscode'
+import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock, window } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
   discover: vi.fn(),
@@ -193,6 +193,24 @@ describe('language model provider', () => {
       expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
+    )
+  })
+
+  it('shows the reason when a core utility request fails', async () => {
+    const provider = createProvider('secret')
+    const failure = new Error('provider unavailable')
+    clientMocks.streamResponse.mockRejectedValueOnce(failure)
+
+    await expect(provider.provideLanguageModelChatResponse(
+      model(),
+      [userTextMessage('hello')],
+      { ...options(), requestInitiator: 'core' } as ReturnType<typeof options>,
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )).rejects.toBe(failure)
+
+    expect(window.showErrorMessage).toHaveBeenCalledWith(
+      'Utility model request failed: provider unavailable',
     )
   })
 

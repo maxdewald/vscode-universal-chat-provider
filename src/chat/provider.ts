@@ -23,6 +23,7 @@ import { estimateTokens } from '@src/chat/requests/estimate'
 import { buildRequest } from '@src/chat/requests/request-builder'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { remainingForModel } from '@src/cliproxy/quota/quota'
+import { errorMessage } from '@src/shared/errors'
 import * as vscode from 'vscode'
 import {
   LanguageModelTextPart,
@@ -206,6 +207,11 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
         },
         token,
       )
+    }
+    catch (error) {
+      if (requestOptions.requestInitiator === 'core')
+        void vscode.window.showErrorMessage(`Utility model request failed: ${errorMessage(error)}`)
+      throw error
     }
     finally {
       // Spend just happened — let the host refresh quota (throttled) so the warning stays current.
