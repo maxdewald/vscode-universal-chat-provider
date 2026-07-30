@@ -48,9 +48,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly cacheMetrics: CacheMetricsTracker
   private quotaReports: QuotaReport[] = []
   private lastUsedModel: { proxyModelId: string, proxyOwner: string, name: string } | undefined
-  // Fired after each request so the host can re-render the status bar for the active model and
-  // refresh quota (throttled) once the spend has landed. Wired by the extension entrypoint.
-  onActivity: (() => void) | undefined
+  onActivity: ((model: { proxyOwner: string }) => void) | undefined
 
   constructor(
     private readonly context: ExtensionContext,
@@ -214,8 +212,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       throw error
     }
     finally {
-      // Spend just happened — let the host refresh quota (throttled) so the warning stays current.
-      this.onActivity?.()
+      this.onActivity?.(targetModel)
     }
   }
 

@@ -10,6 +10,12 @@ export type { QuotaReport, QuotaWindow } from '@src/cliproxy/quota/providers/typ
 
 const ObjectSchema = Type.Object({}, { additionalProperties: true })
 
+export function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
+  const owner = model.proxyOwner.toLowerCase()
+  return (Object.keys(QUOTA_PROVIDERS) as Array<QuotaReport['provider']>)
+    .find(name => QUOTA_PROVIDERS[name].owners.includes(owner))
+}
+
 // backoff maps authIndex -> deadline and is owned here: fetchProviderQuota writes it from the
 // response headers, and an account still inside its window is echoed as an error report (not
 // fetched) so setQuotas keeps its last-good value without touching the upstream.
@@ -17,12 +23,13 @@ export async function fetchQuotas(
   client: ManagementClient,
   signal?: AbortSignal,
   backoff: Map<string, number> = new Map(),
+  providerFilter?: QuotaReport['provider'],
 ): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
     const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
     const provider = raw === 'xai' ? 'grok' : raw
-    if (!isQuotaProvider(provider))
+    if (!isQuotaProvider(provider) || (providerFilter !== undefined && provider !== providerFilter))
       return []
     if ((backoff.get(entry.auth_index?.trim() ?? '') ?? 0) > Date.now()) {
       const account = accountOf(entry)
@@ -58,11 +65,10 @@ export function formatResetCountdown(resetsAt: number | undefined): string | und
 // Maps a model to its remaining-quota percent by handing the report to the provider that
 // bills its owner. Antigravity is keyed per model; the rest report account-level windows.
 export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: string, proxyModelId: string }): number | undefined {
-  const owner = model.proxyOwner.toLowerCase()
-  const match = Object.entries(QUOTA_PROVIDERS).find(([, provider]) => provider.owners.includes(owner))
-  if (match === undefined)
+  const name = quotaProviderForModel(model)
+  if (name === undefined)
     return undefined
-  const [name, provider] = match
+  const provider = QUOTA_PROVIDERS[name]
   const report = reports.find(candidate => candidate.provider === name && candidate.error === undefined)
   return report === undefined ? undefined : provider.remaining(report, model.proxyModelId)
 }

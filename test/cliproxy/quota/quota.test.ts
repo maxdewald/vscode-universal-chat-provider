@@ -74,6 +74,19 @@ describe('fetchQuotas', () => {
     ])
   })
 
+  it('fetches only the provider used by the active model', async () => {
+    const { client, apiCall } = createManagementClientFake([
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
+    ], respondOk)
+
+    const reports = await fetchQuotas(client, undefined, new Map(), 'claude')
+
+    expect(reports.map(report => report.provider)).toEqual(['claude'])
+    expect(apiCall).toHaveBeenCalledTimes(1)
+    expect(apiCall.mock.calls[0]?.[0].url).toContain('oauth/usage')
+  })
+
   it('parses codex reset_at as epoch seconds, falling back to reset_after_seconds', async () => {
     const now = Date.now()
     const body = JSON.stringify({

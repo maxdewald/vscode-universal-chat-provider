@@ -21,10 +21,10 @@ import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
 import { pickUpdate } from '@src/cliproxy/managed/update-policy'
 import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
-import { fetchQuotas } from '@src/cliproxy/quota/quota'
+import { fetchQuotas, quotaProviderForModel } from '@src/cliproxy/quota/quota'
 import { countAccounts } from '@src/cliproxy/status'
 import { errorMessage } from '@src/shared/errors'
-import { debounce, throttle } from 'moderndash'
+import { debounce } from 'moderndash'
 import {
   ConfigurationTarget,
   ProgressLocation,
@@ -33,6 +33,8 @@ import {
 } from 'vscode'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from '@src/cliproxy/status'
+
+const QUOTA_REFRESH_INTERVAL_MS = 180_000
 
 export class ServerController implements ProxyConnection {
   private readonly disposables: Disposable[] = []
@@ -43,12 +45,12 @@ export class ServerController implements ProxyConnection {
   private logTailer: LogTailer | undefined
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => void this.notifyAccountsChanged(), 750)
-  // Anthropic's oauth/usage rate-limits with a ~4min Retry-After, so stay well above that.
-  readonly scheduleQuotaRefresh = throttle(() => void this.refreshQuotas(), 120_000)
   private refreshListener: ((expectedModelIds?: readonly string[]) => Promise<void>) | undefined
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
-  private quotaRefresh: Promise<void> | undefined
+  private quotaReports: QuotaReport[] = []
+  private activeQuotaProvider: QuotaReport['provider'] | undefined
+  private lastQuotaRefresh = new Map<QuotaReport['provider'], number>()
   private quotaBackoff = new Map<string, number>()
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
@@ -118,7 +120,6 @@ export class ServerController implements ProxyConnection {
       await this.bootstrap()
       await this.server!.ensureRunning()
       this.setStatus('running')
-      void this.refreshQuotas()
       void this.accounts.maybePromptLogin()
       void this.maybeUpdateOnStartup()
     }
@@ -138,6 +139,11 @@ export class ServerController implements ProxyConnection {
 
   setQuotaListener(listener: (reports: QuotaReport[]) => void): void {
     this.quotaListener = listener
+  }
+
+  scheduleQuotaRefresh(model: { proxyOwner: string }): void {
+    this.activeQuotaProvider = quotaProviderForModel(model)
+    void this.refreshQuotas()
   }
 
   async login(): Promise<void> {
@@ -342,36 +348,39 @@ export class ServerController implements ProxyConnection {
 
   private async notifyAccountsChanged(expectedModelIds?: readonly string[]): Promise<void> {
     await this.refreshListener?.(expectedModelIds)
-    // Throttled: CPA rewrites auth files on every token refresh, which would otherwise sweep every account.
-    this.scheduleQuotaRefresh()
   }
 
-  // Refreshes quota and notifies the listener. Triggered on server/account events and when
-  // the quota menu opens. ponytail: no poll — add a timer only if staleness becomes a problem.
   async refreshQuotas(): Promise<void> {
-    if (this.quotaListener === undefined)
+    const provider = this.activeQuotaProvider
+    if (this.quotaListener === undefined || provider === undefined)
       return
-    this.quotaRefresh ??= this.performQuotaRefresh().finally(() => {
-      this.quotaRefresh = undefined
-    })
-    return this.quotaRefresh
+    const lastRefresh = this.lastQuotaRefresh.get(provider)
+    if (lastRefresh !== undefined && Date.now() - lastRefresh < QUOTA_REFRESH_INTERVAL_MS)
+      return
+    // Claimed before awaiting so a concurrent call is gated by the same window.
+    this.lastQuotaRefresh.set(provider, Date.now())
+    return this.performQuotaRefresh(provider)
   }
 
-  private async performQuotaRefresh(): Promise<void> {
+  private async performQuotaRefresh(provider: QuotaReport['provider']): Promise<void> {
     const management = await this.managementForStatus()
-    if (management === undefined)
+    if (management === undefined) {
+      this.lastQuotaRefresh.delete(provider)
       return
+    }
     try {
       const reports = await fetchQuotas(
         new ManagementClient(management.baseUrl, management.key),
         undefined,
         this.quotaBackoff,
+        provider,
       )
       for (const report of reports) {
         if (report.error !== undefined)
           this.output.appendLine(`Quota fetch failed for ${report.provider}${report.account === undefined ? '' : ` (${report.account.label})`}: ${report.error}`)
       }
-      this.quotaListener?.(reports)
+      this.quotaReports = [...this.quotaReports.filter(report => report.provider !== provider), ...reports]
+      this.quotaListener?.(this.quotaReports)
     }
     catch (error) {
       this.output.appendLine(`Quota refresh failed: ${errorMessage(error)}`)

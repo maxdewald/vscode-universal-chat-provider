@@ -1,6 +1,7 @@
 import type { ExtensionContext } from 'vscode'
 import { readdir, readFile } from 'node:fs/promises'
 import process from 'node:process'
+import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { ServerController } from '@src/cliproxy/controller'
 import { managedPaths } from '@src/cliproxy/managed/config'
 import { claimLease } from '@src/cliproxy/managed/leases'
@@ -166,6 +167,40 @@ describe('server controller lifecycle', () => {
     releaseRefresh()
     await changed
     expect(completed).toBe(true)
+    controller.dispose()
+  })
+
+  it('refreshes only the active model provider at most once every three minutes', async () => {
+    vi.useFakeTimers({ now: new Date('2026-07-30T12:00:00Z') })
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    controller.setQuotaListener(vi.fn())
+    vi.spyOn(controller as unknown as { managementForStatus: () => Promise<{ baseUrl: string, key: string }> }, 'managementForStatus')
+      .mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', key: 'secret' })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
+    ])
+    const apiCall = vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
+      statusCode: 200,
+      header: {},
+      body: JSON.stringify({ rate_limit: {} }),
+    })
+
+    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
+    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(1))
+    expect(apiCall.mock.calls[0]?.[0].url).toContain('wham/usage')
+
+    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
+    await Promise.resolve()
+    expect(apiCall).toHaveBeenCalledTimes(1)
+
+    controller.scheduleQuotaRefresh({ proxyOwner: 'anthropic' })
+    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(2))
+    expect(apiCall.mock.calls[1]?.[0].url).toContain('oauth/usage')
+
+    await vi.advanceTimersByTimeAsync(180_000)
+    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
+    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(3))
     controller.dispose()
   })
 
