@@ -178,7 +178,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       : requestOptions.requestInitiator === 'core'
         ? this.utilityEffort(targetModel) ?? requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
         : requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
-    const request = buildRequest(targetModel, messages, options, { reasoningEffort: chosenEffort, omitTools: compaction !== undefined })
+    const request = await buildRequest(targetModel, messages, options, { reasoningEffort: chosenEffort, omitTools: compaction !== undefined })
     const recordUsage = this.cacheMetrics.start({
       model: targetModel.proxyModelId,
       promptCacheKey: request.prompt_cache_key,

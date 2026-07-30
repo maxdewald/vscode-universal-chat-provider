@@ -5,6 +5,7 @@ import type {
 } from 'vscode'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
+import { fileTypeFromBuffer } from 'file-type'
 import {
   LanguageModelChatMessageRole,
   LanguageModelChatToolMode,
@@ -42,16 +43,16 @@ interface BuildRequestOptions {
   omitTools?: boolean
 }
 
-export function buildRequest(
+export async function buildRequest(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
   options: ProvideLanguageModelChatResponseOptions,
   { reasoningEffort, omitTools }: BuildRequestOptions = {},
-): ProxyRequestBody {
+): Promise<ProxyRequestBody> {
   const promptCacheKey = buildPromptCacheKey(model, messages)
   const request: ProxyRequestBody = {
     model: model.proxyModelId,
-    input: messages.flatMap(convertMessage),
+    input: (await Promise.all(messages.map(convertMessage))).flat(),
     stream: true,
     max_output_tokens: model.maxOutputTokens,
     ...(model.serviceTier !== undefined ? { service_tier: model.serviceTier } : {}),
@@ -104,7 +105,7 @@ function isCacheControlPart(part: unknown): boolean {
   return part instanceof LanguageModelDataPart && part.mimeType === 'cache_control'
 }
 
-export function convertMessage(message: LanguageModelChatRequestMessage): ProxyRequestItem[] {
+export async function convertMessage(message: LanguageModelChatRequestMessage): Promise<ProxyRequestItem[]> {
   const messageRole: number = message.role
   const role = messageRole === LanguageModelChatMessageRole.Assistant
     ? 'assistant'
@@ -122,16 +123,25 @@ export function convertMessage(message: LanguageModelChatRequestMessage): ProxyR
       })
     }
     else if (part instanceof LanguageModelDataPart) {
-      if (part.mimeType.startsWith('image/')) {
+      // Providers sniff the bytes and reject a mismatched mimeType, so the declared one is never trusted.
+      const detected = await fileTypeFromBuffer(part.data)
+      if (detected === undefined) {
+        content.push({
+          type: role === 'assistant' ? 'output_text' : 'input_text',
+          text: new TextDecoder().decode(part.data),
+        })
+      }
+      else if (detected.mime.startsWith('image/')) {
         content.push({
           type: 'input_image',
-          image_url: `data:${part.mimeType};base64,${Buffer.from(part.data).toString('base64')}`,
+          image_url: `data:${detected.mime};base64,${Buffer.from(part.data).toString('base64')}`,
         })
       }
       else {
         content.push({
-          type: role === 'assistant' ? 'output_text' : 'input_text',
-          text: new TextDecoder().decode(part.data),
+          type: 'input_file',
+          filename: `document.${detected.ext}`,
+          file_data: `data:${detected.mime};base64,${Buffer.from(part.data).toString('base64')}`,
         })
       }
     }
