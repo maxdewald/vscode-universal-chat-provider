@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.33.0...v0.34.0) (2026-07-30)
+
+
+### Features
+
+* **chat:** detect MIME types and support file inputs, fixes png inputs ([74f5be2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/74f5be2fdc9b01d80e48a964d1f4833d6973e725))
+
 ## [0.33.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.32.1...v0.33.0) (2026-07-29)
 
 
