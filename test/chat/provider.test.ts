@@ -284,7 +284,7 @@ describe('language model provider', () => {
 
   it('keeps a pending row for an account whose quota has not loaded yet', () => {
     const provider = createProvider()
-    provider.setQuotas([{ provider: 'claude', windows: [], error: 'rate limited' }])
+    provider.setQuotas([{ provider: 'claude', windows: [] }])
 
     expect(provider.quotaSections()).toEqual([
       { title: 'Claude', entries: [{ name: 'Quota', remainingPercent: undefined }] },

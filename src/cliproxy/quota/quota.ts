@@ -17,8 +17,8 @@ export function quotaProviderForModel(model: { proxyOwner: string }): QuotaRepor
 }
 
 // backoff maps authIndex -> deadline and is owned here: fetchProviderQuota writes it from the
-// response headers, and an account still inside its window is echoed as an error report (not
-// fetched) so setQuotas keeps its last-good value without touching the upstream.
+// response headers, and an account still inside its window reports no windows instead of being
+// fetched, so setQuotas keeps its last-good value without touching the upstream.
 export async function fetchQuotas(
   client: ManagementClient,
   signal?: AbortSignal,
@@ -33,7 +33,7 @@ export async function fetchQuotas(
       return []
     if ((backoff.get(entry.auth_index?.trim() ?? '') ?? 0) > Date.now()) {
       const account = accountOf(entry)
-      return [Promise.resolve<QuotaReport>({ provider, windows: [], error: 'rate limited', ...(account === undefined ? {} : { account }) })]
+      return [Promise.resolve<QuotaReport>({ provider, windows: [], ...(account === undefined ? {} : { account }) })]
     }
     return [fetchProviderQuota(provider, QUOTA_PROVIDERS[provider], client, entry, signal, backoff)]
   })

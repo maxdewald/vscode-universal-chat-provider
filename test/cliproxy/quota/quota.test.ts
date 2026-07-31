@@ -401,10 +401,9 @@ describe('fetchQuotas', () => {
 
   it('skips the upstream call while an account is inside its Retry-After window', async () => {
     const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
-    const until = Date.now() + 60_000
 
-    const report = (await fetchQuotas(client, undefined, new Map([['x1', until]])))[0]!
-    expect(report).toMatchObject({ provider: 'claude', error: 'rate limited' })
+    const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() + 60_000]])))[0]!
+    expect(report).toMatchObject({ provider: 'claude', windows: [] })
     expect(apiCall).not.toHaveBeenCalled()
   })
 
