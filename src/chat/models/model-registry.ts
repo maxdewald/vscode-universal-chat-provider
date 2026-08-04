@@ -110,8 +110,12 @@ export class ModelRegistry {
           this.output.appendLine('Enriched OpenAI-compatible thinking levels from the model catalog.')
       }
       const discovery = await client.discover(controller.signal)
+      const authorizedClaudeModels = await this.connection.authorizedClaudeModels?.()
+      const available = authorizedClaudeModels === undefined
+        ? discovery.available
+        : discovery.available.filter(model => model.owned_by?.toLowerCase() !== 'anthropic' || authorizedClaudeModels.has(model.id))
       const collisions = new Set<string>()
-      const models = mapProxyModels(discovery.available, discovery.metadata, catalog, {
+      const models = mapProxyModels(available, discovery.metadata, catalog, {
         onSkipped: (id, reason) => this.output.appendLine(`Skipped model ${id}: ${reason}.`),
         onCollision: message => collisions.add(message),
       })

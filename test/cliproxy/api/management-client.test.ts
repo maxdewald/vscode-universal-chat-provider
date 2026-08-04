@@ -107,6 +107,28 @@ describe('management client', () => {
     await expect(client.listAuthFiles()).rejects.toMatchObject({ message: 'invalid key' })
   })
 
+  it('sends api-call bodies with duplex so older undici does not reject them', async () => {
+    // The VS Code extension host bundles an undici build that throws
+    // "RequestInit: duplex option is required when sending a body" when a body-carrying request
+    // is dispatched without `duplex` in the fetch init. ky forwards the body on the Request but
+    // strips `duplex` from the init, so the client must inject it via a custom fetch.
+    const fetchMock = vi.fn<(request: Request, init?: RequestInit) => Promise<Response>>(async (request, init) => {
+      const hasBody = request.body !== null || init?.body != null
+      if (hasBody && (init as { duplex?: string } | undefined)?.duplex !== 'half')
+        throw new TypeError('RequestInit: duplex option is required when sending a body.')
+      return Response.json({ status_code: 200, body: '{}' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = createClient()
+
+    await expect(client.apiCall({ auth_index: 'a1', method: 'GET', url: 'https://example.com' })).resolves.toEqual({
+      statusCode: 200,
+      header: {},
+      body: '{}',
+    })
+    expect((fetchMock.mock.calls[0]![1] as { duplex?: string }).duplex).toBe('half')
+  })
+
   it('retries transient local api-call failures with ky', async () => {
     let attempts = 0
     const fetchMock = vi.fn(async () => {

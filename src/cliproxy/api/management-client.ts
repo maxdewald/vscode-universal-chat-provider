@@ -1,6 +1,7 @@
 import type { Static } from '@sinclair/typebox'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
+import { duplexFetch } from '@src/shared/fetch'
 import { asValue } from '@src/shared/json'
 import ky, { isHTTPError } from 'ky'
 
@@ -118,11 +119,13 @@ export class ManagementClient {
   constructor(baseUrl: string, key: string) {
     // ponytail: retry:0/timeout:false preserve the old raw-fetch behavior; ky just folds
     // away the bearer header, base path, and !ok error parsing (the beforeError hook).
+    // duplexFetch injects the `duplex` init that ky strips before it reaches fetch (see its docs).
     this.fetcher = ky.create({
       prefix: `${baseUrl}/v0/management`,
       headers: { Authorization: `Bearer ${key}` },
       retry: 0,
       timeout: false,
+      fetch: duplexFetch,
       hooks: { beforeError: [toManagementError] },
     })
   }

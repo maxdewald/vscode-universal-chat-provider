@@ -4,4 +4,5 @@ export interface ProxyConnection {
   ensureReady: (interactive: boolean) => Promise<void>
   baseUrl: () => string
   enrichOpenAICompatibilityThinking?: (catalog: ReadonlyMap<string, CatalogModel>) => Promise<boolean>
+  authorizedClaudeModels?: () => Promise<ReadonlySet<string> | undefined>
 }

@@ -175,6 +175,24 @@ describe('model registry', () => {
     )
   })
 
+  it('filters Claude models to the authenticated account model list', async () => {
+    const registry = createRegistry('secret', {}, {
+      authorizedClaudeModels: vi.fn(async () => new Set(['claude-opus-4-8'])),
+    })
+    clientMocks.discover.mockResolvedValue({
+      available: [
+        { id: 'claude-opus-4-8', owned_by: 'anthropic', context_length: 200_000, max_completion_tokens: 64_000 },
+        { id: 'claude-opus-4-7', owned_by: 'anthropic', context_length: 200_000, max_completion_tokens: 64_000 },
+        { id: 'gpt-5.6', owned_by: 'openai', context_length: 400_000, max_completion_tokens: 128_000 },
+      ],
+      metadata: [],
+    })
+
+    const models = await registry.forceRefresh(false)
+
+    expect(models.map(model => model.proxyModelId)).toEqual(['claude-opus-4-8', 'gpt-5.6'])
+  })
+
   it('reports regional restrictions without starting credential recovery', async () => {
     const rejected = vi.fn()
     const registry = createRegistry('secret', { onCredentialsRejected: rejected })
