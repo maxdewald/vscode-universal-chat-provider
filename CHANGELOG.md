@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.34.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.34.0...v0.34.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* **quota:** report empty windows instead of error during backoff ([a22cef0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/a22cef0e68552dbef416932b492544856beb566f))
+
+
+### Performance Improvements
+
+* **quota:** refresh quota only for active model provider ([6a7fb5e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6a7fb5e5721c8b9c0e19e091dc96f19bb39ef9f3))
+
 ## [0.34.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.33.0...v0.34.0) (2026-07-30)
 
 
