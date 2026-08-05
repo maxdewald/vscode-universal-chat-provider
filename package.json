@@ -36,7 +36,7 @@
   ],
   "engines": {
     "node": ">=22.18.0",
-    "vscode": "^1.124.0"
+    "vscode": "^1.131.0"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -272,7 +272,7 @@
     "@tsconfig/strictest": "^2.0.8",
     "@types/node": "^24.13.2",
     "@types/semver": "^7.7.1",
-    "@types/vscode": "^1.124.0",
+    "@types/vscode": "^1.125.0",
     "@vitest/coverage-v8": "^4.1.10",
     "@vscode/vsce": "^3.9.2",
     "eslint": "^10.7.0",
