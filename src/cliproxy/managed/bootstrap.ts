@@ -53,6 +53,7 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
       managementKey,
       authDir: paths.authDir,
       openAICompatibility: providers,
+      requestLogging: workspace.getConfiguration('universalChatProvider').get<string>('debugLevel', 'off') === 'requestLogging',
       ...(proxyUrl !== undefined ? { proxyUrl } : {}),
     }))
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)

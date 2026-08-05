@@ -100,6 +100,18 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('writes full request logging to managed config at the highest debug level', async () => {
+    vscodeMock.settings.set('universalChatProvider.debugLevel', 'requestLogging')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.ensureReady(false)
+
+    const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
+    expect(config['debug']).toBe(true)
+    expect(config['request-log']).toBe(true)
+    controller.dispose()
+  })
+
   it('generates managed config from persisted openai-compatible providers', async () => {
     const providers = [{
       'name': 'openrouter.ai',
@@ -121,7 +133,10 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('restarts the managed server when the proxy setting changes', async () => {
+  it.each([
+    'universalChatProvider.server.proxyUrl',
+    'universalChatProvider.debugLevel',
+  ])('restarts the managed server when %s changes', async (changedSetting) => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
     vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
@@ -129,7 +144,7 @@ describe('server controller lifecycle', () => {
     const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
 
     configurationListener?.({
-      affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl',
+      affectsConfiguration: section => section === changedSetting,
     })
 
     await vi.waitFor(() => expect(restart).toHaveBeenCalledWith('proxy configuration changed'))

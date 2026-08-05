@@ -102,7 +102,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 | `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                      | `boolean` | `true`                    |
 | `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                                | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
-| `universalChatProvider.debug`                 | Show prompt-cache hit rate and write per-request diagnostics to extension storage.                                                 | `boolean` | `false`                   |
+| `universalChatProvider.debugLevel`            | Diagnostic detail to collect. Request Logging restarts the managed server and writes sensitive payloads to disk.                   | `string`  | `"off"`                   |
 
 <!-- configs -->
 

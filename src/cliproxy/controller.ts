@@ -73,7 +73,9 @@ export class ServerController implements ProxyConnection {
       },
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration('universalChatProvider.server.proxyUrl') && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
+      const managedConfigChanged = event.affectsConfiguration('universalChatProvider.server.proxyUrl')
+        || event.affectsConfiguration('universalChatProvider.debugLevel')
+      if (managedConfigChanged && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
         void this.restartServer('proxy configuration changed')
     }))
   }

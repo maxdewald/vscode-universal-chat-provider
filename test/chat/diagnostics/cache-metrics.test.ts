@@ -153,6 +153,7 @@ describe('cacheMetricsTracker', () => {
   let directory: string
 
   beforeEach(async () => {
+    vscodeMock.settings.set('universalChatProvider.debugLevel', 'diagnostics')
     directory = await makeTempDirectory('ucp-cache-metrics-')
   })
 
@@ -192,6 +193,7 @@ describe('cacheMetricsTracker', () => {
   }
 
   it('logs the summary but writes nothing and hides the status bar while disabled', async () => {
+    vscodeMock.settings.set('universalChatProvider.debugLevel', 'off')
     const metrics = tracker()
     record(metrics, { output_tokens: 3 }, { model: 'model-a' })
     await metrics.flush()
@@ -205,7 +207,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('records a JSONL line and a status-bar hit rate when enabled', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     record(metrics, {
       input_tokens: 300,
@@ -231,7 +232,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('excludes usage without cache details from the session hit rate', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     record(metrics, {
       input_tokens: 300,
@@ -246,7 +246,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('shows an unavailable session hit rate until cache details are received', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
     await metrics.flush()
@@ -255,7 +254,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('counts unavailable requests without adding them to usage totals', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     record(metrics, undefined, { model: 'codex' })
     record(metrics, {
@@ -272,7 +270,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('fingerprints the request prefix so a stable lead and a divergent tail are distinguishable', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const system = { role: 'system', content: 'you are a helper' }
     record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
@@ -301,7 +298,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('windows a divergence on the change, not the start, so a long shared head does not hide it', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const head = 'x'.repeat(20_000)
     record(metrics, { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }, {
@@ -325,7 +321,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('isolates prefix comparisons by prompt cache key', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
     const systemA = { role: 'system', content: 'session a' }
@@ -343,7 +338,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('keeps invocation order when same-key requests complete in reverse order', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
     const system = { role: 'system', content: 'stable' }
@@ -360,7 +354,6 @@ describe('cacheMetricsTracker', () => {
   })
 
   it('does not compare requests without a prompt cache key', async () => {
-    vscodeMock.settings.set('universalChatProvider.debug', true)
     const metrics = tracker()
     const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
 

@@ -7,7 +7,6 @@ import { errorMessage } from '@src/shared/errors'
 import { asValue } from '@src/shared/json'
 import { LanguageModelDataPart, StatusBarAlignment, window, workspace } from 'vscode'
 
-const ENABLED_SETTING = 'debug'
 const LOG_FILE = 'debug.jsonl'
 const DIVERGED_CONTENT_CAP = 6000
 const DIVERGED_CONTENT_LEAD = 200
@@ -264,7 +263,7 @@ export class CacheMetricsTracker {
   }
 
   private enabled(): boolean {
-    return workspace.getConfiguration('universalChatProvider').get<boolean>(ENABLED_SETTING, false)
+    return workspace.getConfiguration('universalChatProvider').get<string>('debugLevel', 'off') !== 'off'
   }
 
   private accumulate(summary: UsageSummary): void {

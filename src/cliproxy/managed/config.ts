@@ -42,6 +42,7 @@ export interface ManagedConfigOptions {
   authDir: string
   openAICompatibility?: OpenAICompatibilityProvider[]
   proxyUrl?: string
+  requestLogging?: boolean
 }
 
 export function buildManagedConfig(options: ManagedConfigOptions): string {
@@ -50,7 +51,9 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
     'port': options.port,
     'auth-dir': options.authDir,
     'api-keys': [options.apiKey],
+    'debug': options.requestLogging ?? false,
     'logging-to-file': false,
+    'request-log': options.requestLogging ?? false,
     'request-retry': 3,
     'max-retry-interval': 30,
     'transient-error-cooldown-seconds': -1,

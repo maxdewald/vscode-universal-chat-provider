@@ -228,11 +228,26 @@
         "title": "Advanced",
         "order": 5,
         "properties": {
-          "universalChatProvider.debug": {
-            "type": "boolean",
-            "default": false,
+          "universalChatProvider.debugLevel": {
+            "type": "string",
+            "enum": [
+              "off",
+              "diagnostics",
+              "requestLogging"
+            ],
+            "enumItemLabels": [
+              "Off",
+              "Diagnostics",
+              "Request Logging"
+            ],
+            "enumDescriptions": [
+              "Disable diagnostic collection.",
+              "Show prompt-cache metrics and write redacted per-request diagnostics to extension storage.",
+              "Include diagnostics and make the managed CLIProxyAPI log complete request and response payloads. Logs may contain prompts, conversations, tools, files, and credentials."
+            ],
+            "default": "off",
             "order": 1,
-            "description": "Show prompt-cache hit rate and write per-request diagnostics to extension storage."
+            "description": "Diagnostic detail to collect. Request Logging restarts the managed server and writes sensitive payloads to disk."
           }
         }
       }
