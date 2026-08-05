@@ -365,6 +365,9 @@ describe('model mapping', () => {
         { id: 'gpt', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
         { id: 'atlas', owned_by: 'antigravity', context_length: 128_000, max_completion_tokens: 8192 },
         { id: 'sonnet', owned_by: 'anthropic', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'gemini', owned_by: 'google', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'kimi', owned_by: 'moonshot', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'mai', owned_by: 'microsoft', context_length: 128_000, max_completion_tokens: 8192 },
         { id: 'grok', owned_by: 'xai', context_length: 128_000, max_completion_tokens: 8192 },
         { id: 'mystery', owned_by: 'acme-labs', context_length: 128_000, max_completion_tokens: 8192 },
       ],
@@ -378,10 +381,23 @@ describe('model mapping', () => {
       gpt: 'Codex',
       atlas: 'Antigravity',
       sonnet: 'Claude Code',
+      gemini: 'Google',
+      kimi: 'Moonshot',
+      mai: 'Microsoft',
       grok: 'Grok',
       mystery: 'Acme-labs',
     })
     expect(models.find(model => model.id === 'gpt')?.tooltip).toContain('Codex via CLIProxyAPI')
+    expect(Object.fromEntries(models.map(model => [model.id, model.statusIcon?.id]))).toEqual({
+      atlas: undefined,
+      gemini: 'chat-model-provider-gemini',
+      gpt: 'chat-model-provider-openai',
+      grok: undefined,
+      kimi: 'chat-model-provider-kimi',
+      mai: 'chat-model-provider-microsoft',
+      mystery: undefined,
+      sonnet: 'chat-model-provider-claude',
+    })
   })
 
   it('leads the tooltip with the model description and a compact spec line', () => {
@@ -564,10 +580,55 @@ describe('catalog model mapping', () => {
       {},
     )
 
-    expect(models.map(model => [model.id, model.name, model.maxInputTokens])).toEqual([
-      ['anthropic/claude-opus-4.8', 'anthropic/claude-opus-4.8', 200_000],
-      ['anthropic/claude-opus-4.8:thinking', 'anthropic/claude-opus-4.8:thinking', 200_000],
-      ['openai/gpt-5.5:free', 'GPT-5.5', 400_000],
+    expect(models.map(model => [model.id, model.family, model.proxyModelId, model.name, model.maxInputTokens])).toEqual([
+      ['anthropic/claude-opus-4.8', 'claude-opus-4-8', 'anthropic/claude-opus-4.8', 'anthropic/claude-opus-4.8', 200_000],
+      ['anthropic/claude-opus-4.8:thinking', 'claude-opus-4-8', 'anthropic/claude-opus-4.8:thinking', 'anthropic/claude-opus-4.8:thinking', 200_000],
+      ['openai/gpt-5.5:free', 'gpt-5.5', 'openai/gpt-5.5:free', 'GPT-5.5', 400_000],
+    ])
+  })
+
+  it('strips provider and routing prefixes from uncatalogued model families', () => {
+    const [model] = mapProxyModels(
+      [{ id: 'openai/gpt-next:free', owned_by: 'openrouter.ai', context_length: 128_000, max_completion_tokens: 16_000 }],
+      [],
+      new Map(),
+      {},
+    )
+
+    expect(model).toMatchObject({
+      id: 'openai/gpt-next:free',
+      proxyModelId: 'openai/gpt-next:free',
+      family: 'gpt-next',
+    })
+  })
+
+  it('canonicalizes prefixed Kimi and Grok OAuth model families', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'work/kimi-k2.5', owned_by: 'moonshot' },
+        { id: 'team/grok-4.20-0309-reasoning', owned_by: 'xai' },
+      ],
+      [],
+      new Map([
+        ['kimi-k2.5', {
+          id: 'kimi-k2.5',
+          type: 'kimi',
+          context_length: 262_144,
+          max_completion_tokens: 32_768,
+        }],
+        ['grok-4.20-0309-reasoning', {
+          id: 'grok-4.20-0309-reasoning',
+          type: 'xai',
+          context_length: 2_000_000,
+          max_completion_tokens: 65_536,
+        }],
+      ]),
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.family, model.proxyModelId, model.proxyOwner])).toEqual([
+      ['team/grok-4.20-0309-reasoning', 'grok-4.20-0309-reasoning', 'team/grok-4.20-0309-reasoning', 'xai'],
+      ['work/kimi-k2.5', 'kimi-k2.5', 'work/kimi-k2.5', 'moonshot'],
     ])
   })
 
@@ -605,11 +666,11 @@ describe('catalog model mapping', () => {
       {},
     )
 
-    expect(models.map(model => [model.id, model.name, model.maxInputTokens])).toEqual([
-      ['claude-opus-4-8-high', 'claude-opus-4-8-high', 200_000],
-      ['claude-opus-4-8-thinking', 'claude-opus-4-8-thinking', 200_000],
-      ['gemini-3.5-flash-nothinking', 'Gemini 3.5 Flash', 1_000_000],
-      ['gpt-5.5-openai-compact', 'GPT-5.5', 272_000],
+    expect(models.map(model => [model.id, model.family, model.name, model.maxInputTokens])).toEqual([
+      ['claude-opus-4-8-high', 'claude-opus-4-8', 'claude-opus-4-8-high', 200_000],
+      ['claude-opus-4-8-thinking', 'claude-opus-4-8', 'claude-opus-4-8-thinking', 200_000],
+      ['gemini-3.5-flash-nothinking', 'gemini-3.5-flash', 'Gemini 3.5 Flash', 1_000_000],
+      ['gpt-5.5-openai-compact', 'gpt-5.5', 'GPT-5.5', 272_000],
     ])
   })
 

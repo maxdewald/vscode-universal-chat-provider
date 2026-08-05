@@ -42,6 +42,7 @@ export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
 export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string
   proxyOwner: string
+  statusIcon?: { readonly id: string }
   serviceTier?: 'priority'
   reasoningLevels: readonly string[]
   reasoningEffort?: string
@@ -76,6 +77,13 @@ export interface ModelMappingOptions {
 }
 
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
+const PROVIDER_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/claude|anthropic/, 'chat-model-provider-claude'],
+  [/gemini|google/, 'chat-model-provider-gemini'],
+  [/kimi|moonshot/, 'chat-model-provider-kimi'],
+  [/openai|gpt|codex|\bo[134]\b/, 'chat-model-provider-openai'],
+  [/microsoft|\bmai\b/, 'chat-model-provider-microsoft'],
+]
 
 interface ModelCandidate {
   entry: ProxyModelListEntry
@@ -193,6 +201,9 @@ function displayBaseKey(candidate: ModelCandidate): string {
 function toProviderModel(candidate: ModelCandidate, useFullId: boolean): ProviderModel {
   const { entry, detail, catalogModel, providerName, levels, totalContext, outputTokens } = candidate
   const name = useFullId ? entry.id : candidate.baseName
+  const family = catalogModel?.id ?? entry.id.slice(entry.id.lastIndexOf('/') + 1).replace(/:.*/, '')
+  const iconIdentity = `${family} ${providerName}`.toLowerCase()
+  const statusIconId = PROVIDER_ICONS.find(([pattern]) => pattern.test(iconIdentity))?.[1]
   const displayProviderName = formatProviderName(providerName)
   const imageInput = detail?.input_modalities?.includes('image')
     ?? catalogModel?.supportedInputModalities?.some(value => value.toLowerCase() === 'image')
@@ -217,7 +228,8 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
   const baseModel = {
     proxyModelId: entry.id,
     proxyOwner: providerName,
-    family: entry.id,
+    family,
+    ...(statusIconId !== undefined ? { statusIcon: { id: statusIconId } } : {}),
     version: catalogModel?.version ?? entry.id,
     maxInputTokens: totalContext,
     maxOutputTokens: outputTokens,
