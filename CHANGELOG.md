@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.34.1...v0.35.0) (2026-08-05)
+
+
+### Features
+
+* **models:** add provider status icons and improve family resolution ([1a1c2fa](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1a1c2facbe959e82446b58b7551cbade358b8461))
+
 ## [0.34.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.34.0...v0.34.1) (2026-07-31)
 
 
