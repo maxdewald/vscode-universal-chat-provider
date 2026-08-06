@@ -8,6 +8,7 @@ import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
+import { duplexFetch } from '@src/shared/fetch'
 import { asValue } from '@src/shared/json'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import ky, { isHTTPError } from 'ky'
@@ -96,11 +97,13 @@ export class CLIProxyClient {
   constructor(baseUrl: string, apiKey: string) {
     // ponytail: retry:0/timeout:false keep the old raw-fetch behavior (streaming must
     // not time out); ky folds away the auth header, base url, and !ok error parsing.
+    // duplexFetch injects the `duplex` init that ky strips before it reaches fetch (see its docs).
     this.fetcher = ky.create({
       prefix: baseUrl,
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       retry: 0,
       timeout: false,
+      fetch: duplexFetch,
       hooks: { beforeError: [toProxyHttpError] },
     })
   }

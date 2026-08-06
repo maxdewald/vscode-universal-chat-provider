@@ -10,6 +10,7 @@ import type { ServerMode, ServerStatus, ServerStatusSnapshot } from '@src/clipro
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import { rm } from 'node:fs/promises'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
+import { discoverAuthorizedClaudeModels } from '@src/cliproxy/accounts/claude-models'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
@@ -95,6 +96,13 @@ export class ServerController implements ProxyConnection {
 
   async enrichOpenAICompatibilityThinking(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
     return this.accounts.enrichThinkingLevels(catalog)
+  }
+
+  async authorizedClaudeModels(): Promise<ReadonlySet<string> | undefined> {
+    const management = await this.resolveManagement(false)
+    if (management === undefined)
+      return undefined
+    return discoverAuthorizedClaudeModels(new ManagementClient(management.baseUrl, management.key))
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {

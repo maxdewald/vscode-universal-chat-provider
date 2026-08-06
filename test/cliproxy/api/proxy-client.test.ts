@@ -81,7 +81,7 @@ describe('cLIProxyClient', () => {
         item: { type: 'function_call', call_id: 'ignored', name: 'late', arguments: '{}' },
       }),
     ].join('')
-    const fetchMock = vi.fn<(request: Request) => Promise<Response>>().mockResolvedValue(new Response(events, {
+    const fetchMock = vi.fn<(request: Request, init?: RequestInit) => Promise<Response>>().mockResolvedValue(new Response(events, {
       headers: { 'content-type': 'text/event-stream' },
     }))
     vi.stubGlobal('fetch', fetchMock)
@@ -96,6 +96,9 @@ describe('cLIProxyClient', () => {
     expect(request.method).toBe('POST')
     expect(request.headers.get('authorization')).toBe('Bearer key')
     expect(request.headers.get('content-type')).toBe('application/json')
+    // Older undici (bundled in the VS Code extension host) rejects a body-carrying POST unless the
+    // fetch init carries duplex; ky strips it, so the client injects it via a custom fetch.
+    expect((fetchMock.mock.calls[0]![1] as { duplex?: string }).duplex).toBe('half')
     expect(handlers.onText).toHaveBeenCalledWith('hello')
     expect(handlers.onThinking).toHaveBeenCalledWith('think')
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
