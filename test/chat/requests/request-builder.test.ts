@@ -41,6 +41,31 @@ describe('response request conversion', () => {
     expect(buildPromptCacheKey(model, messages)).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
   })
 
+  it('drops empty text beside assistant tool calls', async () => {
+    const messages = [{
+      role: LanguageModelChatMessageRole.Assistant,
+      content: [
+        new LanguageModelTextPart(''),
+        new LanguageModelTextPart(' '),
+        new LanguageModelToolCallPart('call-1', 'lookup', { q: 'x' }),
+      ],
+      name: undefined,
+    }]
+
+    expect(await convertAll(messages)).toEqual([
+      {
+        role: 'assistant',
+        content: [{ type: 'output_text', text: ' ' }],
+      },
+      {
+        type: 'function_call',
+        call_id: 'call-1',
+        name: 'lookup',
+        arguments: '{"q":"x"}',
+      },
+    ])
+  })
+
   it('serializes text, image, data, tool calls, and tool results in order', async () => {
     const messages = [
       {

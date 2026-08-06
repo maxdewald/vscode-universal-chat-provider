@@ -116,7 +116,7 @@ export async function convertMessage(message: LanguageModelChatRequestMessage): 
   for (const part of message.content) {
     if (isCacheControlPart(part))
       continue
-    if (part instanceof LanguageModelTextPart) {
+    if (part instanceof LanguageModelTextPart && part.value.length > 0) {
       content.push({
         type: role === 'assistant' ? 'output_text' : 'input_text',
         text: part.value,
