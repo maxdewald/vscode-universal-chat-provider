@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.37.0...v0.38.0) (2026-08-07)
+
+
+### Features
+
+* track active requests and apply managed server updates when idle ([bba32a4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/bba32a4a5b3120c32184937903d19a0589e5ebae))
+
 ## [0.37.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.36.0...v0.37.0) (2026-08-07)
 
 
