@@ -1,6 +1,6 @@
 import { readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { claimLease, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
+import { claimLease, claimRequestLease, hasActiveRequestLeases, readServerPid, releaseLease, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useChildProcesses, waitForExit } from '../../support/process'
 import { useTempDirectories } from '../../support/temp'
@@ -90,5 +90,17 @@ describe('window leases', () => {
     await writeFile(lockPath, '999999999:stale-owner')
 
     await expect(withOperationLock(lockPath, async () => 'recovered')).resolves.toBe('recovered')
+  })
+})
+
+describe('request leases', () => {
+  it('tracks and releases an active request', async () => {
+    const dir = await makeTempDirectory('ucp-requests-')
+    const release = claimRequestLease(dir)
+
+    expect(hasActiveRequestLeases(dir)).toBe(true)
+    release()
+    expect(hasActiveRequestLeases(dir)).toBe(false)
+    expect(await readdir(dir)).toEqual([])
   })
 })

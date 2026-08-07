@@ -13,6 +13,7 @@ describe('managed config', () => {
       configPath: join('/tmp/store', 'config.yaml'),
       logPath: join('/tmp/store', 'cliproxy.log'),
       leaseDir: join('/tmp/store', 'leases'),
+      requestLeaseDir: join('/tmp/store', 'requests'),
       operationLockPath: join('/tmp/store', 'operation.lock'),
       pidPath: join('/tmp/store', 'server.pid'),
     })

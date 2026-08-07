@@ -13,6 +13,7 @@ export interface ManagedPaths {
   configPath: string
   logPath: string
   leaseDir: string
+  requestLeaseDir: string
   operationLockPath: string
   pidPath: string
 }
@@ -25,6 +26,7 @@ export function managedPaths(root: string): ManagedPaths {
     configPath: join(root, 'config.yaml'),
     logPath: join(root, 'cliproxy.log'),
     leaseDir: join(root, 'leases'),
+    requestLeaseDir: join(root, 'requests'),
     operationLockPath: join(root, 'operation.lock'),
     pidPath: join(root, 'server.pid'),
   }

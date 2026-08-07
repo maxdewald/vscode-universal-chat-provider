@@ -3,11 +3,12 @@ import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
 import { spawn } from 'node:child_process'
 import { closeSync, openSync, rmSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import process from 'node:process'
 import { acquireBinary, readInstalledVersion } from '@src/cliproxy/managed/binary'
 import { DEFAULT_PORT } from '@src/cliproxy/managed/config'
-import { readServerPid, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
+import { claimRequestLease, hasActiveRequestLeases, readServerPid, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
 import { errorMessage } from '@src/shared/errors'
 import getPort from 'get-port'
 import ky from 'ky'
@@ -55,6 +56,33 @@ export class ManagedServer {
     return this.version
   }
 
+  async downloadBinary(requestedVersion: string): Promise<string> {
+    return withOperationLock(this.deps.paths.operationLockPath, async () => {
+      const { version } = await acquireBinary({
+        binDir: this.deps.paths.binDir,
+        requestedVersion,
+        output: this.deps.output,
+      })
+      if (version !== this.version)
+        await writeFile(join(this.deps.paths.root, 'pending-version'), version)
+      return version
+    })
+  }
+
+  async acquireRequest(): Promise<() => void> {
+    return withOperationLock(this.deps.paths.operationLockPath, async () => claimRequestLease(this.deps.paths.requestLeaseDir))
+  }
+
+  async restartPendingWhenIdle(): Promise<RunningServer | undefined> {
+    return withOperationLock(this.deps.paths.operationLockPath, async () => {
+      const pendingVersion = await this.pendingVersion()
+      if (pendingVersion === undefined || hasActiveRequestLeases(this.deps.paths.requestLeaseDir))
+        return undefined
+      this.deps.output.appendLine('Restarting managed CLIProxyAPI (reason: binary update).')
+      return this.restartUnlocked(undefined, pendingVersion)
+    })
+  }
+
   async ensureRunning(signal?: AbortSignal): Promise<RunningServer> {
     if (this.startPromise !== undefined)
       return this.startPromise
@@ -76,19 +104,10 @@ export class ManagedServer {
       }
       catch {}
     }
-    const version = requestedVersion ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
+    const pendingVersion = await this.pendingVersion()
+    const version = requestedVersion ?? pendingVersion ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
     this.startPromise = withOperationLock(this.deps.paths.operationLockPath, async () => {
-      for (let retry = 0; ; retry++) {
-        try {
-          await this.stopUnlocked()
-          return await this.start(signal, version ?? this.deps.requestedVersion())
-        }
-        catch (error) {
-          if (signal?.aborted || retry >= RESTART_RETRIES)
-            throw error
-          this.deps.output.appendLine(`Managed CLIProxyAPI restart attempt ${retry + 1} failed: ${errorMessage(error)} Retrying.`)
-        }
-      }
+      return this.restartUnlocked(signal, version ?? this.deps.requestedVersion())
     }).finally(() => {
       this.startPromise = undefined
     })
@@ -97,6 +116,24 @@ export class ManagedServer {
 
   async stop(): Promise<void> {
     await withOperationLock(this.deps.paths.operationLockPath, async () => this.stopUnlocked())
+  }
+
+  private async restartUnlocked(signal: AbortSignal | undefined, version: string): Promise<RunningServer> {
+    for (let retry = 0; ; retry++) {
+      try {
+        await this.stopUnlocked()
+        return await this.start(signal, version)
+      }
+      catch (error) {
+        if (signal?.aborted || retry >= RESTART_RETRIES)
+          throw error
+        this.deps.output.appendLine(`Managed CLIProxyAPI restart attempt ${retry + 1} failed: ${errorMessage(error)} Retrying.`)
+      }
+    }
+  }
+
+  private async pendingVersion(): Promise<string | undefined> {
+    return readFile(join(this.deps.paths.root, 'pending-version'), 'utf8').then(value => value.trim() || undefined, () => undefined)
   }
 
   private async stopUnlocked(): Promise<void> {
@@ -157,6 +194,8 @@ export class ManagedServer {
   }
 
   private async start(signal?: AbortSignal, requestedVersion: string = this.deps.requestedVersion()): Promise<RunningServer> {
+    const pendingVersionPath = join(this.deps.paths.root, 'pending-version')
+    requestedVersion = await readFile(pendingVersionPath, 'utf8').then(value => value.trim() || requestedVersion, () => requestedVersion)
     const preferred = this.deps.getPort() ?? DEFAULT_PORT
     const preferredBase = `http://${this.deps.host}:${preferred}`
     if (await isHealthy(this.deps.host, preferred, signal)) {
@@ -186,6 +225,7 @@ export class ManagedServer {
     this.adopted = false
     this.port = port
     await this.deps.setPort(port)
+    await rm(pendingVersionPath, { force: true })
     this.deps.output.appendLine(`CLIProxyAPI ${version} is running on port ${port}.`)
     return { baseUrl: this.baseUrl()!, port, version }
   }

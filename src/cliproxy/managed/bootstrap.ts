@@ -39,11 +39,12 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   await mkdir(paths.authDir, { recursive: true })
   claimLease(paths.leaseDir)
 
-  const apiKey = await ensureSecret(context, SECRET_KEY)
-  const managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
+  let managementKey = ''
   const openAICompatibility = new OpenAICompatibilityStore(context.secrets)
 
   const writeConfig = async (port: number): Promise<void> => {
+    const apiKey = await ensureSecret(context, SECRET_KEY)
+    managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
     const proxyUrl = options.proxyUrl()
     const providers = await openAICompatibility.get()
     await writeFile(paths.configPath, buildManagedConfig({

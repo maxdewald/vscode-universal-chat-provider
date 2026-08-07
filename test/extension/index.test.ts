@@ -16,8 +16,9 @@ beforeEach(() => {
 })
 
 describe('extension activation', () => {
-  it('wires the provider, controller, status bar, outputs, and commands', () => {
+  it('wires the provider, controller, status bar, outputs, and commands', async () => {
     const initialize = vi.spyOn(UniversalChatProvider.prototype, 'initialize').mockResolvedValue()
+    const refreshQuotas = vi.spyOn(ServerController.prototype, 'refreshQuotas').mockResolvedValue()
     const setRefreshListener = vi.spyOn(ServerController.prototype, 'setRefreshListener')
     const setStatusListener = vi.spyOn(ServerController.prototype, 'setStatusListener')
     const setQuotaListener = vi.spyOn(ServerController.prototype, 'setQuotaListener')
@@ -27,6 +28,7 @@ describe('extension activation', () => {
     expect(vscodeMock.registeredProviders[0]).toMatchObject({ vendor: 'universal-chat-provider' })
     expect(vscodeMock.commandHandlers).toHaveLength(15)
     expect(initialize).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(refreshQuotas).toHaveBeenCalledTimes(1))
     expect(setRefreshListener).toHaveBeenCalledTimes(1)
     expect(setStatusListener).toHaveBeenCalledTimes(1)
     expect(setQuotaListener).toHaveBeenCalledTimes(1)

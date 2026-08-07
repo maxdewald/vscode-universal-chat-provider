@@ -26,9 +26,10 @@ export async function streamCompletion(
 
   const controller = new AbortController()
   const cancellation = token?.onCancellationRequested(() => controller.abort())
-  const client = new CLIProxyClient(deps.connection.baseUrl(), apiKey)
+  const releaseRequest = await deps.connection.acquireRequest()
 
   try {
+    const client = new CLIProxyClient(deps.connection.baseUrl(), apiKey)
     await client.streamResponse(body, callbacks, controller.signal)
   }
   catch (error) {
@@ -39,6 +40,7 @@ export async function streamCompletion(
     throw mapProviderError(error)
   }
   finally {
+    releaseRequest()
     cancellation?.dispose()
   }
 }

@@ -1,5 +1,7 @@
 import type { ChildProcess } from 'node:child_process'
 import type { OutputChannel } from 'vscode'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { managedPaths } from '@src/cliproxy/managed/config'
 import { ManagedServer } from '@src/cliproxy/managed/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -35,6 +37,33 @@ describe('managed server lifecycle', () => {
     expect(appendLine).toHaveBeenCalledWith('Restarting managed CLIProxyAPI (reason: manual command).')
     expect(writeConfig).toHaveBeenCalledOnce()
     expect(writeConfig).toHaveBeenCalledWith(8317)
+  })
+
+  it('uses a downloaded version queued by another window', async () => {
+    const server = createServer()
+    Object.assign(server, { version: '7.2.5' })
+    const start = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    Object.assign(server, { start })
+    await writeFile(join(root, 'pending-version'), '8.0.0')
+
+    await server.restart('manual command')
+
+    expect(start).toHaveBeenCalledWith(undefined, '8.0.0')
+  })
+
+  it('applies a pending update only when no request is active', async () => {
+    const server = createServer()
+    const restartUnlocked = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    Object.assign(server, { restartUnlocked })
+    await writeFile(join(root, 'pending-version'), '8.0.0')
+    const release = await server.acquireRequest()
+
+    await expect(server.restartPendingWhenIdle()).resolves.toBeUndefined()
+    expect(restartUnlocked).not.toHaveBeenCalled()
+
+    release()
+    await expect(server.restartPendingWhenIdle()).resolves.toMatchObject({ version: '8.0.0' })
+    expect(restartUnlocked).toHaveBeenCalledWith(undefined, '8.0.0')
   })
 
   it('retries a restart twice before succeeding', async () => {

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 import { useChildProcesses } from '../support/process'
 import { useTempDirectories } from '../support/temp'
-import { createExtensionContext, resetVSCodeMock, vscodeMock, workspace } from '../support/vscode'
+import { createExtensionContext, resetVSCodeMock, vscodeMock, window, workspace } from '../support/vscode'
 
 const makeTempDirectory = useTempDirectories()
 const { spawnPersistentNodeProcess } = useChildProcesses()
@@ -77,15 +77,25 @@ describe('server controller lifecycle', () => {
     ))
   })
 
-  it('logs binary updates as restarts with the configured version', async () => {
+  it('downloads binary updates without restarting the server', async () => {
     vscodeMock.settings.set('universalChatProvider.server.version', '8.0.0')
-    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart')
     vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.5')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.updateBinary()
 
-    expect(restart).toHaveBeenCalledWith('binary update', undefined, '8.0.0')
+    expect(downloadBinary).toHaveBeenCalledWith('8.0.0')
+    expect(restart).not.toHaveBeenCalled()
+    expect(window.showInformationMessage).toHaveBeenCalledWith(
+      'CLIProxyAPI 8.0.0 downloaded. It will restart automatically when no requests are active.',
+    )
+
+    window.showWarningMessage.mockResolvedValueOnce('Restart')
+    restart.mockResolvedValueOnce({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    await controller.restartServer()
+    expect(restart).toHaveBeenCalledWith('manual command')
     controller.dispose()
   })
 
@@ -136,16 +146,38 @@ describe('server controller lifecycle', () => {
   it.each([
     'universalChatProvider.server.proxyUrl',
     'universalChatProvider.debugLevel',
-  ])('restarts the managed server when %s changes', async (changedSetting) => {
+  ])('prompts before restarting for a managed server change to %s', async (changedSetting) => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     await controller.ensureReady(false)
     vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
-    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317 })
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart')
     const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
 
     configurationListener?.({
       affectsConfiguration: section => section === changedSetting,
     })
+
+    await vi.waitFor(() => expect(window.showWarningMessage).toHaveBeenCalledWith(
+      'Managed CLIProxyAPI configuration changed. Restart now? Active requests in any VS Code window will be interrupted.',
+      'Restart Now',
+      'Later',
+    ))
+    expect(restart).not.toHaveBeenCalled()
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      'Managed CLIProxyAPI configuration changed; it will apply after the next server restart.',
+    )
+    controller.dispose()
+  })
+
+  it('restarts when a managed configuration prompt is accepted', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    await controller.ensureReady(false)
+    vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317 })
+    window.showWarningMessage.mockResolvedValueOnce('Restart Now')
+    const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
+
+    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl' })
 
     await vi.waitFor(() => expect(restart).toHaveBeenCalledWith('proxy configuration changed'))
     controller.dispose()
@@ -156,10 +188,26 @@ describe('server controller lifecycle', () => {
     const refresh = vi.fn(async () => {})
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     controller.setRefreshListener(refresh)
+    window.showWarningMessage.mockResolvedValueOnce('Restart')
 
     await controller.restartServer()
     expect(restart).toHaveBeenCalledWith('manual command')
     expect(refresh).toHaveBeenCalledTimes(1)
+    controller.dispose()
+  })
+
+  it('does not restart the shared server without confirmation', async () => {
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.restartServer()
+
+    expect(window.showWarningMessage).toHaveBeenCalledWith(
+      'Restart the shared managed CLIProxyAPI server? Active requests in any VS Code window will be interrupted.',
+      { modal: true },
+      'Restart',
+    )
+    expect(restart).not.toHaveBeenCalled()
     controller.dispose()
   })
 
@@ -219,10 +267,36 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('refreshes all quota providers before a model becomes active', async () => {
+    const listener = vi.fn()
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    controller.setQuotaListener(listener)
+    vi.spyOn(controller as unknown as { managementForStatus: () => Promise<{ baseUrl: string, key: string }> }, 'managementForStatus')
+      .mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', key: 'secret' })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
+    ])
+    vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
+      statusCode: 200,
+      header: {},
+      body: JSON.stringify({ rate_limit: {} }),
+    })
+
+    await controller.refreshQuotas()
+
+    expect(listener).toHaveBeenCalledWith([
+      expect.objectContaining({ provider: 'codex' }),
+      expect.objectContaining({ provider: 'claude' }),
+    ])
+    controller.dispose()
+  })
+
   it('logs restart failures and offers both server log channels', async () => {
     const error = new Error('process ID is unavailable')
     vi.spyOn(ManagedServer.prototype, 'restart').mockRejectedValue(error)
     const { window } = await import('../support/vscode')
+    window.showWarningMessage.mockResolvedValueOnce('Restart')
     window.showErrorMessage.mockResolvedValueOnce('Show Server Output')
     const providerOutput = { ...vscodeMock.output, appendLine: vi.fn(), show: vi.fn() }
     const serverOutput = { ...vscodeMock.output, show: vi.fn() }

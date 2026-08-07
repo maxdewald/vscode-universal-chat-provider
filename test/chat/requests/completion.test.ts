@@ -21,6 +21,21 @@ beforeEach(() => {
 })
 
 describe('streamCompletion', () => {
+  it('holds a request lease for the stream', async () => {
+    const release = vi.fn()
+    const connection = {
+      ensureReady: vi.fn(async () => {}),
+      baseUrl: () => 'http://proxy',
+      acquireRequest: vi.fn(async () => release),
+    }
+    clientMocks.streamResponse.mockResolvedValueOnce(undefined)
+
+    await streamCompletion({ ...deps('key'), connection }, emptyBody, callbacks())
+
+    expect(connection.acquireRequest).toHaveBeenCalledOnce()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('requires credentials', async () => {
     await expect(streamCompletion(deps(), emptyBody, callbacks())).rejects.toMatchObject({
       code: 'NoPermissions',
@@ -61,6 +76,7 @@ function deps(apiKey?: string, onCredentialsRejected = vi.fn()): CompletionDeps 
     connection: {
       ensureReady: vi.fn(async () => {}),
       baseUrl: () => 'http://proxy',
+      acquireRequest: vi.fn(async () => vi.fn()),
     },
     credentials: {
       get: vi.fn(async () => apiKey),

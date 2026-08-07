@@ -75,7 +75,11 @@ export class ServerController implements ProxyConnection {
       const managedConfigChanged = event.affectsConfiguration('universalChatProvider.server.proxyUrl')
         || event.affectsConfiguration('universalChatProvider.debugLevel')
       if (managedConfigChanged && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
-        void this.restartServer('proxy configuration changed')
+        void this.promptForConfigRestart()
+    }))
+    this.disposables.push(context.secrets.onDidChange((event) => {
+      if (event.key === MGMT_KEY_SECRET)
+        void context.secrets.get(MGMT_KEY_SECRET).then(key => this.managementKey = key)
     }))
   }
 
@@ -90,6 +94,17 @@ export class ServerController implements ProxyConnection {
       return normalizeBaseUrl(workspace.getConfiguration('universalChatProvider').get<string>('baseUrl', `http://${DEFAULT_HOST}:${DEFAULT_PORT}`))
     return this.server?.baseUrl()
       ?? `http://${DEFAULT_HOST}:${this.context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT}`
+  }
+
+  async acquireRequest(): Promise<() => void> {
+    if (this.mode() === 'external')
+      return () => {}
+    await this.bootstrap()
+    const release = await this.server!.acquireRequest()
+    return () => {
+      release()
+      void this.applyPendingUpdateWhenIdle()
+    }
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {
@@ -118,6 +133,7 @@ export class ServerController implements ProxyConnection {
       await this.server!.ensureRunning()
       this.setStatus('running')
       void this.accounts.maybePromptLogin()
+      void this.applyPendingUpdateWhenIdle()
       void this.maybeUpdateOnStartup()
     }
     catch (error) {
@@ -180,21 +196,19 @@ export class ServerController implements ProxyConnection {
     try {
       await this.bootstrap()
       const previous = this.server!.installedVersion()
+      let downloaded: string | undefined
       await window.withProgress(
-        { location: ProgressLocation.Notification, title: 'Updating CLIProxyAPI…' },
+        { location: ProgressLocation.Notification, title: 'Downloading CLIProxyAPI update…' },
         async () => {
-          await this.server!.restart('binary update', undefined, version)
+          downloaded = await this.server!.downloadBinary(version)
         },
       )
-      this.setStatus('running')
-      const current = this.server!.installedVersion()
-      void window.showInformationMessage(previous === current
-        ? `CLIProxyAPI ${current ?? 'binary'} is already installed.`
-        : `CLIProxyAPI updated from ${previous ?? 'an unknown version'} to ${current ?? version}.`)
-      await this.notifyAccountsChanged()
+      void window.showInformationMessage(previous === downloaded
+        ? `CLIProxyAPI ${downloaded ?? 'binary'} is already running.`
+        : `CLIProxyAPI ${downloaded ?? version} downloaded. It will restart automatically when no requests are active.`)
+      await this.applyPendingUpdateWhenIdle()
     }
     catch (error) {
-      this.setStatus('error')
       this.surfaceOperationError('update', error)
     }
   }
@@ -231,10 +245,45 @@ export class ServerController implements ProxyConnection {
     await this.applyBinaryUpdate(target)
   }
 
+  private async applyPendingUpdateWhenIdle(): Promise<void> {
+    try {
+      if (await this.server?.restartPendingWhenIdle() === undefined)
+        return
+      this.setStatus('running')
+      void window.showInformationMessage('CLIProxyAPI update applied after active requests finished.')
+      await this.notifyAccountsChanged()
+    }
+    catch (error) {
+      this.setStatus('error')
+      this.surfaceOperationError('update', error)
+    }
+  }
+
+  private async promptForConfigRestart(): Promise<void> {
+    const choice = await window.showWarningMessage(
+      'Managed CLIProxyAPI configuration changed. Restart now? Active requests in any VS Code window will be interrupted.',
+      'Restart Now',
+      'Later',
+    )
+    if (choice === 'Restart Now')
+      await this.restartServer('proxy configuration changed')
+    else
+      this.output.appendLine('Managed CLIProxyAPI configuration changed; it will apply after the next server restart.')
+  }
+
   async restartServer(reason: RestartReason = 'manual command'): Promise<void> {
     if (this.mode() === 'external') {
       void window.showInformationMessage('The managed server is not active in external mode.')
       return
+    }
+    if (reason === 'manual command') {
+      const confirm = await window.showWarningMessage(
+        'Restart the shared managed CLIProxyAPI server? Active requests in any VS Code window will be interrupted.',
+        { modal: true },
+        'Restart',
+      )
+      if (confirm !== 'Restart')
+        return
     }
     try {
       await this.bootstrap()
@@ -251,7 +300,7 @@ export class ServerController implements ProxyConnection {
 
   async resetServer(): Promise<void> {
     const confirm = await window.showWarningMessage(
-      'Reset the managed CLIProxyAPI server? Generated config and keys are recreated; connected accounts are kept.',
+      'Reset the shared managed CLIProxyAPI server? Active requests in any VS Code window will be interrupted. Generated config and keys are recreated; connected accounts are kept.',
       { modal: true },
       'Reset',
     )
@@ -349,20 +398,23 @@ export class ServerController implements ProxyConnection {
 
   async refreshQuotas(): Promise<void> {
     const provider = this.activeQuotaProvider
-    if (this.quotaListener === undefined || provider === undefined)
+    if (this.quotaListener === undefined)
       return
-    const lastRefresh = this.lastQuotaRefresh.get(provider)
-    if (lastRefresh !== undefined && Date.now() - lastRefresh < QUOTA_REFRESH_INTERVAL_MS)
-      return
-    // Claimed before awaiting so a concurrent call is gated by the same window.
-    this.lastQuotaRefresh.set(provider, Date.now())
+    if (provider !== undefined) {
+      const lastRefresh = this.lastQuotaRefresh.get(provider)
+      if (lastRefresh !== undefined && Date.now() - lastRefresh < QUOTA_REFRESH_INTERVAL_MS)
+        return
+      // Claimed before awaiting so a concurrent call is gated by the same window.
+      this.lastQuotaRefresh.set(provider, Date.now())
+    }
     return this.performQuotaRefresh(provider)
   }
 
-  private async performQuotaRefresh(provider: QuotaReport['provider']): Promise<void> {
+  private async performQuotaRefresh(provider: QuotaReport['provider'] | undefined): Promise<void> {
     const management = await this.managementForStatus()
     if (management === undefined) {
-      this.lastQuotaRefresh.delete(provider)
+      if (provider !== undefined)
+        this.lastQuotaRefresh.delete(provider)
       return
     }
     try {
@@ -376,7 +428,9 @@ export class ServerController implements ProxyConnection {
         if (report.error !== undefined)
           this.output.appendLine(`Quota fetch failed for ${report.provider}${report.account === undefined ? '' : ` (${report.account.label})`}: ${report.error}`)
       }
-      this.quotaReports = [...this.quotaReports.filter(report => report.provider !== provider), ...reports]
+      this.quotaReports = provider === undefined
+        ? reports
+        : [...this.quotaReports.filter(report => report.provider !== provider), ...reports]
       this.quotaListener?.(this.quotaReports)
     }
     catch (error) {

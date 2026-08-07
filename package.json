@@ -175,8 +175,8 @@
               "Manual"
             ],
             "enumDescriptions": [
-              "Install the latest stable CLIProxyAPI release when VS Code starts.",
-              "Check for stable updates when VS Code starts and ask before installing.",
+              "Download the latest stable CLIProxyAPI release when VS Code starts and restart automatically when no requests are active.",
+              "Check for stable updates when VS Code starts and ask before downloading them for an idle restart.",
               "Use only the configured version and do not check for updates."
             ],
             "default": "automatic",
@@ -197,8 +197,8 @@
             "default": "",
             "scope": "machine",
             "order": 3,
-            "description": "Optional upstream proxy URL for the managed CLIProxyAPI server. A running managed server restarts automatically when this changes.",
-            "markdownDescription": "Optional upstream proxy URL written to `proxy-url` in the managed CLIProxyAPI `config.yaml`. A running managed server restarts automatically when this changes."
+            "description": "Optional upstream proxy URL for the managed CLIProxyAPI server. Changes prompt before restarting.",
+            "markdownDescription": "Optional upstream proxy URL written to `proxy-url` in the managed CLIProxyAPI `config.yaml`. Changes prompt before restarting."
           }
         }
       },
@@ -247,7 +247,7 @@
             ],
             "default": "off",
             "order": 1,
-            "description": "Diagnostic detail to collect. Request Logging restarts the managed server and writes sensitive payloads to disk."
+            "description": "Diagnostic detail to collect. Request Logging prompts before restarting the managed server and writes sensitive payloads to disk."
           }
         }
       }

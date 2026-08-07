@@ -33,6 +33,32 @@ export function releaseLease(leaseDir: string, id: number = process.pid): boolea
   return live === 0
 }
 
+export function claimRequestLease(leaseDir: string): () => void {
+  mkdirSync(leaseDir, { recursive: true })
+  const path = join(leaseDir, `${process.pid}-${randomUUID()}`)
+  writeFileSync(path, '')
+  return () => rmSync(path, { force: true })
+}
+
+export function hasActiveRequestLeases(leaseDir: string): boolean {
+  let names: string[]
+  try {
+    names = readdirSync(leaseDir)
+  }
+  catch {
+    return false
+  }
+  let active = false
+  for (const name of names) {
+    const pid = Number(name.split('-', 1)[0])
+    if (Number.isInteger(pid) && isAlive(pid))
+      active = true
+    else
+      rmSync(join(leaseDir, name), { force: true })
+  }
+  return active
+}
+
 export function writeServerPid(pidPath: string, pid: number): void {
   writeFileSync(pidPath, String(pid))
 }

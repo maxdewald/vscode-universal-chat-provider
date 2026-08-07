@@ -55,7 +55,7 @@ export function activate(context: ExtensionContext): void {
   )
 
   statusBar.show()
-  void provider.initialize()
+  void provider.initialize().then(async () => controller?.refreshQuotas())
   void maybeSuggestUtilityModel(context)
 }
 

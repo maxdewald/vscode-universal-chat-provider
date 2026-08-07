@@ -179,6 +179,7 @@ function createRegistry(
     {
       ensureReady: vi.fn(async () => {}),
       baseUrl: () => 'http://proxy',
+      acquireRequest: vi.fn(async () => vi.fn()),
       ...connection,
     },
     { get: vi.fn(async () => apiKey) } as never,

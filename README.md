@@ -87,22 +87,22 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 <!-- configs -->
 
-| Key                                           | Description                                                                                                                        | Type      | Default                   |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
+| Key                                           | Description                                                                                                                       | Type      | Default                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
 | ▿ <b>Connection</b>                           |
-| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                                       | `string`  | `"managed"`               |
-| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                                | `string`  | `"http://127.0.0.1:8317"` |
-| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                                 | `string`  | `""`                      |
-| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                             | `boolean` | `true`                    |
+| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                                      | `string`  | `"managed"`               |
+| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                               | `string`  | `"http://127.0.0.1:8317"` |
+| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                                | `string`  | `""`                      |
+| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                            | `boolean` | `true`                    |
 | ▿ <b>Managed Server</b>                       |
-| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                       | `string`  | `"automatic"`             |
-| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                                       | `string`  | `"7.2.94"`                |
-| `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. A running managed server restarts automatically when this changes. | `string`  | `""`                      |
+| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                      | `string`  | `"automatic"`             |
+| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                                      | `string`  | `"7.2.94"`                |
+| `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. Changes prompt before restarting.                                 | `string`  | `""`                      |
 | ▿ <b>Status Bar</b>                           |
-| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                      | `boolean` | `true`                    |
-| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                                | `number`  | `10`                      |
+| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                     | `boolean` | `true`                    |
+| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                               | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
-| `universalChatProvider.debugLevel`            | Diagnostic detail to collect. Request Logging restarts the managed server and writes sensitive payloads to disk.                   | `string`  | `"off"`                   |
+| `universalChatProvider.debugLevel`            | Diagnostic detail to collect. Request Logging prompts before restarting the managed server and writes sensitive payloads to disk. | `string`  | `"off"`                   |
 
 <!-- configs -->
 
@@ -140,7 +140,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 <details>
 <summary>Managed-server updates</summary>
 
-Updates are automatic by default. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself.
+Updates download automatically by default and restart the managed server as soon as no requests are active. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself.
 
 </details>
 
