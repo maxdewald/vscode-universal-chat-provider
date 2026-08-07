@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.37.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.36.0...v0.37.0) (2026-08-07)
+
+
+### Features
+
+* use models.dev metadata for compatible models ([4c71dc2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4c71dc218bbe0aa4085d7c02f4785b2fe2f70ea6))
+
+
+### Bug Fixes
+
+* ignore empty text parts in request builder ([2658f90](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2658f90d3c4d41ff3b54adbe3ebfa2a5d05746ec))
+
 ## [0.36.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.35.0...v0.36.0) (2026-08-05)
 
 
