@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.35.0...v0.36.0) (2026-08-05)
+
+
+### Features
+
+* replace debug setting with configurable debugLevel ([9d1a1e7](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9d1a1e7ce5168327eb13f811a75b36c091053e41))
+
 ## [0.35.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.34.1...v0.35.0) (2026-08-05)
 
 
