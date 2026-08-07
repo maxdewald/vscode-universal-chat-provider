@@ -1,5 +1,5 @@
 import type { Static } from '@sinclair/typebox'
-import type { CatalogModel } from '@src/chat/models/catalog'
+import type { CatalogModel, ModelCatalogs } from '@src/chat/models/catalog'
 import type { LanguageModelChatInformation } from 'vscode'
 import { Type } from '@sinclair/typebox'
 import { matchCatalogModel } from '@src/chat/models/catalog-match'
@@ -77,6 +77,7 @@ export interface ModelMappingOptions {
 }
 
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
+const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity'])
 const PROVIDER_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/claude|anthropic/, 'chat-model-provider-claude'],
   [/gemini|google/, 'chat-model-provider-gemini'],
@@ -100,7 +101,7 @@ interface ModelCandidate {
 export function mapProxyModels(
   available: readonly ProxyModelListEntry[],
   metadata: readonly ProxyModelMetadata[],
-  catalog: ReadonlyMap<string, CatalogModel>,
+  catalogs: ModelCatalogs,
   options: ModelMappingOptions,
 ): ProviderModel[] {
   const metadataById = new Map(metadata.map(model => [model.slug, model]))
@@ -112,22 +113,23 @@ export function mapProxyModels(
       continue
     seen.add(entry.id)
 
-    const detail = metadataById.get(entry.id)
+    const oauth = entry.owned_by !== undefined && OAUTH_OWNERS.has(entry.owned_by.toLowerCase())
+    const catalog = oauth ? catalogs.router : catalogs.modelsDev
+    const detail = oauth ? metadataById.get(entry.id) : undefined
     const catalogModel = matchCatalogModel(entry.id, catalog)
+    if (!oauth && catalogModel === undefined) {
+      options.onSkipped?.(entry.id, 'model is not supported: models.dev metadata is unavailable')
+      continue
+    }
     if (isMediaOnly(entry.id, catalogModel))
       continue
 
-    const totalContext = firstPositiveInteger(
-      entry.context_length,
-      detail?.context_window,
-      catalogModel?.context_length,
-      catalogModel?.inputTokenLimit,
-    )
-    const outputTokens = firstPositiveInteger(
-      entry.max_completion_tokens,
-      catalogModel?.max_completion_tokens,
-      catalogModel?.outputTokenLimit,
-    )
+    const totalContext = oauth
+      ? firstPositiveInteger(entry.context_length, detail?.context_window, catalogModel?.context_length, catalogModel?.inputTokenLimit)
+      : firstPositiveInteger(catalogModel?.context_length, catalogModel?.inputTokenLimit)
+    const outputTokens = oauth
+      ? firstPositiveInteger(entry.max_completion_tokens, catalogModel?.max_completion_tokens, catalogModel?.outputTokenLimit)
+      : firstPositiveInteger(catalogModel?.max_completion_tokens, catalogModel?.outputTokenLimit)
     if (totalContext === undefined || outputTokens === undefined) {
       options.onSkipped?.(
         entry.id,
@@ -201,7 +203,8 @@ function displayBaseKey(candidate: ModelCandidate): string {
 function toProviderModel(candidate: ModelCandidate, useFullId: boolean): ProviderModel {
   const { entry, detail, catalogModel, providerName, levels, totalContext, outputTokens } = candidate
   const name = useFullId ? entry.id : candidate.baseName
-  const family = catalogModel?.id ?? entry.id.slice(entry.id.lastIndexOf('/') + 1).replace(/:.*/, '')
+  const familyId = catalogModel?.id ?? entry.id
+  const family = familyId.slice(familyId.lastIndexOf('/') + 1).replace(/:.*/, '')
   const iconIdentity = `${family} ${providerName}`.toLowerCase()
   const statusIconId = PROVIDER_ICONS.find(([pattern]) => pattern.test(iconIdentity))?.[1]
   const displayProviderName = formatProviderName(providerName)
@@ -218,7 +221,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     contextSize: {
       type: 'number',
       enum: [totalContext],
-      enumItemLabels: [formatTokens(totalContext)],
+      enumItemLabels: [formatTokens(totalContext + outputTokens)],
       default: totalContext,
       description: 'Context Size',
       group: 'tokens',

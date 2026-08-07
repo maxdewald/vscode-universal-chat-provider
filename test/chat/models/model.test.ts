@@ -1,7 +1,76 @@
-import { mapProxyModels } from '@src/chat/models/model'
+import type { CatalogModel } from '@src/chat/models/catalog'
+import type { ModelMappingOptions, ProxyModelListEntry, ProxyModelMetadata } from '@src/chat/models/model'
+import { mapProxyModels as mapModels } from '@src/chat/models/model'
 import { describe, expect, it } from 'vitest'
 
+function mapProxyModels(
+  available: readonly ProxyModelListEntry[],
+  metadata: readonly ProxyModelMetadata[],
+  catalog: Map<string, CatalogModel>,
+  options: ModelMappingOptions,
+) {
+  return mapModels(available, metadata, { router: catalog, modelsDev: catalog }, options)
+}
+
 describe('model mapping', () => {
+  it('uses models.dev exclusively for OpenAI-compatible models', () => {
+    const [model] = mapModels(
+      [{ id: 'opencode.ai/deepseek-v4-flash', owned_by: 'opencode.ai', context_length: 272_000 }],
+      [{ slug: 'opencode.ai/deepseek-v4-flash', input_modalities: ['text', 'image'] }],
+      {
+        router: new Map([['deepseek-v4-flash', {
+          id: 'deepseek-v4-flash',
+          display_name: 'Router DeepSeek',
+          context_length: 272_000,
+          max_completion_tokens: 16_000,
+          supportedInputModalities: ['text', 'image'],
+        }]]),
+        modelsDev: new Map([['opencode.ai/deepseek-v4-flash', {
+          id: 'deepseek-v4-flash',
+          display_name: 'DeepSeek V4 Flash (New)',
+          context_length: 616_000,
+          max_completion_tokens: 384_000,
+          supportedInputModalities: ['text'],
+          supported_parameters: ['tools'],
+        }]]),
+      },
+      {},
+    )
+
+    expect(model).toMatchObject({
+      name: 'DeepSeek V4 Flash (New)',
+      maxInputTokens: 616_000,
+      maxOutputTokens: 384_000,
+      capabilities: { imageInput: false, toolCalling: true },
+    })
+  })
+
+  it('ignores models.dev for OAuth models', () => {
+    const [model] = mapModels(
+      [{ id: 'gpt-5.4', owned_by: 'openai', context_length: 272_000, max_completion_tokens: 128_000 }],
+      [{ slug: 'gpt-5.4', display_name: 'CLIProxy GPT', input_modalities: ['text', 'image'] }],
+      {
+        router: new Map([['gpt-5.4', { id: 'gpt-5.4', display_name: 'Router GPT' }]]),
+        modelsDev: new Map([['gpt-5.4', {
+          id: 'gpt-5.4',
+          display_name: 'models.dev GPT',
+          context_length: 1,
+          max_completion_tokens: 1,
+          supportedInputModalities: ['text'],
+          supported_parameters: [],
+        }]]),
+      },
+      {},
+    )
+
+    expect(model).toMatchObject({
+      name: 'CLIProxy GPT',
+      maxInputTokens: 272_000,
+      maxOutputTokens: 128_000,
+      capabilities: { imageInput: true, toolCalling: true },
+    })
+  })
+
   it('creates one entry with a reasoning-effort selector', () => {
     const models = mapProxyModels(
       [{ id: 'gpt-5.4', owned_by: 'openai' }],
@@ -46,7 +115,7 @@ describe('model mapping', () => {
         contextSize: {
           type: 'number',
           enum: [400_000],
-          enumItemLabels: ['400K'],
+          enumItemLabels: ['528K'],
           default: 400_000,
           description: 'Context Size',
           group: 'tokens',
@@ -88,7 +157,10 @@ describe('model mapping', () => {
         { id: 'image-generation', owned_by: 'openai', context_length: 4096, max_completion_tokens: 8192 },
       ],
       [],
-      new Map(),
+      new Map([
+        ['mai', { id: 'mai', context_length: 128_000, max_completion_tokens: 8192 }],
+        ['mystery', { id: 'mystery', context_length: 128_000, max_completion_tokens: 8192 }],
+      ]),
       {},
     )
 
@@ -107,7 +179,7 @@ describe('model mapping', () => {
     expect(models).toEqual([])
     expect(skipped).toEqual([{
       id: 'vendor/unknown-model',
-      reason: 'model is not supported: context window and output tokens must be supplied manually',
+      reason: 'model is not supported: models.dev metadata is unavailable',
     }])
   })
 
@@ -190,7 +262,7 @@ describe('model mapping', () => {
     }]))
 
     expect(identities).toEqual(Object.fromEntries(entries.map(entry => [entry.id, {
-      family: entry.id,
+      family: entry.id === 'vendor/model' ? 'model' : entry.id,
       proxyOwner: entry.owned_by,
     }])))
   })
@@ -275,8 +347,8 @@ describe('model mapping', () => {
     const levels = [{ effort: 'low' }, { effort: 'high' }]
     const models = mapProxyModels(
       [
-        { id: 'model-a', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
-        { id: 'model-b', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'model-a', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'model-b', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
       ],
       [
         { slug: 'model-a', display_name: 'Model (Low)', supported_reasoning_levels: levels },
@@ -289,13 +361,13 @@ describe('model mapping', () => {
     expect(models.map(model => model.proxyModelId)).toEqual(['model-a', 'model-b'])
     expect(models.map(model => model.name)).toEqual(['model-a', 'model-b'])
     expect(collisions).toEqual([
-      'Model display collision for Proxy "Model": model-a, model-b; showing full IDs.',
+      'Model display collision for Codex "Model": model-a, model-b; showing full IDs.',
     ])
   })
 
   it('keeps fixed reasoning names when no selector can be offered', () => {
     const [model] = mapProxyModels(
-      [{ id: 'fixed-high', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
+      [{ id: 'fixed-high', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 }],
       [{
         slug: 'fixed-high',
         display_name: 'Fixed Model (High)',
@@ -312,7 +384,7 @@ describe('model mapping', () => {
         contextSize: {
           type: 'number',
           enum: [128_000],
-          enumItemLabels: ['128K'],
+          enumItemLabels: ['136.2K'],
           default: 128_000,
           description: 'Context Size',
           group: 'tokens',
@@ -324,8 +396,8 @@ describe('model mapping', () => {
   it('keeps distinct aliases when their reasoning choices differ', () => {
     const models = mapProxyModels(
       [
-        { id: 'model-high', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
-        { id: 'model-low', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'model-high', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
+        { id: 'model-low', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
       ],
       [
         {
@@ -350,9 +422,12 @@ describe('model mapping', () => {
 
   it('humanizes ids only when no display name is available', () => {
     const [model] = mapProxyModels(
-      [{ id: 'mystery-model_low', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
+      [{ id: 'mystery-model_low', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 }],
       [],
-      new Map(),
+      new Map([
+        ['mai', { id: 'mai', context_length: 128_000, max_completion_tokens: 8192 }],
+        ['mystery', { id: 'mystery', context_length: 128_000, max_completion_tokens: 8192 }],
+      ]),
       {},
     )
 
@@ -372,7 +447,10 @@ describe('model mapping', () => {
         { id: 'mystery', owned_by: 'acme-labs', context_length: 128_000, max_completion_tokens: 8192 },
       ],
       [],
-      new Map(),
+      new Map([
+        ['mai', { id: 'mai', context_length: 128_000, max_completion_tokens: 8192 }],
+        ['mystery', { id: 'mystery', context_length: 128_000, max_completion_tokens: 8192 }],
+      ]),
       {},
     )
 
@@ -461,13 +539,13 @@ describe('model mapping', () => {
 
   it('falls back to the spec lines when no description is available', () => {
     const [model] = mapProxyModels(
-      [{ id: 'mystery', owned_by: 'proxy', context_length: 128_000, max_completion_tokens: 8192 }],
+      [{ id: 'mystery', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 }],
       [],
       new Map(),
       {},
     )
 
-    expect(model?.tooltip).toBe('Proxy via CLIProxyAPI\n\n8.2K max output · Tools')
+    expect(model?.tooltip).toBe('Codex via CLIProxyAPI\n\n8.2K max output · Tools')
   })
 
   it('deduplicates IDs, applies safe numeric fallbacks, and filters catalog media models', () => {
@@ -481,7 +559,7 @@ describe('model mapping', () => {
       ],
       [{ slug: 'tiny', context_window: -1, max_context_window: Number.NaN }],
       new Map([
-        ['tiny', { id: 'tiny', max_completion_tokens: -5, outputTokenLimit: 8 }],
+        ['tiny', { id: 'tiny', context_length: 128_000, max_completion_tokens: -5, outputTokenLimit: 8 }],
         ['picture', { id: 'picture', type: 'openai-image' }],
         ['audio-only', { id: 'audio-only', supportedOutputModalities: ['audio'] }],
       ]),
@@ -587,11 +665,15 @@ describe('catalog model mapping', () => {
     ])
   })
 
-  it('strips provider and routing prefixes from uncatalogued model families', () => {
+  it('strips provider and routing prefixes from models.dev model families', () => {
     const [model] = mapProxyModels(
       [{ id: 'openai/gpt-next:free', owned_by: 'openrouter.ai', context_length: 128_000, max_completion_tokens: 16_000 }],
       [],
-      new Map(),
+      new Map([['openai/gpt-next:free', {
+        id: 'openai/gpt-next:free',
+        context_length: 128_000,
+        max_completion_tokens: 16_000,
+      }]]),
       {},
     )
 
@@ -722,7 +804,7 @@ describe('catalog model mapping', () => {
     expect(models).toHaveLength(1)
     expect(model).toMatchObject({
       name: 'Catalog Model',
-      family: 'vendor/model',
+      family: 'model',
       version: 'v1',
       maxInputTokens: 1_000_000,
       maxOutputTokens: 50_000,

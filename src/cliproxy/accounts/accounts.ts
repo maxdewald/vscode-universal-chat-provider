@@ -1,8 +1,6 @@
-import type { CatalogModel } from '@src/chat/models/catalog'
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
 import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
-import { enrichOpenAICompatibilityProviders } from '@src/cliproxy/accounts/openai-compat-thinking'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
@@ -166,24 +164,6 @@ export class AccountsService {
     }
     catch (error) {
       void window.showErrorMessage(`Could not add OpenAI-compatible endpoint: ${errorMessage(error)}`)
-    }
-  }
-
-  async enrichThinkingLevels(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
-    const management = this.deps.currentManagement()
-    if (management === undefined)
-      return false
-    try {
-      const client = new ManagementClient(management.baseUrl, management.key)
-      const existing = await client.listOpenAICompatibility()
-      if (!enrichOpenAICompatibilityProviders(existing, catalog))
-        return false
-      await client.putOpenAICompatibility(existing)
-      await this.deps.persistOpenAICompatibility?.(existing)
-      return true
-    }
-    catch {
-      return false
     }
   }
 

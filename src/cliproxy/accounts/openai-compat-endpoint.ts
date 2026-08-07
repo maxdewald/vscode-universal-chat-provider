@@ -1,10 +1,8 @@
-import type { CatalogModel } from '@src/chat/models/catalog'
 import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { Memento } from 'vscode'
 import { Type } from '@sinclair/typebox'
-import { fetchCatalog } from '@src/chat/models/catalog'
-import { enrichOpenAICompatibilityProviders } from '@src/cliproxy/accounts/openai-compat-thinking'
 import { asValue } from '@src/shared/json'
+import ky from 'ky'
 import { ProgressLocation, window } from 'vscode'
 
 const LAST_OPENAI_BASE_URL_KEY = 'universalChatProvider.lastOpenAIBaseUrl'
@@ -13,7 +11,6 @@ export interface OpenAICompatibilityDraft {
   baseUrl: string
   apiKey: string
   modelIds: string[]
-  catalog: ReadonlyMap<string, CatalogModel>
 }
 
 export async function promptOpenAICompatibilityEndpoint(
@@ -45,12 +42,9 @@ export async function promptOpenAICompatibilityEndpoint(
 
   const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
   const normalizedApiKey = apiKey.trim()
-  const [discovered, catalog] = await window.withProgress(
+  const discovered = await window.withProgress(
     { location: ProgressLocation.Notification, title: 'Fetching models from endpoint…' },
-    async () => Promise.all([
-      discoverUpstreamModels(normalizedBaseUrl, normalizedApiKey),
-      fetchCatalog(),
-    ]),
+    async () => discoverUpstreamModels(normalizedBaseUrl, normalizedApiKey),
   )
 
   let modelIds = discovered
@@ -71,7 +65,7 @@ export async function promptOpenAICompatibilityEndpoint(
       return undefined
   }
 
-  return { baseUrl: normalizedBaseUrl, apiKey: normalizedApiKey, modelIds, catalog }
+  return { baseUrl: normalizedBaseUrl, apiKey: normalizedApiKey, modelIds }
 }
 
 export function buildOpenAICompatibilityProvider(
@@ -87,7 +81,6 @@ export function buildOpenAICompatibilityProvider(
     'api-key-entries': [{ 'api-key': draft.apiKey }],
     models,
   }
-  enrichOpenAICompatibilityProviders([provider], draft.catalog)
   return provider
 }
 
@@ -99,13 +92,12 @@ const UpstreamModelsSchema = Type.Object({
 
 async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<string[]> {
   try {
-    const response = await fetch(`${baseUrl}/models`, {
+    const payload = asValue(UpstreamModelsSchema, await ky.get(`${baseUrl}/models`, {
+      fetch: globalThis.fetch,
       headers: { Authorization: `Bearer ${apiKey}` },
+      retry: 0,
       signal: AbortSignal.timeout(10_000),
-    })
-    if (!response.ok)
-      return []
-    const payload = asValue(UpstreamModelsSchema, await response.json())
+    }).json<unknown>())
     return uniqueModelIds((payload?.data ?? []).map(model => model.id))
   }
   catch {

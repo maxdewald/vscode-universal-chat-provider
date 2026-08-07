@@ -26,7 +26,7 @@ vi.mock('../../src/cliproxy/api/proxy-client', () => ({
 }))
 
 vi.mock('../../src/chat/models/catalog', () => ({
-  fetchCatalog: vi.fn(async () => new Map()),
+  fetchCatalog: vi.fn(async () => ({ router: new Map(), modelsDev: new Map() })),
 }))
 
 beforeEach(() => {
@@ -367,8 +367,8 @@ describe('conversation compaction', () => {
     const provider = createProvider('secret')
     clientMocks.discover.mockResolvedValue({
       available: [
-        { id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
-        { id: 'cheap', owned_by: 'test', context_length: 200_000, max_completion_tokens: 20 },
+        { id: 'model-a', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 },
+        { id: 'cheap', owned_by: 'openai', context_length: 200_000, max_completion_tokens: 20 },
       ],
       metadata: [{
         slug: 'cheap',
@@ -491,5 +491,5 @@ function options() {
 }
 
 function discovery() {
-  return singleModelDiscovery()
+  return singleModelDiscovery({ owned_by: 'openai' })
 }

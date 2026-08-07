@@ -1,4 +1,3 @@
-import type { CatalogModel } from '@src/chat/models/catalog'
 import type { ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { ManagedPaths } from '@src/cliproxy/managed/config'
@@ -91,10 +90,6 @@ export class ServerController implements ProxyConnection {
       return normalizeBaseUrl(workspace.getConfiguration('universalChatProvider').get<string>('baseUrl', `http://${DEFAULT_HOST}:${DEFAULT_PORT}`))
     return this.server?.baseUrl()
       ?? `http://${DEFAULT_HOST}:${this.context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT}`
-  }
-
-  async enrichOpenAICompatibilityThinking(catalog: ReadonlyMap<string, CatalogModel>): Promise<boolean> {
-    return this.accounts.enrichThinkingLevels(catalog)
   }
 
   async statusSnapshot(): Promise<ServerStatusSnapshot> {

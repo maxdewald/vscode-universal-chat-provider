@@ -25,7 +25,7 @@ vi.mock('../../../src/chat/models/catalog', () => ({
 beforeEach(() => {
   resetVSCodeMock()
   clientMocks.discover.mockReset()
-  catalogMocks.fetchCatalog.mockReset().mockResolvedValue(new Map())
+  catalogMocks.fetchCatalog.mockReset().mockResolvedValue({ router: new Map(), modelsDev: new Map() })
 })
 
 describe('model registry', () => {
@@ -112,7 +112,7 @@ describe('model registry', () => {
 
   it('logs collisions only when they enter the current collision set', async () => {
     const registry = createRegistry('secret')
-    const message = 'Model display collision for Test "Model": model-a, model-b; showing full IDs.'
+    const message = 'Model display collision for Codex "Model": model-a, model-b; showing full IDs.'
 
     clientMocks.discover.mockResolvedValue(collidingDiscovery())
     await registry.forceRefresh(false)
@@ -156,25 +156,6 @@ describe('model registry', () => {
     expect(window.showErrorMessage).not.toHaveBeenCalled()
   })
 
-  it('enriches openai-compatible thinking levels once before discovery', async () => {
-    const enrich = vi.fn(async () => true)
-    const registry = createRegistry('secret', {}, {
-      enrichOpenAICompatibilityThinking: enrich,
-    })
-    const catalog = new Map([['gpt-5.6-sol', { id: 'gpt-5.6-sol' }]])
-    catalogMocks.fetchCatalog.mockResolvedValue(catalog)
-    clientMocks.discover.mockResolvedValue(discovery())
-
-    await registry.forceRefresh(false)
-    await registry.forceRefresh(false)
-
-    expect(enrich).toHaveBeenCalledTimes(1)
-    expect(enrich).toHaveBeenCalledWith(catalog)
-    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      'Enriched OpenAI-compatible thinking levels from the model catalog.',
-    )
-  })
-
   it('reports regional restrictions without starting credential recovery', async () => {
     const rejected = vi.fn()
     const registry = createRegistry('secret', { onCredentialsRejected: rejected })
@@ -212,14 +193,14 @@ function createRegistry(
 }
 
 function discovery() {
-  return singleModelDiscovery()
+  return singleModelDiscovery({ owned_by: 'openai' })
 }
 
 function collidingDiscovery() {
   return {
     available: [
-      { id: 'model-a', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
-      { id: 'model-b', owned_by: 'test', context_length: 128_000, max_completion_tokens: 20 },
+      { id: 'model-a', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 },
+      { id: 'model-b', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 },
     ],
     metadata: [
       { slug: 'model-a', display_name: 'Model (Low)', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },

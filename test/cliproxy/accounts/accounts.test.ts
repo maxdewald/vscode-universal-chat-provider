@@ -1,16 +1,7 @@
-import type { CatalogModel } from '@src/chat/models/catalog'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetVSCodeMock, window } from '../../support/vscode'
-
-const catalogMocks = vi.hoisted(() => ({
-  fetchCatalog: vi.fn<() => Promise<Map<string, CatalogModel>>>(),
-}))
-
-vi.mock('../../../src/chat/models/catalog', () => ({
-  fetchCatalog: catalogMocks.fetchCatalog,
-}))
 
 describe('accounts login completion', () => {
   beforeEach(() => {
@@ -98,16 +89,6 @@ describe('openai-compatible endpoint', () => {
   beforeEach(() => {
     resetVSCodeMock()
     vi.unstubAllGlobals()
-    catalogMocks.fetchCatalog.mockReset().mockResolvedValue(new Map([
-      ['gpt-5.5', {
-        id: 'gpt-5.5',
-        thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
-      }],
-      ['gpt-5.6-sol', {
-        id: 'gpt-5.6-sol',
-        thinking: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
-      }],
-    ]))
   })
 
   afterEach(() => {
@@ -178,11 +159,7 @@ describe('openai-compatible endpoint', () => {
         'api-key-entries': [{ 'api-key': 'sk-test' }],
         'models': [
           { name: 'claude-opus-4-8', alias: 'opencode.ai/claude-opus-4-8' },
-          {
-            name: 'gpt-5.5',
-            alias: 'opencode.ai/gpt-5.5',
-            thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
-          },
+          { name: 'gpt-5.5', alias: 'opencode.ai/gpt-5.5' },
         ],
       },
     ])
@@ -202,7 +179,7 @@ describe('openai-compatible endpoint', () => {
       .mockResolvedValueOnce('https://openrouter.ai/api/v1')
       .mockResolvedValueOnce('sk-or')
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      expect(String(input)).toBe('https://openrouter.ai/api/v1/models')
+      expect(input instanceof Request ? input.url : input.toString()).toBe('https://openrouter.ai/api/v1/models')
       return Response.json({ data: [{ id: 'gpt-5.5' }, { id: 'claude-opus-4-8' }] })
     }))
 
@@ -218,11 +195,7 @@ describe('openai-compatible endpoint', () => {
         'base-url': 'https://openrouter.ai/api/v1',
         'api-key-entries': [{ 'api-key': 'sk-or' }],
         'models': [
-          {
-            name: 'gpt-5.5',
-            alias: 'openrouter.ai/gpt-5.5',
-            thinking: { levels: ['low', 'medium', 'high', 'xhigh'] },
-          },
+          { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
           { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
         ],
       },
@@ -301,52 +274,6 @@ describe('openai-compatible endpoint', () => {
     expect(persistOpenAICompatibility).not.toHaveBeenCalled()
     expect(onAccountsChanged).not.toHaveBeenCalled()
     expect(window.showErrorMessage).toHaveBeenCalledWith('Could not add OpenAI-compatible endpoint: write failed')
-  })
-
-  it('enriches existing openai-compatible providers missing thinking levels', async () => {
-    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
-    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
-      {
-        'name': 'codegate.dev',
-        'base-url': 'https://codegate.dev/v1',
-        'api-key-entries': [{ 'api-key': 'sk-test' }],
-        'models': [
-          { name: 'gpt-5.6-sol', alias: 'codegate.dev/gpt-5.6-sol' },
-          {
-            name: 'gpt-5.5',
-            alias: 'codegate.dev/gpt-5.5',
-            thinking: { levels: ['low', 'high'] },
-          },
-        ],
-      },
-    ])
-    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
-    const { service } = serviceWith({
-      currentManagement: () => ({ baseUrl: 'http://127.0.0.1:8317', key: 'k' }),
-      persistOpenAICompatibility,
-    })
-
-    await expect(service.enrichThinkingLevels(await catalogMocks.fetchCatalog())).resolves.toBe(true)
-    expect(put).toHaveBeenCalledWith([
-      {
-        'name': 'codegate.dev',
-        'base-url': 'https://codegate.dev/v1',
-        'api-key-entries': [{ 'api-key': 'sk-test' }],
-        'models': [
-          {
-            name: 'gpt-5.6-sol',
-            alias: 'codegate.dev/gpt-5.6-sol',
-            thinking: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
-          },
-          {
-            name: 'gpt-5.5',
-            alias: 'codegate.dev/gpt-5.5',
-            thinking: { levels: ['low', 'high'] },
-          },
-        ],
-      },
-    ])
-    expect(persistOpenAICompatibility).toHaveBeenCalledWith(put.mock.calls[0]?.[0])
   })
 
   it('keeps same-url endpoints with different tokens under unique names', async () => {
