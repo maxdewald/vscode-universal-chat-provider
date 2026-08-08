@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.0...v0.38.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* model provider metadata fallback ([fb32cf4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/fb32cf4b5df908c7d0c8d47fb7431dafdd962f87))
+
 ## [0.38.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.37.0...v0.38.0) (2026-08-07)
 
 
