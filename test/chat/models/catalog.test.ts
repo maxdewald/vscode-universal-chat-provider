@@ -57,6 +57,18 @@ describe('fetchCatalog', () => {
                 },
               },
             },
+            vendor: {
+              id: 'vendor',
+              api: 'https://api.vendor.example/v1',
+              models: {
+                'reasoning-model': {
+                  id: 'reasoning-model',
+                  name: 'Provider Reasoning Model',
+                  limit: { context: 500_000, output: 100_000 },
+                  reasoning_options: [{ values: ['low', 'medium', 'high'] }],
+                },
+              },
+            },
           },
           models: {
             'deepseek/deepseek-v4-flash': {
@@ -66,6 +78,11 @@ describe('fetchCatalog', () => {
               tool_call: true,
               modalities: { input: ['text'], output: ['text'] },
               limit: { context: 1_000_000, output: 384_000 },
+            },
+            'vendor/reasoning-model': {
+              id: 'vendor/reasoning-model',
+              name: 'Canonical Reasoning Model',
+              limit: { context: 200_000, output: 50_000 },
             },
           },
         })
@@ -95,6 +112,12 @@ describe('fetchCatalog', () => {
     expect(result.modelsDev.get('opencode.ai/grok-4.5')).toMatchObject({
       context_length: 500_000,
       max_completion_tokens: 500_000,
+    })
+    expect(matchCatalogModel('custom.example/reasoning-model', result.modelsDev)).toMatchObject({
+      display_name: 'Provider Reasoning Model',
+      context_length: 400_000,
+      max_completion_tokens: 100_000,
+      thinking: { levels: ['low', 'medium', 'high'] },
     })
   })
 

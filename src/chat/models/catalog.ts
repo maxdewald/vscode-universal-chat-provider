@@ -127,8 +127,12 @@ function flattenModelsDevCatalog(payload: unknown): Map<string, CatalogModel> {
 
   for (const [id, candidate] of Object.entries(modelsDev.models ?? {})) {
     const model = toCatalogModel(candidate)
+    const separator = id.indexOf('/')
+    const owner = separator === -1 ? undefined : id.slice(0, separator)
+    const modelId = separator === -1 ? id : id.slice(separator + 1)
+    const providerModel = owner === undefined ? undefined : modelsDev.providers?.[owner]?.models[modelId]
     result.set(id, model)
-    result.set(id.slice(id.lastIndexOf('/') + 1), model)
+    result.set(modelId, providerModel === undefined ? model : toCatalogModel(providerModel))
   }
 
   for (const [providerId, provider] of Object.entries(modelsDev.providers ?? {})) {
