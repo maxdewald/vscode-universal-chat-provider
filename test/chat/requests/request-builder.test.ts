@@ -159,6 +159,23 @@ describe('response request conversion', () => {
     ])
   })
 
+  it('drops empty text parts so Anthropic does not reject the request', async () => {
+    const messages = [{
+      role: LanguageModelChatMessageRole.User,
+      content: [
+        new LanguageModelTextPart(''),
+        new LanguageModelTextPart('hello'),
+        new LanguageModelTextPart(''),
+      ],
+      name: undefined,
+    }]
+
+    expect(await convertAll(messages)).toEqual([{
+      role: 'user',
+      content: [{ type: 'input_text', text: 'hello' }],
+    }])
+  })
+
   it('adds supported reasoning and tool options', async () => {
     const request = await buildRequest(
       model,

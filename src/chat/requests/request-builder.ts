@@ -117,19 +117,22 @@ export async function convertMessage(message: LanguageModelChatRequestMessage): 
     if (isCacheControlPart(part))
       continue
     if (part instanceof LanguageModelTextPart) {
-      content.push({
-        type: role === 'assistant' ? 'output_text' : 'input_text',
-        text: part.value,
-      })
+      if (part.value !== '')
+        content.push({
+          type: role === 'assistant' ? 'output_text' : 'input_text',
+          text: part.value,
+        })
     }
     else if (part instanceof LanguageModelDataPart) {
       // Providers sniff the bytes and reject a mismatched mimeType, so the declared one is never trusted.
       const detected = await fileTypeFromBuffer(part.data)
       if (detected === undefined) {
-        content.push({
-          type: role === 'assistant' ? 'output_text' : 'input_text',
-          text: new TextDecoder().decode(part.data),
-        })
+        const text = new TextDecoder().decode(part.data)
+        if (text !== '')
+          content.push({
+            type: role === 'assistant' ? 'output_text' : 'input_text',
+            text,
+          })
       }
       else if (detected.mime.startsWith('image/')) {
         content.push({
