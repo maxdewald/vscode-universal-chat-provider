@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.38.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.1...v0.38.2) (2026-08-08)
+
+
+### Bug Fixes
+
+* cap managed server updates at 7.2.115 ([bd41029](https://github.com/maxdewald/vscode-universal-chat-provider/commit/bd41029ecaaae8dc85013db607379be115b43b23))
+
 ## [0.38.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.0...v0.38.1) (2026-08-08)
 
 
