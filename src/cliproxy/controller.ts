@@ -18,12 +18,13 @@ import { DEFAULT_HOST, DEFAULT_PORT } from '@src/cliproxy/managed/config'
 import { releaseLease } from '@src/cliproxy/managed/leases'
 import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
-import { pickUpdate } from '@src/cliproxy/managed/update-policy'
+import { MAX_MANAGED_VERSION, MAX_MANAGED_VERSION_REASON, pickUpdate } from '@src/cliproxy/managed/update-policy'
 import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
 import { fetchQuotas, quotaProviderForModel } from '@src/cliproxy/quota/quota'
 import { countAccounts } from '@src/cliproxy/status'
 import { errorMessage } from '@src/shared/errors'
 import { debounce } from 'moderndash'
+import semver from 'semver'
 import {
   ConfigurationTarget,
   ProgressLocation,
@@ -189,7 +190,7 @@ export class ServerController implements ProxyConnection {
       void window.showInformationMessage('Binary updates apply only to the managed server.')
       return
     }
-    await this.applyBinaryUpdate(this.updatePolicy() === 'manual' ? this.configuredVersion() : 'latest')
+    await this.applyBinaryUpdate(this.requestedVersion())
   }
 
   private async applyBinaryUpdate(version: string): Promise<void> {
@@ -233,13 +234,22 @@ export class ServerController implements ProxyConnection {
     if (target === null)
       return
 
+    const downgrade = installed !== undefined && semver.lt(target, installed)
+    if (downgrade)
+      this.output.appendLine(`Downgrading CLIProxyAPI ${installed} to ${target}. ${MAX_MANAGED_VERSION_REASON}`)
     if (policy === 'suggestUpdates') {
-      const choice = await window.showInformationMessage(
-        `CLIProxyAPI ${target} is available (you're on ${installed ?? 'an unknown version'}).`,
-        'Update',
-        'Not Now',
-      )
-      if (choice !== 'Update')
+      const choice = downgrade
+        ? await window.showWarningMessage(
+            `CLIProxyAPI ${installed} should be downgraded to ${target}. ${MAX_MANAGED_VERSION_REASON}`,
+            'Downgrade',
+            'Not Now',
+          )
+        : await window.showInformationMessage(
+            `CLIProxyAPI ${target} is available (you're on ${installed ?? 'an unknown version'}).`,
+            'Update',
+            'Not Now',
+          )
+      if (choice !== (downgrade ? 'Downgrade' : 'Update'))
         return
     }
     await this.applyBinaryUpdate(target)
@@ -344,7 +354,7 @@ export class ServerController implements ProxyConnection {
   }
 
   private requestedVersion(): string {
-    return this.updatePolicy() === 'automatic' ? 'latest' : this.configuredVersion()
+    return this.updatePolicy() === 'manual' ? this.configuredVersion() : MAX_MANAGED_VERSION
   }
 
   private configuredProxyUrl(): string | undefined {

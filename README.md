@@ -142,6 +142,8 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 Updates download automatically by default and restart the managed server as soon as no requests are active. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself.
 
+Managed updates are temporarily capped at CLIProxyAPI `7.2.115`. Newer releases stop advancing Claude prompt caches for requests translated from the OpenAI Responses endpoint, which makes long chats far more expensive ([upstream issue](https://github.com/router-for-me/CLIProxyAPI/issues/4855)). `automatic` downgrades to the cap on its own and `suggestUpdates` asks first; set `manual` and pick `universalChatProvider.server.version` to run a newer release anyway. The cap is lifted once the regression is fixed upstream.
+
 </details>
 
 <details>
