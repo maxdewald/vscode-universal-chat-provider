@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.38.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.2...v0.38.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **deps:** update dependency tokenx to v2 ([#109](https://github.com/maxdewald/vscode-universal-chat-provider/issues/109)) ([cdb9013](https://github.com/maxdewald/vscode-universal-chat-provider/commit/cdb9013b788cfe471ea3d1de730243df58e6513d))
+* remove managed server version cap ([31a8513](https://github.com/maxdewald/vscode-universal-chat-provider/commit/31a85139241b747c33c2fc3b542e2bc60041397f))
+
 ## [0.38.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.1...v0.38.2) (2026-08-08)
 
 
