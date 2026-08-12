@@ -77,39 +77,39 @@ describe('server controller lifecycle', () => {
     ))
   })
 
-  it('downgrades without asking when updates are automatic', async () => {
+  it('updates past the former cap when updates are automatic', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'automatic')
     vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.116')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('7.2.115')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady(false)
 
-    await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledWith('7.2.115'))
+    await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledWith('8.0.0'))
     expect(window.showWarningMessage).not.toHaveBeenCalled()
     controller.dispose()
   })
 
-  it('asks before downgrading when suggestUpdates is selected', async () => {
+  it('asks before updating past the former cap when suggestUpdates is selected', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'suggestUpdates')
     vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.116')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('7.2.115')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady(false)
 
-    await vi.waitFor(() => expect(window.showWarningMessage).toHaveBeenCalledWith(
-      expect.stringContaining('CLIProxyAPI 7.2.116 should be downgraded to 7.2.115.'),
-      'Downgrade',
+    await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledWith(
+      'CLIProxyAPI 8.0.0 is available (you\'re on 7.2.116).',
+      'Update',
       'Not Now',
     ))
     expect(downloadBinary).not.toHaveBeenCalled()
     controller.dispose()
   })
 
-  it('keeps a manual version above the maximum', async () => {
+  it('keeps a manually configured version', async () => {
     vscodeMock.settings.set('universalChatProvider.server.version', '8.0.0')
     const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
@@ -120,14 +120,14 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('caps the update command at the maximum supported version', async () => {
+  it('requests the latest version from the update command', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'automatic')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('7.2.115')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.updateBinary()
 
-    expect(downloadBinary).toHaveBeenCalledWith('7.2.115')
+    expect(downloadBinary).toHaveBeenCalledWith('latest')
     controller.dispose()
   })
 
