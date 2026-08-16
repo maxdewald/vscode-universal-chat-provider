@@ -96,7 +96,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 | `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                            | `boolean` | `true`                    |
 | ▿ <b>Managed Server</b>                       |
 | `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                      | `string`  | `"automatic"`             |
-| `universalChatProvider.server.version`        | Exact CLIProxyAPI release used when update policy is Manual.                                                                      | `string`  | `"7.2.94"`                |
+| `universalChatProvider.server.version`        | CLIProxyAPI release used when update policy is Manual. Use latest or an exact version.                                            | `string`  | `"latest"`                |
 | `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. Changes prompt before restarting.                                 | `string`  | `""`                      |
 | ▿ <b>Status Bar</b>                           |
 | `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                     | `boolean` | `true`                    |
@@ -140,7 +140,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 <details>
 <summary>Managed-server updates</summary>
 
-Updates download automatically by default and restart the managed server as soon as no requests are active. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself.
+Updates download automatically by default and restart the managed server as soon as no requests are active. Change `universalChatProvider.server.updatePolicy` to `suggestUpdates` or `manual` if you'd rather review or pin them yourself. Manual mode uses the configured version, which defaults to `latest`; enter an exact version to pin it.
 
 </details>
 

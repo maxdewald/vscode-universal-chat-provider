@@ -12,7 +12,7 @@ import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
-import { DEFAULT_BINARY_VERSION, resolveVersion } from '@src/cliproxy/managed/binary'
+import { resolveVersion } from '@src/cliproxy/managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from '@src/cliproxy/managed/config'
 import { releaseLease } from '@src/cliproxy/managed/leases'
@@ -334,8 +334,8 @@ export class ServerController implements ProxyConnection {
   }
 
   private configuredVersion(): string {
-    return workspace.getConfiguration('universalChatProvider').get<string>('server.version', DEFAULT_BINARY_VERSION).trim()
-      || DEFAULT_BINARY_VERSION
+    return workspace.getConfiguration('universalChatProvider').get<string>('server.version', 'latest').trim()
+      || 'latest'
   }
 
   private updatePolicy(): UpdatePolicy {

@@ -187,11 +187,11 @@
           },
           "universalChatProvider.server.version": {
             "type": "string",
-            "default": "7.2.94",
+            "default": "latest",
             "scope": "machine",
             "order": 2,
-            "description": "Exact CLIProxyAPI release used when update policy is Manual.",
-            "markdownDescription": "Exact CLIProxyAPI release used when `#universalChatProvider.server.updatePolicy#` is `manual`."
+            "description": "CLIProxyAPI release used when update policy is Manual. Use latest or an exact version.",
+            "markdownDescription": "CLIProxyAPI release used when `#universalChatProvider.server.updatePolicy#` is `manual`. Use `latest` or an exact version to pin it."
           },
           "universalChatProvider.server.proxyUrl": {
             "type": "string",

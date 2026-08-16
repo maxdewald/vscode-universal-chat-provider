@@ -120,6 +120,17 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('uses latest when manual mode has no pinned version', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.version', '')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.updateBinary()
+
+    expect(downloadBinary).toHaveBeenCalledWith('latest')
+    controller.dispose()
+  })
+
   it('requests the latest version from the update command', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'automatic')
     const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')

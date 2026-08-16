@@ -9,7 +9,6 @@ import { parseTarGzip } from 'nanotar'
 import semver from 'semver'
 
 const REPO = 'router-for-me/CLIProxyAPI'
-export const DEFAULT_BINARY_VERSION = '7.2.94'
 
 interface AssetInfo {
   assetName: string
