@@ -210,18 +210,27 @@ describe('cLIProxyClient', () => {
     expect(handlers.onThinking).not.toHaveBeenCalled()
   })
 
-  it('forwards prompt cache keys as CLIProxyAPI session hints', async () => {
+  it('forwards prompt cache keys in the request body without a redundant session header', async () => {
+    let requestBody: unknown
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>()
-      .mockResolvedValue(new Response(event({ type: 'response.completed' })))
+      .mockImplementation(async (request) => {
+        requestBody = await request.clone().json()
+        return new Response(event({ type: 'response.completed' }))
+      })
     vi.stubGlobal('fetch', fetchMock)
     const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
 
     await new CLIProxyClient('http://proxy', 'key').streamResponse({ model: 'x', prompt_cache_key: 'universal-chat-provider-cache-key' } as ProxyRequestBody, callbacks(), new AbortController().signal)
 
-    const { headers } = fetchMock.mock.calls[0]![0]
+    const request = fetchMock.mock.calls[0]![0]
+    const { headers } = request
     expect(headers.get('authorization')).toBe('Bearer key')
     expect(headers.get('content-type')).toBe('application/json')
-    expect(headers.get('session_id')).toBe('universal-chat-provider-cache-key')
+    expect(headers.get('session-id')).toBeNull()
+    expect(headers.get('session_id')).toBeNull()
+    expect(requestBody).toMatchObject({
+      prompt_cache_key: 'universal-chat-provider-cache-key',
+    })
   })
 
   it('emits completed pending calls and preserves invalid or scalar arguments', async () => {

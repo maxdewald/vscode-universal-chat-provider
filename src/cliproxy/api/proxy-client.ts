@@ -118,13 +118,8 @@ export class CLIProxyClient {
     callbacks: StreamCallbacks,
     signal: AbortSignal,
   ): Promise<void> {
-    const promptCacheKey = body.prompt_cache_key
-    const sessionHeader = promptCacheKey !== undefined && promptCacheKey.length > 0
-      ? { Session_id: promptCacheKey }
-      : {}
     const response = await this.fetcher.post('/v1/responses', {
       json: body,
-      headers: sessionHeader,
       signal,
     })
     if (!response.body)
