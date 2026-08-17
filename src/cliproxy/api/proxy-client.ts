@@ -41,6 +41,7 @@ const ErrorBodySchema = Type.Object({
 
 const StreamItemSchema = Type.Object({
   type: Type.Optional(Type.String()),
+  status: Type.Optional(Type.String()),
   call_id: Type.Optional(Type.String()),
   name: Type.Optional(Type.String()),
   arguments: Type.Optional(Type.String()),
@@ -49,6 +50,10 @@ const StreamItemSchema = Type.Object({
 
 const StreamResponseSchema = Type.Object({
   usage: Type.Optional(Type.Unknown()),
+  incomplete_details: Type.Optional(Type.Union([
+    Type.Null(),
+    Type.Object({ reason: Type.Optional(Type.String()) }),
+  ])),
   error: Type.Optional(Type.Union([Type.Null(), Type.String(), ErrorObjectSchema])),
 })
 
@@ -185,6 +190,10 @@ export class CLIProxyClient {
         const item = asValue(StreamItemSchema, payload.item)
         if (item?.type === 'function_call') {
           const key = toolKey(payload, item)
+          if (item.status === 'incomplete') {
+            pending.delete(key)
+            continue
+          }
           const current = pending.get(key) ?? {
             callId: item.call_id ?? key,
             name: item.name ?? 'unknown_tool',
@@ -199,6 +208,19 @@ export class CLIProxyClient {
         for (const call of pending.values())
           emitToolCall(call, callbacks, emitted)
         callbacks.onUsage?.(asValue(StreamResponseSchema, payload.response)?.usage)
+      }
+      else if (type === 'response.incomplete') {
+        thinking.end()
+        const incomplete = asValue(StreamResponseSchema, payload.response)
+        callbacks.onUsage?.(incomplete?.usage)
+        const reason = incomplete?.incomplete_details?.reason
+        if (reason === 'max_output_tokens')
+          return
+        if (reason === 'content_filter')
+          throw new Error('CLIProxyAPI blocked the response with its content filter.')
+        throw new Error(reason !== undefined && reason.length > 0
+          ? `CLIProxyAPI returned an incomplete response: ${reason}.`
+          : 'CLIProxyAPI returned an incomplete response without a reason.')
       }
       else if (type === 'response.failed' || type === 'error') {
         throw new Error(streamErrorMessage(payload))

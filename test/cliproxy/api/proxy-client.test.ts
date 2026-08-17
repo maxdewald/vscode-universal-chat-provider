@@ -72,6 +72,7 @@ describe('cLIProxyClient', () => {
         type: 'response.completed',
         response: {
           error: null,
+          incomplete_details: null,
           usage: { input_tokens: 10, output_tokens: 2 },
         },
       }),
@@ -258,6 +259,80 @@ describe('cLIProxyClient', () => {
     expect(handlers.onToolCall).toHaveBeenCalledWith('raw', 'raw_tool', { raw: '{bad' })
   })
 
+  it('preserves partial output and usage when the maximum output token limit is reached', async () => {
+    const usage = { input_tokens: 10, output_tokens: 5, total_tokens: 15 }
+    const body = [
+      event({ type: 'response.output_text.delta', delta: 'partial answer' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: 'final thought' }),
+      event({
+        type: 'response.output_item.added',
+        item_id: 'partial-item',
+        item: { type: 'function_call', call_id: 'partial-call', name: 'partial_tool', arguments: '{"value":' },
+      }),
+      event({
+        type: 'response.output_item.done',
+        item_id: 'partial-item',
+        item: { type: 'function_call', status: 'incomplete', call_id: 'partial-call', name: 'partial_tool', arguments: '{"value":' },
+      }),
+      event({
+        type: 'response.incomplete',
+        response: { incomplete_details: { reason: 'max_output_tokens' }, usage },
+      }),
+    ].join('')
+    const handlers = callbacks()
+
+    await expect(stream(body, handlers))
+      .resolves
+      .toBeUndefined()
+
+    expect(handlers.onText).toHaveBeenCalledWith('partial answer')
+    expect(handlers.onThinking.mock.calls.flat()).toEqual(['final thought', ''])
+    expect(handlers.onUsage).toHaveBeenCalledWith(usage)
+    expect(handlers.onToolCall).not.toHaveBeenCalled()
+  })
+
+  it('reports usage and rejects content-filtered responses without flushing pending calls', async () => {
+    const usage = { input_tokens: 8, output_tokens: 3, total_tokens: 11 }
+    const body = [
+      event({ type: 'response.output_text.delta', delta: 'visible prefix' }),
+      event({
+        type: 'response.output_item.done',
+        item: { type: 'function_call', status: 'completed', call_id: 'complete-call', name: 'complete_tool', arguments: '{}' },
+      }),
+      event({
+        type: 'response.output_item.added',
+        item_id: 'pending-item',
+        item: { type: 'function_call', call_id: 'pending-call', name: 'pending_tool', arguments: '{' },
+      }),
+      event({
+        type: 'response.incomplete',
+        response: { incomplete_details: { reason: 'content_filter' }, usage },
+      }),
+    ].join('')
+    const handlers = callbacks()
+
+    await expect(stream(body, handlers))
+      .rejects
+      .toThrow('blocked the response with its content filter')
+
+    expect(handlers.onText).toHaveBeenCalledWith('visible prefix')
+    expect(handlers.onUsage).toHaveBeenCalledWith(usage)
+    expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
+    expect(handlers.onToolCall).toHaveBeenCalledWith('complete-call', 'complete_tool', {})
+  })
+
+  it.each([
+    ['unknown reason', { reason: 'safety_policy' }, 'incomplete response: safety_policy'],
+    ['missing reason', {}, 'incomplete response without a reason'],
+  ])('rejects an incomplete response with an %s', async (_name, incompleteDetails, message) => {
+    await expect(stream(event({
+      type: 'response.incomplete',
+      response: { incomplete_details: incompleteDetails },
+    })))
+      .rejects
+      .toThrow(message)
+  })
+
   it('rejects empty streaming bodies', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null)))
     const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
@@ -290,6 +365,12 @@ function callbacks() {
     onToolCall: vi.fn(),
     onUsage: vi.fn(),
   }
+}
+
+async function stream(body: string, handlers = callbacks()): Promise<void> {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+  const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+  return new CLIProxyClient('http://proxy', 'key').streamResponse(emptyBody, handlers, new AbortController().signal)
 }
 
 function event(payload: unknown): string {
