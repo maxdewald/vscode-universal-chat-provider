@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.39.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.3...v0.39.0) (2026-08-17)
+
+
+### Features
+
+* default manual managed server version to latest ([7f986ac](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7f986ac4da0aa8ca863621a59c58a64a9f37a49a))
+* derive fast mode variants from models.dev ([6ee92f4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/6ee92f44b4e3916e4d745b5b1f02dfb433a271d8))
+* handle incomplete stream responses ([2bc9838](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2bc9838f1904b1a6993e06ef9cf6f03e393f0243))
+
+
+### Bug Fixes
+
+* **deps:** update dependency eventsource-parser to v4 ([#116](https://github.com/maxdewald/vscode-universal-chat-provider/issues/116)) ([00aedfd](https://github.com/maxdewald/vscode-universal-chat-provider/commit/00aedfd0cabaa130ddce44aa0093475150030aa2))
+
+
+### Refactoring
+
+* remove redundant session header from proxy requests ([f7b589a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/f7b589aef37c303f5a80f14feb59e92bbb7e1c13))
+
 ## [0.38.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.2...v0.38.3) (2026-08-12)
 
 
