@@ -136,6 +136,47 @@ describe('fetchCatalog', () => {
     expect(fetchMock.mock.calls.filter(([input]) => input instanceof Request && input.url === modelsDevUrl)).toHaveLength(1)
   })
 
+  it('derives the fast mode cost multiplier from models.dev', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      if (url !== modelsDevUrl)
+        return Response.json({})
+      return Response.json({
+        providers: {
+          anthropic: {
+            id: 'anthropic',
+            models: {
+              'claude-opus-5': {
+                id: 'claude-opus-5',
+                limit: { context: 1_000_000, output: 128_000 },
+                cost: { input: 5, output: 25 },
+                experimental: { modes: { fast: { cost: { input: 10, output: 50 } } } },
+              },
+              'gpt-5.5': {
+                id: 'gpt-5.5',
+                limit: { context: 272_000, output: 128_000 },
+                cost: { input: 1.25, output: 30 },
+                experimental: { modes: { fast: { cost: { input: 3.13, output: 75 } } } },
+              },
+              'claude-sonnet-5': {
+                id: 'claude-sonnet-5',
+                limit: { context: 1_000_000, output: 128_000 },
+                cost: { input: 3, output: 15 },
+              },
+            },
+          },
+        },
+      })
+    }))
+    const { fetchCatalog } = await import('@src/chat/models/catalog')
+
+    const { modelsDev } = await fetchCatalog()
+
+    expect(modelsDev.get('anthropic/claude-opus-5')?.fastCostMultiplier).toBe(2)
+    expect(modelsDev.get('anthropic/gpt-5.5')?.fastCostMultiplier).toBe(2.5)
+    expect(modelsDev.get('anthropic/claude-sonnet-5')?.fastCostMultiplier).toBeUndefined()
+  })
+
   it('returns an empty catalog when the request fails', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new Error('offline')

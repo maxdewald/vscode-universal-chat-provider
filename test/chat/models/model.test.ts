@@ -191,9 +191,8 @@ describe('model mapping', () => {
         display_name: 'GPT-5.6 Sol',
         supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }],
         default_reasoning_level: 'low',
-        service_tiers: [{ id: 'priority' }],
       }],
-      new Map(),
+      new Map([['gpt-5.6-sol', { id: 'gpt-5.6-sol', fastCostMultiplier: 2 }]]),
       {},
     )
 
@@ -217,7 +216,7 @@ describe('model mapping', () => {
       {
         id: 'gpt-5.6-sol:fast',
         name: 'GPT-5.6 Sol (Fast Mode)',
-        detail: '1.5x usage · Codex',
+        detail: '2x usage · Codex',
         family: 'gpt-5.6-sol',
         proxyModelId: 'gpt-5.6-sol',
         serviceTier: 'priority',
@@ -227,10 +226,24 @@ describe('model mapping', () => {
     expect(models[1]?.reasoningLevels).toEqual(models[0]?.reasoningLevels)
   })
 
-  it('does not add a Fast variant when metadata does not advertise it', () => {
+  it('adds a Fast variant for Claude models, which advertise no service tier', () => {
+    const models = mapProxyModels(
+      [{ id: 'claude-opus-5', owned_by: 'anthropic', context_length: 1_000_000, max_completion_tokens: 128_000 }],
+      [{ slug: 'claude-opus-5', display_name: 'Claude Opus 5' }],
+      new Map([['claude-opus-5', { id: 'claude-opus-5', fastCostMultiplier: 2 }]]),
+      {},
+    )
+
+    expect(models.map(model => ({ id: model.id, detail: model.detail, serviceTier: model.serviceTier }))).toEqual([
+      { id: 'claude-opus-5', detail: 'Claude Code', serviceTier: undefined },
+      { id: 'claude-opus-5:fast', detail: '2x usage · Claude Code', serviceTier: 'priority' },
+    ])
+  })
+
+  it('does not add a Fast variant when no fast mode is advertised', () => {
     const models = mapProxyModels(
       [{ id: 'gpt-5.4-mini', owned_by: 'openai', context_length: 272_000, max_completion_tokens: 128_000 }],
-      [{ slug: 'gpt-5.4-mini', service_tiers: [] }],
+      [{ slug: 'gpt-5.4-mini' }],
       new Map(),
       {},
     )
@@ -612,6 +625,30 @@ describe('model mapping', () => {
       id: 'no-output',
       reason: 'model is not supported: context window and output tokens must be supplied manually',
     }])
+  })
+
+  it('drops models the proxy hides or excludes from the api, reporting the skip', () => {
+    const skipped: { id: string, reason: string }[] = []
+    const models = mapProxyModels(
+      [
+        { id: 'listed', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+        { id: 'codex-auto-review', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+        { id: 'spark', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+      ],
+      [
+        { slug: 'listed', visibility: 'list', supported_in_api: true },
+        { slug: 'codex-auto-review', visibility: 'hide', supported_in_api: true },
+        { slug: 'spark', visibility: 'list', supported_in_api: false },
+      ],
+      new Map(),
+      { onSkipped: (id, reason) => skipped.push({ id, reason }) },
+    )
+
+    expect(models.map(model => model.id)).toEqual(['listed'])
+    expect(skipped).toEqual([
+      { id: 'codex-auto-review', reason: 'model is hidden upstream' },
+      { id: 'spark', reason: 'model is hidden upstream' },
+    ])
   })
 
   it('advertises the full context window as input regardless of the reported output cap', () => {

@@ -18,10 +18,6 @@ const SupportedReasoningLevelSchema = Type.Object({
   effort: Type.String(),
 }, { additionalProperties: true })
 
-const ServiceTierSchema = Type.Object({
-  id: Type.String(),
-}, { additionalProperties: true })
-
 export const ProxyModelMetadataSchema = Type.Object({
   slug: Type.String(),
   display_name: Type.Optional(Type.String()),
@@ -34,7 +30,6 @@ export const ProxyModelMetadataSchema = Type.Object({
   supports_parallel_tool_calls: Type.Optional(Type.Boolean()),
   supported_reasoning_levels: Type.Optional(Type.Array(SupportedReasoningLevelSchema)),
   default_reasoning_level: Type.Optional(Type.String()),
-  service_tiers: Type.Optional(Type.Array(ServiceTierSchema)),
 }, { additionalProperties: true })
 
 export type ProxyModelMetadata = Static<typeof ProxyModelMetadataSchema>
@@ -96,6 +91,7 @@ interface ModelCandidate {
   levels: string[]
   totalContext: number
   outputTokens: number
+  fastCostMultiplier: number | undefined
 }
 
 export function mapProxyModels(
@@ -114,9 +110,13 @@ export function mapProxyModels(
     seen.add(entry.id)
 
     const oauth = entry.owned_by !== undefined && OAUTH_OWNERS.has(entry.owned_by.toLowerCase())
-    const catalog = oauth ? catalogs.router : catalogs.modelsDev
     const detail = oauth ? metadataById.get(entry.id) : undefined
-    const catalogModel = matchCatalogModel(entry.id, catalog)
+    if (isHiddenUpstream(detail)) {
+      options.onSkipped?.(entry.id, 'model is hidden upstream')
+      continue
+    }
+    const modelsDevModel = matchCatalogModel(entry.id, catalogs.modelsDev)
+    const catalogModel = oauth ? matchCatalogModel(entry.id, catalogs.router) : modelsDevModel
     if (!oauth && catalogModel === undefined) {
       options.onSkipped?.(entry.id, 'model is not supported: models.dev metadata is unavailable')
       continue
@@ -153,13 +153,14 @@ export function mapProxyModels(
       levels,
       totalContext,
       outputTokens,
+      fastCostMultiplier: modelsDevModel?.fastCostMultiplier,
     })
   }
 
   const ambiguousNames = ambiguousDisplayNames(candidates, options)
   const models = candidates.map(candidate => ({
     model: toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate))),
-    supportsFastMode: supportsFastMode(candidate.detail),
+    fastCostMultiplier: candidate.fastCostMultiplier,
   }))
   models.sort((a, b) => {
     const nameOrder = a.model.name.replace(REASONING_NAME_SUFFIX, '')
@@ -168,19 +169,17 @@ export function mapProxyModels(
       return nameOrder
     return effortRank(a.model.reasoningEffort) - effortRank(b.model.reasoningEffort)
   })
-  return models.flatMap(({ model, supportsFastMode }) => supportsFastMode ? [model, toFastModel(model)] : [model])
+  return models.flatMap(({ model, fastCostMultiplier }) =>
+    fastCostMultiplier === undefined ? [model] : [model, toFastModel(model, fastCostMultiplier)])
 }
 
-function supportsFastMode(metadata: ProxyModelMetadata | undefined): boolean {
-  return metadata?.service_tiers?.some(tier => tier.id.trim().toLowerCase() === 'priority') ?? false
-}
-
-function toFastModel(model: ProviderModel): ProviderModel {
+// CLIProxyAPI turns service_tier=priority into Anthropic's speed=fast, so one field drives both.
+function toFastModel(model: ProviderModel, costMultiplier: number): ProviderModel {
   return {
     ...model,
     id: `${model.id}:fast`,
     name: `${model.name} (Fast Mode)`,
-    detail: `1.5x usage · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
+    detail: `${costMultiplier}x usage · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
     serviceTier: 'priority',
   }
 }
@@ -306,6 +305,10 @@ function resolveReasoning(
   }
 
   return levels
+}
+
+function isHiddenUpstream(metadata: ProxyModelMetadata | undefined): boolean {
+  return metadata?.visibility?.toLowerCase() === 'hide' || metadata?.supported_in_api === false
 }
 
 function isMediaOnly(id: string, model: CatalogModel | undefined): boolean {

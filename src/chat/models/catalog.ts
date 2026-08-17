@@ -30,7 +30,12 @@ const CatalogModelSchema = Type.Object({
   supportedInputModalities: Type.Optional(Type.Array(Type.String())),
   supportedOutputModalities: Type.Optional(Type.Array(Type.String())),
   thinking: Type.Optional(CatalogThinkingSchema),
+  fastCostMultiplier: Type.Optional(Type.Number()),
 })
+
+const ModelsDevCostSchema = Type.Object({
+  output: Type.Optional(Type.Number()),
+}, { additionalProperties: true })
 
 const ModelsDevModelSchema = Type.Object({
   id: Type.String(),
@@ -40,6 +45,12 @@ const ModelsDevModelSchema = Type.Object({
     values: Type.Optional(Type.Array(Type.Unknown())),
   }, { additionalProperties: true }))),
   tool_call: Type.Optional(Type.Boolean()),
+  cost: Type.Optional(ModelsDevCostSchema),
+  experimental: Type.Optional(Type.Object({
+    modes: Type.Optional(Type.Object({
+      fast: Type.Optional(Type.Object({ cost: Type.Optional(ModelsDevCostSchema) }, { additionalProperties: true })),
+    }, { additionalProperties: true })),
+  }, { additionalProperties: true })),
   modalities: Type.Optional(Type.Object({
     input: Type.Optional(Type.Array(Type.String())),
     output: Type.Optional(Type.Array(Type.String())),
@@ -151,6 +162,7 @@ function toCatalogModel(model: ModelsDevModel): CatalogModel {
   const levels = model.reasoning_options
     ?.flatMap(option => option.values ?? [])
     .filter((value): value is string => typeof value === 'string') ?? []
+  const fastMultiplier = fastCostMultiplier(model)
   const output = model.limit?.output
   const input = model.limit?.input
     ?? (model.limit?.context === undefined || output === undefined
@@ -166,7 +178,17 @@ function toCatalogModel(model: ModelsDevModel): CatalogModel {
     ...(model.modalities?.input === undefined ? {} : { supportedInputModalities: model.modalities.input }),
     ...(model.modalities?.output === undefined ? {} : { supportedOutputModalities: model.modalities.output }),
     ...(levels.length === 0 ? {} : { thinking: { levels } }),
+    ...(fastMultiplier === undefined ? {} : { fastCostMultiplier: fastMultiplier }),
   }
+}
+
+// models.dev prices every cost field at the same fast ratio, so output alone yields the multiplier.
+function fastCostMultiplier(model: ModelsDevModel): number | undefined {
+  const base = model.cost?.output
+  const fast = model.experimental?.modes?.fast?.cost?.output
+  if (base === undefined || fast === undefined || base <= 0 || fast <= 0)
+    return undefined
+  return Math.round((fast / base) * 10) / 10
 }
 
 function apiHostname(value: string): string | undefined {
