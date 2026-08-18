@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.39.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.39.0...v0.39.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* avoid duplicate skipped model logs ([fbc4a17](https://github.com/maxdewald/vscode-universal-chat-provider/commit/fbc4a17937c7884167286748644bbcf5053dc3df))
+* log all request failures consistently ([e7d3cb4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e7d3cb4b568f026f7427ed8961e1bc1250db489e))
+* log utility model failures ([aa5e445](https://github.com/maxdewald/vscode-universal-chat-provider/commit/aa5e445252b72790b2e1e6ca9e983731db3b8014))
+* preserve top-level proxy error messages ([401b37e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/401b37e97909455c347e31fe354a2e652c3718be))
+* show utility model failures and compaction failure reasons ([b0bb677](https://github.com/maxdewald/vscode-universal-chat-provider/commit/b0bb677a271aa285ac50f673825886a4a9c0e679))
+
 ## [0.39.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.38.3...v0.39.0) (2026-08-17)
 
 
