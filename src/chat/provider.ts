@@ -207,16 +207,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       )
     }
     catch (error) {
-      const utilityTask = compaction !== undefined
-        ? 'compaction'
-        : requestOptions.requestInitiator === 'core' ? 'utility' : undefined
-      if (utilityTask !== undefined) {
-        const effort = request.reasoning?.effort
-        this.output.appendLine(
-          `[utility] failed task=${utilityTask} model=${targetModel.proxyModelId}`
-          + `${effort === undefined ? '' : ` effort=${effort}`} error=${errorMessage(error)}`,
-        )
-      }
+      const effort = request.reasoning?.effort
+      this.output.appendLine(
+        `[request] failed model=${targetModel.proxyModelId}`
+        + `${effort === undefined ? '' : ` effort=${effort}`}`
+        + ` error=${errorMessage(error)}`,
+      )
       throw error
     }
     finally {
