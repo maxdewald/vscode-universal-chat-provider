@@ -69,6 +69,13 @@ describe('streamCompletion', () => {
     ).rejects.toMatchObject({ code, message })
     expect(rejected).toHaveBeenCalledTimes(recovers ? 1 : 0)
   })
+
+  it('passes HTTP 400 errors through unchanged', async () => {
+    const error = new ProxyHttpError('actual proxy reason', 400)
+    clientMocks.streamResponse.mockRejectedValueOnce(error)
+
+    await expect(streamCompletion(deps('key'), emptyBody, callbacks())).rejects.toBe(error)
+  })
 })
 
 function deps(apiKey?: string, onCredentialsRejected = vi.fn()): CompletionDeps {

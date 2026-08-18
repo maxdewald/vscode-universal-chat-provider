@@ -52,6 +52,32 @@ describe('cLIProxyClient', () => {
       .toEqual(new ProxyHttpError('proxy unavailable', 503))
   })
 
+  it('reports a top-level JSON HTTP error message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({
+      type: 'error',
+      code: 'invalid_request_error',
+      message: 'actual proxy reason',
+    }, { status: 400 })))
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+    const { ProxyHttpError } = await import('@src/cliproxy/api/errors')
+
+    await expect(new CLIProxyClient('http://proxy', 'key')
+      .streamResponse(emptyBody, callbacks(), new AbortController().signal))
+      .rejects
+      .toEqual(new ProxyHttpError('actual proxy reason', 400))
+  })
+
+  it('ignores an empty top-level JSON HTTP error message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ message: '   ' }, { status: 400 })))
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+    const { ProxyHttpError } = await import('@src/cliproxy/api/errors')
+
+    await expect(new CLIProxyClient('http://proxy', 'key')
+      .streamResponse(emptyBody, callbacks(), new AbortController().signal))
+      .rejects
+      .toEqual(new ProxyHttpError('CLIProxyAPI request failed with HTTP 400.', 400))
+  })
+
   it('streams text, thinking, usage, and assembled tool calls exactly once', async () => {
     const events = [
       event({ type: 'response.output_text.delta', delta: 'hello' }),

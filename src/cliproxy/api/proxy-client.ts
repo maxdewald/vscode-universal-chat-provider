@@ -86,11 +86,13 @@ const toProxyHttpError: BeforeErrorHook = ({ error }) => {
     return error
   const body = error.data
   const objectBody = asValue(ErrorBodySchema, body)
-  const message = objectBody !== undefined
-    ? (typeof objectBody.error === 'string' ? objectBody.error : objectBody.error?.message)
-    : typeof body === 'string' && body.trim() ? body.trim() : undefined
+  const message = (typeof objectBody?.error === 'string'
+    ? objectBody.error
+    : objectBody?.error?.message ?? '').trim()
+  || (objectBody?.message ?? '').trim()
+  || (typeof body === 'string' ? body.trim() : '')
   return new ProxyHttpError(
-    message ?? `CLIProxyAPI request failed with HTTP ${error.response.status}.`,
+    message || `CLIProxyAPI request failed with HTTP ${error.response.status}.`,
     error.response.status,
   )
 }
