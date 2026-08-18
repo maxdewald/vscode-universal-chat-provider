@@ -133,6 +133,26 @@ describe('model registry', () => {
     expect(outputMessages(message)).toHaveLength(3)
   })
 
+  it('logs each skipped model only once', async () => {
+    const registry = createRegistry('secret')
+    const message = 'Skipped model codex-auto-review: model is hidden upstream.'
+
+    clientMocks.discover.mockResolvedValue({
+      available: [
+        { id: 'codex-auto-review', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 },
+      ],
+      metadata: [
+        { slug: 'codex-auto-review', visibility: 'hide', supported_in_api: true },
+      ],
+    })
+    await registry.forceRefresh(false)
+    await registry.forceRefresh(false)
+    registry.reset()
+    await registry.forceRefresh(false)
+
+    expect(outputMessages(message)).toHaveLength(1)
+  })
+
   it('retains cached models on discovery failure and reports interactive errors', async () => {
     const registry = createRegistry('secret')
     clientMocks.discover.mockResolvedValueOnce(discovery())

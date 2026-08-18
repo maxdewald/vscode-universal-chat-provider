@@ -24,6 +24,7 @@ export class ModelRegistry {
   private readonly changeEmitter = new EventEmitter<void>()
   private cachedModels: ProviderModel[] = []
   private cachedFingerprint = ''
+  private readonly loggedSkips = new Set<string>()
   private previousCollisions = new Set<string>()
   private lastRefreshAt = 0
   private refreshPromise: Promise<ProviderModel[]> | undefined
@@ -105,7 +106,13 @@ export class ModelRegistry {
       const discovery = await client.discover(controller.signal)
       const collisions = new Set<string>()
       const models = mapProxyModels(discovery.available, discovery.metadata, catalogs, {
-        onSkipped: (id, reason) => this.output.appendLine(`Skipped model ${id}: ${reason}.`),
+        onSkipped: (id, reason) => {
+          const message = `Skipped model ${id}: ${reason}.`
+          if (this.loggedSkips.has(message))
+            return
+          this.loggedSkips.add(message)
+          this.output.appendLine(message)
+        },
         onCollision: message => collisions.add(message),
       })
       for (const collision of collisions) {
