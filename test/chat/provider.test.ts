@@ -212,6 +212,9 @@ describe('language model provider', () => {
     expect(window.showErrorMessage).toHaveBeenCalledWith(
       'Utility model request failed: provider unavailable',
     )
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      '[utility] failed task=utility model=model-a effort=low error=provider unavailable',
+    )
   })
 
   it('refreshes models on startup when credentials are stored', async () => {
@@ -363,6 +366,26 @@ describe('language model provider', () => {
 })
 
 describe('conversation compaction', () => {
+  it('logs the real utility model error when compaction fails', async () => {
+    const provider = createProvider('secret')
+    const message = 'Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.'
+    const failure = new Error(message)
+    clientMocks.streamResponse.mockRejectedValueOnce(failure)
+
+    await expect(provider.provideLanguageModelChatResponse(
+      { ...model(), reasoningLevels: ['minimal', 'high'], reasoningEffort: 'high' },
+      compactionMessages(),
+      options(),
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )).rejects.toBe(failure)
+
+    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
+      `[utility] failed task=compaction model=model-a effort=minimal error=${message}`,
+    )
+    expect(window.showErrorMessage).not.toHaveBeenCalled()
+  })
+
   it('runs compaction on the utility model at the lowest effort without tools', async () => {
     const provider = createProvider('secret')
     clientMocks.discover.mockResolvedValue({

@@ -52,7 +52,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   constructor(
     private readonly context: ExtensionContext,
-    output: OutputChannel,
+    private readonly output: OutputChannel,
     private readonly connection: ProxyConnection,
     private readonly onSignIn?: () => Promise<void>,
   ) {
@@ -207,8 +207,16 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       )
     }
     catch (error) {
-      if (requestOptions.requestInitiator === 'core')
-        void vscode.window.showErrorMessage(`Utility model request failed: ${errorMessage(error)}`)
+      const utilityTask = compaction !== undefined
+        ? 'compaction'
+        : requestOptions.requestInitiator === 'core' ? 'utility' : undefined
+      if (utilityTask !== undefined) {
+        const effort = request.reasoning?.effort
+        this.output.appendLine(
+          `[utility] failed task=${utilityTask} model=${targetModel.proxyModelId}`
+          + `${effort === undefined ? '' : ` effort=${effort}`} error=${errorMessage(error)}`,
+        )
+      }
       throw error
     }
     finally {
