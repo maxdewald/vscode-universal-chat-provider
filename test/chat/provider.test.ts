@@ -1,6 +1,6 @@
 import type { StreamCallbacks } from '@src/cliproxy/api/proxy-client'
 import type { LanguageModelChatMessageRole, OutputChannel } from 'vscode'
-import { UniversalChatProvider } from '@src/chat/provider'
+import { UniversalChatProvider, utilityModelId } from '@src/chat/provider'
 import { estimateTokens } from '@src/chat/requests/estimate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -147,73 +147,51 @@ describe('language model provider', () => {
     )
   })
 
-  it('uses stored utility effort only for core utility requests', async () => {
+  it('publishes a hidden utility alias that pins effort and reports failures', async () => {
     const provider = createProvider('secret')
-    await provider.updateUtilityEffort('model-a', 'high')
+    clientMocks.discover.mockResolvedValueOnce({
+      available: [{ id: 'model-a', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 }],
+      metadata: [{
+        slug: 'model-a',
+        supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }],
+        default_reasoning_level: 'medium',
+      }],
+    })
     clientMocks.streamResponse.mockResolvedValue(undefined)
-    const message = [userTextMessage('hello')]
-
-    await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'low' },
-      message,
-      { ...options(), requestInitiator: 'core' } as ReturnType<typeof options>,
-      { report: vi.fn() },
+    const models = await provider.provideLanguageModelChatInformation(
+      { silent: true },
       new CancellationTokenSource().token,
     )
+    const alias = models.find(model => model.id === utilityModelId('model-a', 'low'))!
+
     await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'low' },
-      message,
-      options(),
+      alias,
+      [userTextMessage('hello')],
+      { ...options(), modelConfiguration: { reasoningEffort: 'medium' } } as ReturnType<typeof options>,
       { report: vi.fn() },
       new CancellationTokenSource().token,
     )
 
     expect(clientMocks.streamResponse.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({ reasoning: { effort: 'high', summary: 'detailed' } }),
-    )
-    expect(clientMocks.streamResponse.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
     )
-  })
+    expect(models.map(model => ({ id: model.id, selectable: (model as { isUserSelectable?: boolean }).isUserSelectable }))).toEqual([
+      { id: 'model-a', selectable: undefined },
+      { id: 'model-a:utility-low', selectable: false },
+      { id: 'model-a:utility-medium', selectable: false },
+    ])
 
-  it('falls back to the lowest effort for core utility requests with stale stored effort', async () => {
-    const provider = createProvider('secret')
-    await provider.updateUtilityEffort('model-a', 'stale')
-    clientMocks.streamResponse.mockResolvedValue(undefined)
-
-    await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
-      [userTextMessage('hello')],
-      { ...options(), requestInitiator: 'core' } as ReturnType<typeof options>,
-      { report: vi.fn() },
-      new CancellationTokenSource().token,
-    )
-
-    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
-      expect.any(Object),
-      expect.any(AbortSignal),
-    )
-  })
-
-  it('shows the reason when a core utility request fails', async () => {
-    const provider = createProvider('secret')
     const failure = new Error('provider unavailable')
     clientMocks.streamResponse.mockRejectedValueOnce(failure)
-
     await expect(provider.provideLanguageModelChatResponse(
-      model(),
+      alias,
       [userTextMessage('hello')],
-      { ...options(), requestInitiator: 'core' } as ReturnType<typeof options>,
+      options(),
       { report: vi.fn() },
       new CancellationTokenSource().token,
     )).rejects.toBe(failure)
-
     expect(window.showErrorMessage).toHaveBeenCalledWith(
       'Utility model request failed: provider unavailable',
-    )
-    expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      '[utility] failed task=utility model=model-a effort=low error=provider unavailable',
     )
   })
 
@@ -381,9 +359,11 @@ describe('conversation compaction', () => {
     )).rejects.toBe(failure)
 
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
-      `[utility] failed task=compaction model=model-a effort=minimal error=${message}`,
+      `[request] failed model=model-a effort=minimal error=${message}`,
     )
-    expect(window.showErrorMessage).not.toHaveBeenCalled()
+    expect(window.showErrorMessage).toHaveBeenCalledWith(
+      `Utility model request failed: ${message}`,
+    )
   })
 
   it('runs compaction on the utility model at the lowest effort without tools', async () => {

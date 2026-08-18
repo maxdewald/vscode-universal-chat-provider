@@ -1,5 +1,5 @@
-import type { UniversalChatProvider } from '@src/chat/provider'
 import type { ExtensionContext } from 'vscode'
+import { utilityModelId, type UniversalChatProvider } from '@src/chat/provider'
 import { commands, ConfigurationTarget, extensions, window, workspace } from 'vscode'
 
 const SHOWN_KEY = 'universalChatProvider.utilityModelNudgeShown'
@@ -47,12 +47,10 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
   }
 
   const chat = workspace.getConfiguration('chat')
-  const current = chat.get<string>('utilityModel', '').trim()
   const selected = await window.showQuickPick(
     models.map(model => ({
       label: model.name,
       description: UCP_PREFIX + model.id,
-      picked: current === UCP_PREFIX + model.id,
       model,
       ...(model.detail !== undefined ? { detail: model.detail } : {}),
     })),
@@ -65,13 +63,12 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
   if (selected === undefined)
     return
 
-  const effort = await pickUtilityEffort(selected.model, provider.getUtilityEffort(selected.model.id))
+  const effort = await pickUtilityEffort(selected.model)
   if (effort === undefined && selected.model.reasoningLevels.length > 0)
     return
 
-  const value = UCP_PREFIX + selected.model.id
+  const value = UCP_PREFIX + (effort === undefined ? selected.model.id : utilityModelId(selected.model.id, effort))
   const exploreValue = `${selected.model.name} (universal-chat-provider)`
-  await provider.updateUtilityEffort(selected.model.id, effort)
   await chat.update('utilityModel', value, ConfigurationTarget.Global)
   await chat.update('utilitySmallModel', value, ConfigurationTarget.Global)
   await chat.update('exploreAgent.defaultModel', exploreValue, ConfigurationTarget.Global)
@@ -80,19 +77,16 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
   )
 }
 
-async function pickUtilityEffort(model: { reasoningLevels: readonly string[] }, current: string | undefined): Promise<string | undefined> {
+async function pickUtilityEffort(model: { reasoningLevels: readonly string[] }): Promise<string | undefined> {
   if (model.reasoningLevels.length === 0)
     return undefined
   if (model.reasoningLevels.length === 1)
     return model.reasoningLevels[0]
 
-  const fallback = model.reasoningLevels[0]
-  const picked = current !== undefined && model.reasoningLevels.includes(current) ? current : fallback
   const selected = await window.showQuickPick(
     model.reasoningLevels.map(effort => ({
       label: formatEffort(effort),
       description: effort,
-      picked: effort === picked,
       effort,
     })),
     {

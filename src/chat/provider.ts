@@ -30,12 +30,15 @@ import {
   LanguageModelToolCallPart,
 } from 'vscode'
 
-const UTILITY_EFFORTS_KEY = 'universalChatProvider.utilityReasoningEfforts'
 const UCP_PREFIX = 'universal-chat-provider/'
+const UTILITY_SUFFIX = ':utility-'
 
 interface HostChatResponseOptions {
   modelConfiguration?: { reasoningEffort?: string }
-  requestInitiator?: string
+}
+
+export function utilityModelId(modelId: string, effort: string): string {
+  return `${modelId}${UTILITY_SUFFIX}${effort}`
 }
 
 // Not yet in the published @types/vscode this project pins; present at runtime in Copilot Chat.
@@ -51,7 +54,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   onActivity: ((model: { proxyOwner: string }) => void) | undefined
 
   constructor(
-    private readonly context: ExtensionContext,
+    context: ExtensionContext,
     private readonly output: OutputChannel,
     private readonly connection: ProxyConnection,
     private readonly onSignIn?: () => Promise<void>,
@@ -153,9 +156,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     // so open the account login flow first; the refresh then shows whatever they connected.
     if (!options.silent && this.onSignIn !== undefined) {
       await this.onSignIn()
-      return this.registry.forceRefresh(false)
+      return withUtilityAliases(await this.registry.forceRefresh(false))
     }
-    return this.registry.refresh(!options.silent, token)
+    return withUtilityAliases(await this.registry.refresh(!options.silent, token))
   }
 
   async provideLanguageModelChatResponse(
@@ -170,11 +173,12 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     const compaction = detectCompaction(messages)
     const targetModel = compaction === 'separate' ? this.compactionModel(model) : model
     this.lastUsedModel = { proxyModelId: targetModel.proxyModelId, proxyOwner: targetModel.proxyOwner, name: targetModel.name }
+    const utilityRequest = model.id.includes(UTILITY_SUFFIX)
     const chosenEffort = compaction !== undefined
       // Compaction is prose over a transcript-sized prompt, so the lowest level is what makes it fast.
       ? targetModel.reasoningLevels[0]
-      : requestOptions.requestInitiator === 'core'
-        ? this.utilityEffort(targetModel) ?? requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
+      : utilityRequest
+        ? model.reasoningEffort
         : requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
     const request = await buildRequest(targetModel, messages, options, { reasoningEffort: chosenEffort, omitTools: compaction !== undefined })
     const recordUsage = this.cacheMetrics.start({
@@ -213,6 +217,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
         + `${effort === undefined ? '' : ` effort=${effort}`}`
         + ` error=${errorMessage(error)}`,
       )
+      if (utilityRequest || compaction !== undefined)
+        void vscode.window.showErrorMessage(`Utility model request failed: ${errorMessage(error)}`)
       throw error
     }
     finally {
@@ -238,24 +244,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return this.registry.forceRefresh(interactive, expectedProxyModelIds)
   }
 
-  getUtilityEffort(modelId: string): string | undefined {
-    return this.context.globalState.get<Record<string, string>>(UTILITY_EFFORTS_KEY, {})[modelId]
-  }
-
-  private utilityEffort(model: ProviderModel): string | undefined {
-    const stored = this.getUtilityEffort(model.id)
-    return stored !== undefined && model.reasoningLevels.includes(stored) ? stored : model.reasoningLevels[0]
-  }
-
-  async updateUtilityEffort(modelId: string, effort: string | undefined): Promise<void> {
-    const next = { ...this.context.globalState.get<Record<string, string>>(UTILITY_EFFORTS_KEY, {}) }
-    if (effort === undefined)
-      delete next[modelId]
-    else
-      next[modelId] = effort
-    await this.context.globalState.update(UTILITY_EFFORTS_KEY, next)
-  }
-
   async configure(): Promise<void> {
     return this.credentialFlows.configure()
   }
@@ -273,7 +261,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     const configured = vscode.workspace.getConfiguration('chat').get<string>('utilityModel', '').trim()
     if (!configured.startsWith(UCP_PREFIX))
       return current
-    const utility = this.registry.snapshot().find(candidate => candidate.id === configured.slice(UCP_PREFIX.length))
+    const configuredId = configured.slice(UCP_PREFIX.length).split(UTILITY_SUFFIX)[0]!
+    const utility = this.registry.snapshot().find(candidate => candidate.id === configuredId)
     return utility !== undefined && utility.maxInputTokens >= current.maxInputTokens ? utility : current
   }
 
@@ -284,6 +273,18 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       onCredentialsRejected: () => void this.credentialFlows.showCredentialRecovery(),
     }
   }
+}
+
+function withUtilityAliases(models: readonly ProviderModel[]): ProviderModel[] {
+  return models.flatMap(model => [
+    model,
+    ...model.reasoningLevels.map(effort => ({
+      ...model,
+      id: utilityModelId(model.id, effort),
+      reasoningEffort: effort,
+      isUserSelectable: false,
+    })),
+  ])
 }
 
 function hasQuota(report: QuotaReport): boolean {
