@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.39.1...v0.40.0) (2026-08-21)
+
+
+### Features
+
+* support codex 1M context  sizes ([8a18b3e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/8a18b3eac9155a75fd7159b2465d09623884466e))
+
 ## [0.39.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.39.0...v0.39.1) (2026-08-18)
 
 
