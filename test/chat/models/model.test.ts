@@ -77,8 +77,8 @@ describe('model mapping', () => {
       [{
         slug: 'gpt-5.4',
         display_name: 'GPT-5.4',
-        context_window: 400_000,
-        max_context_window: 1_000_000,
+        context_window: 272_000,
+        max_context_window: 921_000,
         supported_reasoning_levels: [
           { effort: 'low' },
           { effort: 'medium' },
@@ -104,7 +104,7 @@ describe('model mapping', () => {
       name: 'GPT-5.4',
       proxyModelId: 'gpt-5.4',
       family: 'gpt-5.4',
-      maxInputTokens: 400_000,
+      maxInputTokens: 921_000,
       maxOutputTokens: 128_000,
       capabilities: { imageInput: true, toolCalling: true },
       reasoningLevels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
@@ -114,9 +114,9 @@ describe('model mapping', () => {
       properties: {
         contextSize: {
           type: 'number',
-          enum: [400_000],
-          enumItemLabels: ['528K'],
-          default: 400_000,
+          enum: [272_000, 921_000],
+          enumItemLabels: ['400K', '1M'],
+          default: 272_000,
           description: 'Context Size',
           group: 'tokens',
         },
@@ -584,6 +584,33 @@ describe('model mapping', () => {
       id: 'tiny',
       maxInputTokens: 128_000,
       maxOutputTokens: 8,
+    })
+  })
+
+  it('ignores invalid, equal, and smaller maximum context windows', () => {
+    const models = mapProxyModels(
+      ['invalid', 'equal', 'smaller'].map(id => ({
+        id,
+        owned_by: 'openai',
+        context_length: 128_000,
+        max_completion_tokens: 8,
+      })),
+      [
+        { slug: 'invalid', max_context_window: Number.NaN },
+        { slug: 'equal', max_context_window: 128_000 },
+        { slug: 'smaller', max_context_window: 64_000 },
+      ],
+      new Map(),
+      {},
+    )
+
+    expect(Object.fromEntries(models.map(model => [model.id, {
+      maxInputTokens: model.maxInputTokens,
+      contextSizes: model.configurationSchema?.properties.contextSize.enum,
+    }]))).toEqual({
+      invalid: { maxInputTokens: 128_000, contextSizes: [128_000] },
+      equal: { maxInputTokens: 128_000, contextSizes: [128_000] },
+      smaller: { maxInputTokens: 128_000, contextSizes: [128_000] },
     })
   })
 

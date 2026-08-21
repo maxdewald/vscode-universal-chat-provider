@@ -34,7 +34,7 @@ const UCP_PREFIX = 'universal-chat-provider/'
 const UTILITY_SUFFIX = ':utility-'
 
 interface HostChatResponseOptions {
-  modelConfiguration?: { reasoningEffort?: string }
+  modelConfiguration?: { contextSize?: number, reasoningEffort?: string }
 }
 
 export function utilityModelId(modelId: string, effort: string): string {
@@ -171,7 +171,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     // Host-only fields used by Copilot Chat; not in the public ProvideLanguageModelChatResponseOptions type.
     const requestOptions = options as HostChatResponseOptions
     const compaction = detectCompaction(messages)
-    const targetModel = compaction === 'separate' ? this.compactionModel(model) : model
+    const targetModel = compaction === 'separate'
+      ? this.compactionModel(model, requestOptions.modelConfiguration?.contextSize)
+      : model
     this.lastUsedModel = { proxyModelId: targetModel.proxyModelId, proxyOwner: targetModel.proxyOwner, name: targetModel.name }
     const utilityRequest = model.id.includes(UTILITY_SUFFIX)
     const chosenEffort = compaction !== undefined
@@ -257,13 +259,16 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   // Falls back to the current model, which still gets the lowest reasoning level and no tools.
-  private compactionModel(current: ProviderModel): ProviderModel {
+  private compactionModel(current: ProviderModel, selectedContextSize: number | undefined): ProviderModel {
     const configured = vscode.workspace.getConfiguration('chat').get<string>('utilityModel', '').trim()
     if (!configured.startsWith(UCP_PREFIX))
       return current
     const configuredId = configured.slice(UCP_PREFIX.length).split(UTILITY_SUFFIX)[0]!
     const utility = this.registry.snapshot().find(candidate => candidate.id === configuredId)
-    return utility !== undefined && utility.maxInputTokens >= current.maxInputTokens ? utility : current
+    const requiredContext = selectedContextSize
+      ?? current.configurationSchema?.properties.contextSize.default
+      ?? current.maxInputTokens
+    return utility !== undefined && utility.maxInputTokens >= requiredContext ? utility : current
   }
 
   private completionDeps(): CompletionDeps {

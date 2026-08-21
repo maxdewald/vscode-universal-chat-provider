@@ -385,8 +385,26 @@ describe('conversation compaction', () => {
       callbacks.onUsage?.({ output_tokens: 1 })
     })
 
+    const expandableModel = createProviderModel({
+      maxInputTokens: 500_000,
+      reasoningLevels: ['low', 'high'],
+      reasoningEffort: 'high',
+      configurationSchema: {
+        properties: {
+          contextSize: {
+            type: 'number',
+            enum: [100_000, 500_000],
+            enumItemLabels: ['100K', '500K'],
+            default: 100_000,
+            description: 'Context Size',
+            group: 'tokens',
+          },
+        },
+      },
+    })
+
     await provider.provideLanguageModelChatResponse(
-      { ...model(), reasoningLevels: ['low', 'high'], reasoningEffort: 'high' },
+      expandableModel,
       compactionMessages(),
       { ...options(), tools: [{ name: 'lookup', description: 'Look up' }] },
       { report: vi.fn() },
@@ -403,6 +421,24 @@ describe('conversation compaction', () => {
     )
     expect(requestBody()).not.toHaveProperty('tools')
     expect(requestBody()).not.toHaveProperty('tool_choice')
+
+    clientMocks.streamResponse.mockClear()
+    await provider.provideLanguageModelChatResponse(
+      expandableModel,
+      compactionMessages(),
+      { ...options(), modelConfiguration: { contextSize: 500_000 } } as ReturnType<typeof options>,
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'model-a',
+        reasoning: { effort: 'low', summary: 'detailed' },
+      }),
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
   })
 
   it('keeps the current model at the lowest effort when no utility model is set', async () => {

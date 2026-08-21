@@ -201,6 +201,10 @@ function displayBaseKey(candidate: ModelCandidate): string {
 
 function toProviderModel(candidate: ModelCandidate, useFullId: boolean): ProviderModel {
   const { entry, detail, catalogModel, providerName, levels, totalContext, outputTokens } = candidate
+  const maximumContext = firstPositiveInteger(detail?.max_context_window)
+  const contextSizes = maximumContext !== undefined && maximumContext > totalContext
+    ? [totalContext, maximumContext]
+    : [totalContext]
   const name = useFullId ? entry.id : candidate.baseName
   const familyId = catalogModel?.id ?? entry.id
   const family = familyId.slice(familyId.lastIndexOf('/') + 1).replace(/:.*/, '')
@@ -219,8 +223,8 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
   const configurationProperties: ModelConfigurationSchema['properties'] = {
     contextSize: {
       type: 'number',
-      enum: [totalContext],
-      enumItemLabels: [formatTokens(totalContext + outputTokens)],
+      enum: contextSizes,
+      enumItemLabels: contextSizes.map(contextSize => formatTokens(contextSize + outputTokens)),
       default: totalContext,
       description: 'Context Size',
       group: 'tokens',
@@ -233,7 +237,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     family,
     ...(statusIconId !== undefined ? { statusIcon: { id: statusIconId } } : {}),
     version: catalogModel?.version ?? entry.id,
-    maxInputTokens: totalContext,
+    maxInputTokens: contextSizes.at(-1)!,
     maxOutputTokens: outputTokens,
     supportsParallelToolCalls,
     detail: displayProviderName,
