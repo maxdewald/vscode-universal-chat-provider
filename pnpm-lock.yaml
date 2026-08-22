@@ -59,7 +59,7 @@ importers:
         version: 7.8.0
       '@types/vscode':
         specifier: ^1.125.0
-        version: 1.125.0
+        version: 1.134.0
       '@vitest/coverage-v8':
         specifier: ^4.1.10
         version: 4.1.10(vitest@4.1.10)
@@ -71,7 +71,7 @@ importers:
         version: 10.8.1(jiti@2.7.0)(supports-color@7.2.0)
       jest-mock-vscode:
         specifier: ^4.12.0
-        version: 4.12.0(@types/vscode@1.125.0)
+        version: 4.12.0(@types/vscode@1.134.0)
       tsdown:
         specifier: ^0.22.3
         version: 0.22.14(typescript@6.0.3)
@@ -814,8 +814,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.125.0':
-    resolution: {integrity: sha512-0icm/ZQAaism87P0ekHqi4/Ju9du+Tm0RUW+y7vqRsxY2cY0FNRX1nAnaW7nT6npPt2tfHiheZ55Zm9UhqonFA==}
+  '@types/vscode@1.134.0':
+    resolution: {integrity: sha512-NDEu0hg4sF7+vvFsADsktqUJ6f80LHSZvVK2Ovo1XiQ0/VHck1O3zst+ZZyVA/uvz6vo6LcuoqU2q48YMqOwWw==}
 
   '@typescript-eslint/eslint-plugin@8.66.0':
     resolution: {integrity: sha512-p088eaGrzYz1s+7cov0aMOCkNGTJlVxF4jgubf28c8L0Cv9Rloj8YBHnv4hXLq6IIEE1AsjNWavO+k+8kP2Y0A==}
@@ -4250,7 +4250,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.125.0': {}
+  '@types/vscode@1.134.0': {}
 
   '@typescript-eslint/eslint-plugin@8.66.0(@typescript-eslint/parser@8.66.0(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(eslint@10.8.1(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
@@ -5615,9 +5615,9 @@ snapshots:
       editions: 6.22.0
       textextensions: 6.11.0
 
-  jest-mock-vscode@4.12.0(@types/vscode@1.125.0):
+  jest-mock-vscode@4.12.0(@types/vscode@1.134.0):
     dependencies:
-      '@types/vscode': 1.125.0
+      '@types/vscode': 1.134.0
       vscode-uri: 3.1.0
 
   jiti@2.7.0:
