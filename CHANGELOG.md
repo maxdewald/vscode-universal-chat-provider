@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.42.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.41.0...v0.42.0) (2026-08-23)
+
+
+### Features
+
+* consolidate debugging logs and delete after 14 days ([f142320](https://github.com/maxdewald/vscode-universal-chat-provider/commit/f142320e5d6a2d9693157664444468a842202df4))
+
+
+### Bug Fixes
+
+* make log rotation polling reliable ([2b21830](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2b21830020641da0967ca4cbb0fc5e5e70f37b28))
+
+
+### Refactoring
+
+* simplify log tailer disposal ([0ba0372](https://github.com/maxdewald/vscode-universal-chat-provider/commit/0ba0372bddf7fa27280aa728eb59af3bd4ce3768))
+
 ## [0.41.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.40.0...v0.41.0) (2026-08-23)
 
 
