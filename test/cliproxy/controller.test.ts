@@ -1,5 +1,6 @@
 import type { ExtensionContext } from 'vscode'
-import { readdir, readFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import process from 'node:process'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { ServerController } from '@src/cliproxy/controller'
@@ -184,6 +185,19 @@ describe('server controller lifecycle', () => {
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['debug']).toBe(true)
     expect(config['request-log']).toBe(true)
+    controller.dispose()
+  })
+
+  it('removes expired request logs while debug logging is off', async () => {
+    const logDir = join(managedPaths(root).authDir, 'logs')
+    const expired = 'v1-responses-2000-01-01T000000-expired.log'
+    await mkdir(logDir, { recursive: true })
+    await writeFile(join(logDir, expired), 'expired payload')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    await controller.ensureReady(false)
+
+    await vi.waitFor(async () => expect(await readdir(logDir)).not.toContain(expired))
     controller.dispose()
   })
 
