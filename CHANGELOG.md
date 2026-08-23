@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.40.0...v0.41.0) (2026-08-23)
+
+
+### Features
+
+* support web search for all advertised models ([e98f0e5](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e98f0e5a89fdc2f9d261e86520c12beb9e32f3dd))
+
 ## [0.40.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.39.1...v0.40.0) (2026-08-21)
 
 
