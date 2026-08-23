@@ -8,6 +8,7 @@ import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from '@src/cliproxy/status'
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
@@ -15,9 +16,10 @@ import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
 import { resolveVersion } from '@src/cliproxy/managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from '@src/cliproxy/managed/config'
-import { releaseLease } from '@src/cliproxy/managed/leases'
+import { releaseLease, withOperationLock } from '@src/cliproxy/managed/leases'
 import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
+import { maintainRequestLogs } from '@src/cliproxy/managed/request-log-maintenance'
 import { pickUpdate } from '@src/cliproxy/managed/update-policy'
 import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
 import { fetchQuotas, quotaProviderForModel } from '@src/cliproxy/quota/quota'
@@ -42,6 +44,7 @@ export class ServerController implements ProxyConnection {
   private paths: ManagedPaths | undefined
   private managementKey: string | undefined
   private logTailer: LogTailer | undefined
+  private logMaintenanceTimer: NodeJS.Timeout | undefined
   private bootstrapPromise: Promise<void> | undefined
   private readonly scheduleRefresh = debounce(() => void this.notifyAccountsChanged(), 750)
   private refreshListener: ((expectedModelIds?: readonly string[]) => Promise<void>) | undefined
@@ -325,6 +328,7 @@ export class ServerController implements ProxyConnection {
 
   dispose(): void {
     this.scheduleRefresh.cancel()
+    clearInterval(this.logMaintenanceTimer)
     for (const disposable of this.disposables.splice(0))
       disposable.dispose()
     if (this.paths !== undefined && releaseLease(this.paths.leaseDir))
@@ -375,10 +379,26 @@ export class ServerController implements ProxyConnection {
     this.server = state.server
     this.managementKey = state.managementKey
     this.disposables.push(...watchCredentialFiles(state.paths.authDir, () => this.scheduleRefresh()))
+    this.startLogMaintenance(join(state.paths.authDir, 'logs'), join(state.paths.root, 'log-maintenance.lock'))
     if (this.logTailer === undefined) {
       this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()
       this.disposables.push(this.logTailer)
     }
+  }
+
+  private startLogMaintenance(logDir: string, lockPath: string): void {
+    if (this.logMaintenanceTimer !== undefined)
+      return
+    const run = async (): Promise<void> => {
+      try {
+        await withOperationLock(lockPath, async () => maintainRequestLogs(logDir))
+      }
+      catch (error) {
+        this.output.appendLine(`Request log maintenance failed: ${errorMessage(error)}`)
+      }
+    }
+    void run()
+    this.logMaintenanceTimer = setInterval(() => void run(), 60 * 60 * 1000)
   }
 
   private async inspectServer(baseUrl: string): Promise<string | undefined | false> {
