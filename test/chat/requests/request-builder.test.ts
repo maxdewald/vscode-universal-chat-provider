@@ -16,6 +16,7 @@ const model = createProviderModel({
   maxOutputTokens: 4096,
   reasoningLevels: ['low', 'high'],
   supportsParallelToolCalls: true,
+  supportsWebSearch: true,
 })
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
@@ -244,6 +245,44 @@ describe('response request conversion', () => {
     expect(fast).toHaveProperty('service_tier', 'priority')
     expect(fast.model).toBe('proxy-model')
     expect(fast.prompt_cache_key).toBe(standard.prompt_cache_key)
+  })
+
+  it('offers hosted web search automatically without requiring a search', async () => {
+    const request = await buildRequest(model, [userTextMessage('latest news')], {
+      toolMode: LanguageModelChatToolMode.Auto,
+    }, { webSearch: true })
+
+    expect(request).toMatchObject({
+      tools: [{ type: 'web_search' }],
+      tool_choice: 'auto',
+    })
+    expect(request).not.toHaveProperty('parallel_tool_calls')
+  })
+
+  it('combines hosted search with local tools in automatic mode', async () => {
+    const request = await buildRequest(model, [userTextMessage('research this')], {
+      toolMode: LanguageModelChatToolMode.Auto,
+      tools: [{ name: 'lookup', description: 'Look up a value' }],
+    }, { webSearch: true })
+
+    expect(request.tools).toEqual([
+      expect.objectContaining({ type: 'function', name: 'lookup' }),
+      { type: 'web_search' },
+    ])
+    expect(request.tool_choice).toBe('auto')
+    expect(request.parallel_tool_calls).toBe(true)
+  })
+
+  it('keeps Required mode scoped to caller-provided function tools', async () => {
+    const request = await buildRequest(model, [userTextMessage('look up this value')], {
+      toolMode: LanguageModelChatToolMode.Required,
+      tools: [{ name: 'lookup', description: 'Look up a value' }],
+    }, { webSearch: true })
+
+    expect(request.tools).toEqual([
+      expect.objectContaining({ type: 'function', name: 'lookup' }),
+    ])
+    expect(request.tool_choice).toBe('required')
   })
 
   it('keeps prompt cache keys stable across turns in the same chat seed', async () => {

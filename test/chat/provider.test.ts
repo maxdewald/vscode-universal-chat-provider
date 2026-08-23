@@ -100,6 +100,51 @@ describe('language model provider', () => {
     )
   })
 
+  it('offers hosted search for supported ordinary models and renders citations', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
+      callbacks.onText('Current answer')
+      callbacks.onCitation?.({ url: 'https://example.com/release', title: 'Release [notes]' })
+      callbacks.onCitation?.({ url: 'https://docs.example.com/reference' })
+    })
+    const report = vi.fn()
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), supportsWebSearch: true },
+      [userTextMessage('What changed?')],
+      options(),
+      { report },
+      new CancellationTokenSource().token,
+    )
+
+    expect(requestBody()).toMatchObject({
+      tools: [{ type: 'web_search' }],
+      tool_choice: 'auto',
+    })
+    expect(report).toHaveBeenLastCalledWith(new LanguageModelTextPart(
+      '\n\n**Sources**\n1. [Release \\[notes\\]](https://example.com/release)\n2. [docs.example.com](https://docs.example.com/reference)',
+    ))
+  })
+
+  it.each([
+    ['unsupported model', false, 'model-a'],
+    ['utility alias', true, utilityModelId('model-a', 'low')],
+  ] as const)('does not offer hosted search for %s', async (_name, supportsWebSearch, modelId) => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+
+    await provider.provideLanguageModelChatResponse(
+      { ...model(), id: modelId, supportsWebSearch, reasoningEffort: 'low' },
+      [userTextMessage('hello')],
+      options(),
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(requestBody()).not.toHaveProperty('tools')
+    expect(requestBody()).not.toHaveProperty('tool_choice')
+  })
+
   it('sends the effort picked from the model-config dropdown and logs it', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {

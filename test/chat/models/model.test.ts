@@ -251,6 +251,29 @@ describe('model mapping', () => {
     expect(models.map(model => model.id)).toEqual(['gpt-5.4-mini'])
   })
 
+  it.each([
+    ['supported OpenAI route', 'openai', true, 'text_and_image', true],
+    ['text-only OpenAI route', 'openai', true, 'text', true],
+    ['supported Anthropic route', 'anthropic', true, 'text_and_image', true],
+    ['disabled upstream', 'openai', false, 'text_and_image', false],
+    ['missing support flag', 'openai', undefined, 'text_and_image', false],
+    ['missing tool type', 'openai', true, undefined, false],
+    ['unknown tool type', 'openai', true, 'future_search', false],
+  ] as const)('maps hosted search capability for %s', (_name, owner, supportsSearchTool, webSearchToolType, expected) => {
+    const [model] = mapProxyModels(
+      [{ id: 'search-model', owned_by: owner, context_length: 128_000, max_completion_tokens: 8192 }],
+      [{
+        slug: 'search-model',
+        ...(supportsSearchTool === undefined ? {} : { supports_search_tool: supportsSearchTool }),
+        ...(webSearchToolType === undefined ? {} : { web_search_tool_type: webSearchToolType }),
+      }],
+      new Map(),
+      {},
+    )
+
+    expect(model?.supportsWebSearch).toBe(expected)
+  })
+
   it('advertises exact model identities independently of provider categories', () => {
     const entries = [
       { id: 'gpt-5.6-sol', owned_by: 'openai', context_length: 372_000, max_completion_tokens: 128_000 },

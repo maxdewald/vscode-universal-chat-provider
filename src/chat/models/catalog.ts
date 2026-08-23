@@ -1,6 +1,7 @@
 import type { Static } from '@sinclair/typebox'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+import { urlHostname } from '@src/shared/url'
 import ky from 'ky'
 
 const CatalogPayloadSchema = Type.Object({}, { additionalProperties: true })
@@ -192,10 +193,5 @@ function fastCostMultiplier(model: ModelsDevModel): number | undefined {
 }
 
 function apiHostname(value: string): string | undefined {
-  try {
-    return new URL(value).hostname.replace(/^www\./, '')
-  }
-  catch {
-    return undefined
-  }
+  return urlHostname(value)?.replace(/^www\./, '')
 }

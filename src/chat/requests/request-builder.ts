@@ -23,6 +23,8 @@ export interface ProxyFunctionTool {
   strict: boolean
 }
 
+export type ProxyTool = ProxyFunctionTool | { type: 'web_search' }
+
 export interface ProxyRequestBody {
   model: string
   input: ProxyRequestItem[]
@@ -31,7 +33,7 @@ export interface ProxyRequestBody {
   service_tier?: string
   prompt_cache_key?: string
   reasoning?: { effort: string, summary: string }
-  tools?: ProxyFunctionTool[]
+  tools?: ProxyTool[]
   tool_choice?: 'required' | 'auto'
   parallel_tool_calls?: boolean
 }
@@ -41,13 +43,14 @@ export type ProxyRequestItem = Record<string, unknown>
 interface BuildRequestOptions {
   reasoningEffort?: string | undefined
   omitTools?: boolean
+  webSearch?: boolean
 }
 
 export async function buildRequest(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
   options: ProvideLanguageModelChatResponseOptions,
-  { reasoningEffort, omitTools }: BuildRequestOptions = {},
+  { reasoningEffort, omitTools, webSearch }: BuildRequestOptions = {},
 ): Promise<ProxyRequestBody> {
   const promptCacheKey = buildPromptCacheKey(model, messages)
   const request: ProxyRequestBody = {
@@ -65,8 +68,8 @@ export async function buildRequest(
   if (effort !== undefined)
     request.reasoning = { effort, summary: 'detailed' }
 
-  if (!omitTools && options.tools !== undefined && options.tools.length > 0) {
-    request.tools = options.tools.map((tool) => {
+  if (!omitTools) {
+    const functionTools = (options.tools ?? []).map((tool) => {
       const parameters = tool.inputSchema ?? { type: 'object', properties: {} }
       return {
         type: 'function' as const,
@@ -76,8 +79,17 @@ export async function buildRequest(
         strict: false,
       }
     })
-    request.tool_choice = options.toolMode === LanguageModelChatToolMode.Required ? 'required' : 'auto'
-    request.parallel_tool_calls = model.supportsParallelToolCalls
+    const requiredFunctions = options.toolMode === LanguageModelChatToolMode.Required && functionTools.length > 0
+    const tools: ProxyTool[] = [
+      ...functionTools,
+      ...(webSearch && !requiredFunctions ? [{ type: 'web_search' as const }] : []),
+    ]
+    if (tools.length > 0) {
+      request.tools = tools
+      request.tool_choice = requiredFunctions ? 'required' : 'auto'
+      if (functionTools.length > 0)
+        request.parallel_tool_calls = model.supportsParallelToolCalls
+    }
   }
 
   return request

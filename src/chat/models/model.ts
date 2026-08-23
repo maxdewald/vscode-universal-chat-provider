@@ -28,6 +28,8 @@ export const ProxyModelMetadataSchema = Type.Object({
   supported_in_api: Type.Optional(Type.Boolean()),
   input_modalities: Type.Optional(Type.Array(Type.String())),
   supports_parallel_tool_calls: Type.Optional(Type.Boolean()),
+  supports_search_tool: Type.Optional(Type.Boolean()),
+  web_search_tool_type: Type.Optional(Type.String()),
   supported_reasoning_levels: Type.Optional(Type.Array(SupportedReasoningLevelSchema)),
   default_reasoning_level: Type.Optional(Type.String()),
 }, { additionalProperties: true })
@@ -42,6 +44,7 @@ export interface ProviderModel extends LanguageModelChatInformation {
   reasoningLevels: readonly string[]
   reasoningEffort?: string
   supportsParallelToolCalls: boolean
+  supportsWebSearch: boolean
   configurationSchema?: ModelConfigurationSchema
 }
 
@@ -73,6 +76,7 @@ export interface ModelMappingOptions {
 
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
 const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity'])
+const WEB_SEARCH_TOOL_TYPES = new Set(['text', 'text_and_image'])
 const PROVIDER_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/claude|anthropic/, 'chat-model-provider-claude'],
   [/gemini|google/, 'chat-model-provider-gemini'],
@@ -216,6 +220,9 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     ?? false
   const parallelToolCalls = detail?.supports_parallel_tool_calls
   const supportsParallelToolCalls = parallelToolCalls ?? true
+  const supportsWebSearch = detail?.supports_search_tool === true
+    && detail.web_search_tool_type !== undefined
+    && WEB_SEARCH_TOOL_TYPES.has(detail.web_search_tool_type)
   const toolCalling = parallelToolCalls !== undefined
     || (catalogModel?.supported_parameters?.includes('tools') ?? true)
   const description = detail?.description ?? catalogModel?.description
@@ -240,6 +247,7 @@ function toProviderModel(candidate: ModelCandidate, useFullId: boolean): Provide
     maxInputTokens: contextSizes.at(-1)!,
     maxOutputTokens: outputTokens,
     supportsParallelToolCalls,
+    supportsWebSearch,
     detail: displayProviderName,
     tooltip,
     configurationSchema: { properties: configurationProperties },

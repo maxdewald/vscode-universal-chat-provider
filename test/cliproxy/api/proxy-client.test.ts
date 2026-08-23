@@ -130,6 +130,112 @@ describe('cLIProxyClient', () => {
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
   })
 
+  it('collects hosted search citations without emitting a local tool call', async () => {
+    const body = [
+      event({
+        type: 'response.output_item.added',
+        output_index: 0,
+        item: { id: 'ws_1', type: 'web_search_call', status: 'in_progress' },
+      }),
+      event({ type: 'response.web_search_call.searching', item_id: 'ws_1', output_index: 0 }),
+      event({ type: 'response.web_search_call.completed', item_id: 'ws_1', output_index: 0 }),
+      event({
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: {
+          id: 'ws_1',
+          type: 'web_search_call',
+          status: 'completed',
+          action: {
+            type: 'search',
+            queries: ['current release'],
+            sources: [{ type: 'url', url: 'https://example.com/release' }],
+          },
+        },
+      }),
+      event({ type: 'response.output_text.delta', delta: 'Version 2 shipped.' }),
+      event({
+        type: 'response.output_text.annotation.added',
+        annotation: {
+          type: 'url_citation',
+          url: 'https://example.com/release',
+          title: 'Release notes',
+          start_index: 0,
+          end_index: 9,
+        },
+      }),
+      event({ type: 'response.completed', response: {} }),
+    ].join('')
+    const handlers = callbacks()
+
+    await stream(body, handlers)
+
+    expect(handlers.onText).toHaveBeenCalledWith('Version 2 shipped.')
+    expect(handlers.onThinking.mock.calls.flat()).toEqual(['Web Search: current release', ''])
+    expect(handlers.onToolCall).not.toHaveBeenCalled()
+    expect(handlers.onCitation).toHaveBeenCalledTimes(1)
+    expect(handlers.onCitation).toHaveBeenCalledWith({ url: 'https://example.com/release' })
+  })
+
+  it('falls back to final content annotations and deduplicates citations', async () => {
+    const citation = {
+      type: 'url_citation',
+      url: 'https://example.com/docs',
+      title: 'Documentation',
+      start_index: 0,
+      end_index: 4,
+    }
+    const body = [
+      event({
+        type: 'response.content_part.done',
+        part: { type: 'output_text', text: 'docs', annotations: [citation] },
+      }),
+      event({
+        type: 'response.output_item.done',
+        item: { type: 'message', content: [{ type: 'output_text', annotations: [citation] }] },
+      }),
+      event({
+        type: 'response.completed',
+        response: {
+          output: [{ type: 'message', content: [{ type: 'output_text', annotations: [citation] }] }],
+        },
+      }),
+    ].join('')
+    const handlers = callbacks()
+
+    await stream(body, handlers)
+
+    expect(handlers.onCitation).toHaveBeenCalledTimes(1)
+    expect(handlers.onCitation).toHaveBeenCalledWith({
+      url: 'https://example.com/docs',
+      title: 'Documentation',
+    })
+  })
+
+  it('does not validate absent actions on ordinary response items', async () => {
+    const reportValidationError = vi.fn()
+    const { setJsonValidationErrorReporter } = await import('@src/shared/json')
+    setJsonValidationErrorReporter(reportValidationError)
+
+    await stream(event({
+      type: 'response.output_item.done',
+      item: { type: 'message', content: [] },
+    }), callbacks())
+
+    expect(reportValidationError).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-web citation schemes', async () => {
+    const handlers = callbacks()
+
+    await stream(event({
+      type: 'response.output_text.annotation.added',
+      annotation: { type: 'url_citation', url: 'command:workbench.action.openSettings', title: 'Settings' },
+    }), handlers)
+
+    expect(handlers.onCitation).not.toHaveBeenCalled()
+  })
+
   it.each([
     {
       name: 'drops a trailing empty-summary sentinel',
@@ -389,6 +495,7 @@ function callbacks() {
     onText: vi.fn(),
     onThinking: vi.fn(),
     onToolCall: vi.fn(),
+    onCitation: vi.fn(),
     onUsage: vi.fn(),
   }
 }

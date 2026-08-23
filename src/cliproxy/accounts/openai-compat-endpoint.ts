@@ -2,6 +2,7 @@ import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-c
 import type { Memento } from 'vscode'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+import { isHttpUrl } from '@src/shared/url'
 import ky from 'ky'
 import { ProgressLocation, window } from 'vscode'
 
@@ -121,15 +122,5 @@ function uniqueProviderName(base: string, existing: readonly string[]): string {
     const candidate = `${base}-${index}`
     if (!taken.has(candidate.toLowerCase()))
       return candidate
-  }
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  }
-  catch {
-    return false
   }
 }

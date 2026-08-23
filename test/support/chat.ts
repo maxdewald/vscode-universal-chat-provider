@@ -14,6 +14,7 @@ export function createProviderModel(overrides: Partial<ProviderModel> = {}): Pro
     maxOutputTokens: 20,
     reasoningLevels: ['low', 'high'],
     supportsParallelToolCalls: true,
+    supportsWebSearch: false,
     capabilities: {
       imageInput: false,
       toolCalling: true,
