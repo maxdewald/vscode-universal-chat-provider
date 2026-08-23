@@ -43,8 +43,7 @@ export class LogTailer implements Disposable {
   }
 
   dispose(): void {
-    if (this.timer !== undefined)
-      clearInterval(this.timer)
+    clearInterval(this.timer)
   }
 
   private poll(restart = false): void {
