@@ -11,7 +11,7 @@ import {
   LanguageModelToolCallPart,
 } from 'vscode'
 import { createProviderModel, decodeJsonDataPart, singleModelDiscovery, userTextMessage } from '../support/chat'
-import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock, window } from '../support/vscode'
+import { createExtensionContext, LanguageModelThinkingPart, resetVSCodeMock, vscodeMock, window, workspace } from '../support/vscode'
 
 const clientMocks = vi.hoisted(() => ({
   discover: vi.fn(),
@@ -194,6 +194,7 @@ describe('language model provider', () => {
 
   it('publishes a hidden utility alias that pins effort and reports failures', async () => {
     const provider = createProvider('secret')
+    vscodeMock.settings.set('chat.utilityModel', `universal-chat-provider/${utilityModelId('model-a', 'low')}`)
     clientMocks.discover.mockResolvedValueOnce({
       available: [{ id: 'model-a', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 }],
       metadata: [{
@@ -220,10 +221,14 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({ reasoning: { effort: 'low', summary: 'detailed' } }),
     )
-    expect(models.map(model => ({ id: model.id, selectable: (model as { isUserSelectable?: boolean }).isUserSelectable }))).toEqual([
-      { id: 'model-a', selectable: undefined },
-      { id: 'model-a:utility-low', selectable: false },
-      { id: 'model-a:utility-medium', selectable: false },
+    expect(models.map(model => ({
+      id: model.id,
+      name: model.name,
+      selectable: model.isUserSelectable,
+      levels: model.reasoningLevels,
+    }))).toEqual([
+      { id: 'model-a', name: 'Model A', selectable: undefined, levels: ['low', 'medium'] },
+      { id: 'model-a:utility-low', name: 'Model A (Selected Utility Model)', selectable: false, levels: ['low'] },
     ])
 
     const failure = new Error('provider unavailable')
@@ -238,6 +243,19 @@ describe('language model provider', () => {
     expect(window.showErrorMessage).toHaveBeenCalledWith(
       'Utility model request failed: provider unavailable',
     )
+  })
+
+  it('republishes models when a utility setting changes', async () => {
+    const provider = createProvider('secret')
+    const changed = vi.fn()
+    provider.onDidChangeLanguageModelChatInformation(changed)
+    const listener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
+
+    listener?.({ affectsConfiguration: section => section === 'chat.utilitySmallModel' })
+    expect(changed).toHaveBeenCalledTimes(1)
+
+    listener?.({ affectsConfiguration: () => false })
+    expect(changed).toHaveBeenCalledTimes(1)
   })
 
   it('refreshes models on startup when credentials are stored', async () => {

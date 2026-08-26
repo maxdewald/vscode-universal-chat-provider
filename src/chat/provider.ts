@@ -5,7 +5,6 @@ import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import type {
   CancellationToken,
-  Event,
   ExtensionContext,
   LanguageModelChatProvider,
   LanguageModelChatRequestMessage,
@@ -34,6 +33,7 @@ import {
 
 const UCP_PREFIX = 'universal-chat-provider/'
 const UTILITY_SUFFIX = ':utility-'
+const UTILITY_SETTINGS = ['utilityModel', 'utilitySmallModel'] as const
 
 interface HostChatResponseOptions {
   modelConfiguration?: { contextSize?: number, reasoningEffort?: string }
@@ -51,6 +51,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly registry: ModelRegistry
   private readonly credentialFlows: CredentialFlows
   private readonly cacheMetrics: CacheMetricsTracker
+  private readonly modelsChanged = new vscode.EventEmitter<void>()
+  private readonly disposables: vscode.Disposable[] = []
   private quotaReports: QuotaReport[] = []
   private lastUsedModel: { proxyModelId: string, proxyOwner: string, name: string } | undefined
   onActivity: ((model: { proxyOwner: string }) => void) | undefined
@@ -69,11 +71,16 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     })
     this.credentialFlows = new CredentialFlows(this.credentials, this.registry, output)
     this.cacheMetrics = new CacheMetricsTracker(context, output)
+    this.disposables.push(
+      this.registry.onDidChange(() => this.modelsChanged.fire()),
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (UTILITY_SETTINGS.some(setting => event.affectsConfiguration(`chat.${setting}`)))
+          this.modelsChanged.fire()
+      }),
+    )
   }
 
-  get onDidChangeLanguageModelChatInformation(): Event<void> {
-    return this.registry.onDidChange
-  }
+  readonly onDidChangeLanguageModelChatInformation = this.modelsChanged.event
 
   setQuotas(reports: QuotaReport[]): void {
     // Claude's usage endpoint intermittently 401s; keep the last good value per account so a
@@ -87,8 +94,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     })
   }
 
-  // Remaining quota for the model in the most recent request, or undefined when no model has run
-  // yet or its provider exposes no quota. Drives the status-bar low-quota warning.
   currentModelQuota(): { name: string, remainingPercent: number } | undefined {
     if (this.lastUsedModel === undefined)
       return undefined
@@ -96,7 +101,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return remaining === undefined ? undefined : { name: this.lastUsedModel.name, remainingPercent: remaining }
   }
 
-  // Structured quota for the menu: Codex/Claude/Grok as account windows (5h/7d/credits), Antigravity per model.
   quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
     const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
     for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok'], ['kimi', 'Kimi']] as const) {
@@ -135,6 +139,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   dispose(): void {
+    for (const disposable of this.disposables)
+      disposable.dispose()
+    this.modelsChanged.dispose()
     this.registry.dispose()
     this.cacheMetrics.dispose()
   }
@@ -304,15 +311,32 @@ function escapeMarkdownLinkText(value: string): string {
 }
 
 function withUtilityAliases(models: readonly ProviderModel[]): ProviderModel[] {
-  return models.flatMap(model => [
-    model,
-    ...model.reasoningLevels.map(effort => ({
-      ...model,
-      id: utilityModelId(model.id, effort),
-      reasoningEffort: effort,
-      isUserSelectable: false,
-    })),
-  ])
+  const wanted = configuredUtilityAliases()
+  return models.flatMap((model) => {
+    const efforts = model.reasoningLevels.filter(effort => wanted.has(utilityModelId(model.id, effort)))
+    return [model, ...efforts.map(effort => toUtilityAlias(model, effort))]
+  })
+}
+
+function toUtilityAlias(model: ProviderModel, effort: string): ProviderModel {
+  const { reasoningEffort: _, ...properties } = model.configurationSchema?.properties ?? {}
+  return {
+    ...model,
+    id: utilityModelId(model.id, effort),
+    name: `${model.name} (Selected Utility Model)`,
+    reasoningEffort: effort,
+    reasoningLevels: [effort],
+    isUserSelectable: false,
+    ...(model.configurationSchema === undefined ? {} : { configurationSchema: { properties } as typeof model.configurationSchema }),
+  }
+}
+
+function configuredUtilityAliases(): Set<string> {
+  const chat = vscode.workspace.getConfiguration('chat')
+  return new Set(UTILITY_SETTINGS
+    .map(setting => chat.get<string>(setting, '').trim())
+    .filter(value => value.startsWith(UCP_PREFIX) && value.includes(UTILITY_SUFFIX))
+    .map(value => value.slice(UCP_PREFIX.length)))
 }
 
 function hasQuota(report: QuotaReport): boolean {

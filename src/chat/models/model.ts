@@ -40,6 +40,7 @@ export interface ProviderModel extends LanguageModelChatInformation {
   proxyModelId: string
   proxyOwner: string
   statusIcon?: { readonly id: string }
+  isUserSelectable?: boolean
   serviceTier?: 'priority'
   reasoningLevels: readonly string[]
   reasoningEffort?: string
