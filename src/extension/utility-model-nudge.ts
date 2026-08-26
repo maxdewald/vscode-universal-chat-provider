@@ -73,6 +73,7 @@ export async function setUtilityModel(provider: UniversalChatProvider): Promise<
   await chat.update('utilityModel', value, ConfigurationTarget.Global)
   await chat.update('utilitySmallModel', value, ConfigurationTarget.Global)
   await chat.update('exploreAgent.defaultModel', exploreValue, ConfigurationTarget.Global)
+  await chat.update('byokUtilityModelDefault', 'mainAgent', ConfigurationTarget.Global)
   void window.showInformationMessage(
     `Copilot's utility tasks and Explore agent now use ${selected.model.name}${effort !== undefined ? ` (${formatEffort(effort)})` : ''}.`,
   )

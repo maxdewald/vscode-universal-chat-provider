@@ -64,7 +64,7 @@ Let your models handle Copilot's light background tasks and Explore searches. Ru
 <details>
 <summary>How it works</summary>
 
-The command points Copilot's `chat.utilityModel`, `chat.utilitySmallModel`, and `chat.exploreAgent.defaultModel` settings at your selected model, so commit messages, chat titles, summaries, and Explore searches run through your accounts. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
+The command points Copilot's `chat.utilityModel`, `chat.utilitySmallModel`, and `chat.exploreAgent.defaultModel` settings at your selected model, so commit messages, chat titles, summaries, and Explore searches run through your accounts. It also sets `chat.byokUtilityModelDefault` to `mainAgent`, so remaining utility flows fall back to your selected chat model instead of Copilot's. When the model supports thinking levels, the command also asks for the utility Thinking Effort; commit messages use `chat.utilitySmallModel` plus that effort. No Copilot subscription required.
 
 </details>
 
