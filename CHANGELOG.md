@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.42.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.0...v0.42.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* expose only configured utility model aliases ([8fced31](https://github.com/maxdewald/vscode-universal-chat-provider/commit/8fced313d7cc25155b76b7358dbe2caf4f0adf8d))
+* route remaining utility flows through selected model ([83de48b](https://github.com/maxdewald/vscode-universal-chat-provider/commit/83de48bfb9d6bb97fcb243a3e594e60f66fdce78))
+
 ## [0.42.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.41.0...v0.42.0) (2026-08-23)
 
 
