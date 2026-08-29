@@ -2,6 +2,7 @@ import type { Static } from '@sinclair/typebox'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+import { vscodeCompatibleFetch } from '@src/shared/vscode-fetch'
 import ky, { isHTTPError } from 'ky'
 
 export const LOGIN_PROVIDERS = [
@@ -124,6 +125,7 @@ export class ManagementClient {
       retry: 0,
       timeout: false,
       hooks: { beforeError: [toManagementError] },
+      fetch: vscodeCompatibleFetch,
     })
   }
 

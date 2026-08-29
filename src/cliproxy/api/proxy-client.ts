@@ -10,6 +10,7 @@ import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/m
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { asValue } from '@src/shared/json'
 import { isHttpUrl } from '@src/shared/url'
+import { vscodeCompatibleFetch } from '@src/shared/vscode-fetch'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import ky, { isHTTPError } from 'ky'
 
@@ -140,6 +141,7 @@ export class CLIProxyClient {
       retry: 0,
       timeout: false,
       hooks: { beforeError: [toProxyHttpError] },
+      fetch: vscodeCompatibleFetch,
     })
   }
 
