@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.1...v0.42.2) (2026-08-29)
+
+
+### Bug Fixes
+
+* preserve duplex through VS Code proxy fetch ([#130](https://github.com/maxdewald/vscode-universal-chat-provider/issues/130)) ([7bbe105](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7bbe1053b581f4d82ee31b1bedb6f462ed7f8005))
+
 ## [0.42.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.0...v0.42.1) (2026-08-26)
 
 
