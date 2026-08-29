@@ -13,7 +13,7 @@ importers:
         version: 0.34.52
       eventsource-parser:
         specifier: ^4.0.0
-        version: 4.0.0
+        version: 4.1.0
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -1784,8 +1784,8 @@ packages:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
 
-  eventsource-parser@4.0.0:
-    resolution: {integrity: sha512-aIpvYxbqTx4KYWw73KpCt1Rh22tEAJ144F1qR76CT3Ex+LNMEPKf5HFrK5Yz9fMP1EVT0GrfA35VZvWQhMPuSQ==}
+  eventsource-parser@4.1.0:
+    resolution: {integrity: sha512-+DHvQ1wLO//MK+1OZgcuXCbZFKgu3YjKPJt7n98rxX8vezL0ni+7s3ZQiM8bJkUEOk7MsuCycrPLj0FzUNf7Og==}
     engines: {node: '>=22.12'}
 
   expand-template@2.0.3:
@@ -5305,7 +5305,7 @@ snapshots:
 
   esutils@2.0.3: {}
 
-  eventsource-parser@4.0.0: {}
+  eventsource-parser@4.1.0: {}
 
   expand-template@2.0.3:
     optional: true
