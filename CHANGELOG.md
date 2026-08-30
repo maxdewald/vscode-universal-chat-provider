@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.2...v0.42.3) (2026-08-30)
+
+
+### Refactoring
+
+* centralize Ky fetch configuration ([943b9b1](https://github.com/maxdewald/vscode-universal-chat-provider/commit/943b9b192b6daaf72dc9b8988fa9af76cef395c9))
+
 ## [0.42.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.1...v0.42.2) (2026-08-29)
 
 
