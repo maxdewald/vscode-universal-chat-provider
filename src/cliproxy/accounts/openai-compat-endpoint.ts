@@ -2,8 +2,8 @@ import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-c
 import type { Memento } from 'vscode'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+import { kyFetch } from '@src/shared/kyFetch'
 import { isHttpUrl } from '@src/shared/url'
-import ky from 'ky'
 import { ProgressLocation, window } from 'vscode'
 
 const LAST_OPENAI_BASE_URL_KEY = 'universalChatProvider.lastOpenAIBaseUrl'
@@ -93,8 +93,7 @@ const UpstreamModelsSchema = Type.Object({
 
 async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<string[]> {
   try {
-    const payload = asValue(UpstreamModelsSchema, await ky.get(`${baseUrl}/models`, {
-      fetch: globalThis.fetch,
+    const payload = asValue(UpstreamModelsSchema, await kyFetch.get(`${baseUrl}/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       retry: 0,
       signal: AbortSignal.timeout(10_000),

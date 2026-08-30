@@ -1,8 +1,8 @@
 import type { Static } from '@sinclair/typebox'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+import { kyFetch } from '@src/shared/kyFetch'
 import { urlHostname } from '@src/shared/url'
-import ky from 'ky'
 
 const CatalogPayloadSchema = Type.Object({}, { additionalProperties: true })
 
@@ -124,7 +124,7 @@ function scoreCatalogModel(model: CatalogModel): number {
 
 async function fetchPayload(url: string, signal?: AbortSignal): Promise<unknown | undefined> {
   try {
-    return await ky.get(url, { fetch: globalThis.fetch, signal: signal ?? null }).json<unknown>()
+    return await kyFetch.get(url, { signal: signal ?? null }).json<unknown>()
   }
   catch {
     return undefined

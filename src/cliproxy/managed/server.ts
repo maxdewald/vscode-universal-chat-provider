@@ -10,8 +10,8 @@ import { acquireBinary, readInstalledVersion } from '@src/cliproxy/managed/binar
 import { DEFAULT_PORT } from '@src/cliproxy/managed/config'
 import { claimRequestLease, hasActiveRequestLeases, readServerPid, removeServerPid, withOperationLock, writeServerPid } from '@src/cliproxy/managed/leases'
 import { errorMessage } from '@src/shared/errors'
+import { kyFetch } from '@src/shared/kyFetch'
 import getPort from 'get-port'
-import ky from 'ky'
 import { sleep } from 'moderndash'
 
 const HEALTH_TIMEOUT_MS = 1500
@@ -264,7 +264,7 @@ export class ManagedServer {
 
 async function isHealthy(host: string, port: number, signal?: AbortSignal): Promise<boolean> {
   try {
-    const response = await ky.get(`http://${host}:${port}/healthz`, {
+    const response = await kyFetch.get(`http://${host}:${port}/healthz`, {
       timeout: HEALTH_TIMEOUT_MS,
       retry: 0,
       throwHttpErrors: false,

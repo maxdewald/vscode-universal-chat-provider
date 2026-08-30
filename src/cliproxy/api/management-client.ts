@@ -2,8 +2,8 @@ import type { Static } from '@sinclair/typebox'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
-import { vscodeCompatibleFetch } from '@src/shared/vscode-fetch'
-import ky, { isHTTPError } from 'ky'
+import { kyFetch } from '@src/shared/kyFetch'
+import { isHTTPError } from 'ky'
 
 export const LOGIN_PROVIDERS = [
   { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },
@@ -119,13 +119,12 @@ export class ManagementClient {
   constructor(baseUrl: string, key: string) {
     // ponytail: retry:0/timeout:false preserve the old raw-fetch behavior; ky just folds
     // away the bearer header, base path, and !ok error parsing (the beforeError hook).
-    this.fetcher = ky.create({
+    this.fetcher = kyFetch.extend({
       prefix: `${baseUrl}/v0/management`,
       headers: { Authorization: `Bearer ${key}` },
       retry: 0,
       timeout: false,
       hooks: { beforeError: [toManagementError] },
-      fetch: vscodeCompatibleFetch,
     })
   }
 

@@ -9,10 +9,10 @@ import { Type } from '@sinclair/typebox'
 import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { asValue } from '@src/shared/json'
+import { kyFetch } from '@src/shared/kyFetch'
 import { isHttpUrl } from '@src/shared/url'
-import { vscodeCompatibleFetch } from '@src/shared/vscode-fetch'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
-import ky, { isHTTPError } from 'ky'
+import { isHTTPError } from 'ky'
 
 export interface DiscoveryResult {
   available: ProxyModelListEntry[]
@@ -135,13 +135,12 @@ export class CLIProxyClient {
   constructor(baseUrl: string, apiKey: string) {
     // ponytail: retry:0/timeout:false keep the old raw-fetch behavior (streaming must
     // not time out); ky folds away the auth header, base url, and !ok error parsing.
-    this.fetcher = ky.create({
+    this.fetcher = kyFetch.extend({
       prefix: baseUrl,
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       retry: 0,
       timeout: false,
       hooks: { beforeError: [toProxyHttpError] },
-      fetch: vscodeCompatibleFetch,
     })
   }
 

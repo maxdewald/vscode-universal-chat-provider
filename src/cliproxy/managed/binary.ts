@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto'
 import { access, chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { arch as osArch, platform as osPlatform } from 'node:os'
 import { dirname, join } from 'node:path'
+import { kyFetch } from '@src/shared/kyFetch'
 import { unzipSync } from 'fflate'
-import ky from 'ky'
 import { parseTarGzip } from 'nanotar'
 import semver from 'semver'
 
@@ -42,7 +42,7 @@ export function normalizeVersion(version: string): string {
 }
 
 // ky retries transient failures (5xx/429/network) and honors Retry-After on rate limits.
-const fetcher = ky.create({
+const fetcher = kyFetch.extend({
   headers: { 'User-Agent': 'universal-chat-provider-vscode' },
   retry: { limit: 3 },
   timeout: false,
