@@ -36,34 +36,20 @@ describe('local CLIProxyAPI config', () => {
     })
   })
 
-  it('reads a plaintext management key, ignoring hashed keys', async () => {
+  it.each(['super-secret', '$2a$10$abcdefghijklmnopqrstuv'])('ignores management key %s', async (managementKey) => {
     const directory = await makeTempDirectory('universal-chat-provider-config-')
     const configPath = join(directory, 'config.yaml')
     await writeFile(configPath, [
       'api-keys:',
       '  - actual-key',
       'remote-management:',
-      '  secret-key: super-secret',
+      `  secret-key: "${managementKey}"`,
     ].join('\n'))
 
     await expect(readLocalProxyConfig(configPath)).resolves.toEqual({
       path: configPath,
       apiKey: 'actual-key',
-      managementKey: 'super-secret',
     })
-  })
-
-  it('ignores a bcrypt-hashed management secret', async () => {
-    const directory = await makeTempDirectory('universal-chat-provider-config-')
-    const configPath = join(directory, 'config.yaml')
-    await writeFile(configPath, [
-      'auth-dir: auth',
-      'remote-management:',
-      '  secret-key: "$2a$10$abcdefghijklmnopqrstuv"',
-    ].join('\n'))
-
-    const config = await readLocalProxyConfig(configPath)
-    expect(config.managementKey).toBeUndefined()
   })
 
   it('rejects malformed YAML', async () => {

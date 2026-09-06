@@ -8,14 +8,10 @@ const PLACEHOLDER_KEY = /^your-api-key(?:-\d+)?$/i
 export interface LocalProxyConfig {
   path: string
   apiKey?: string
-  managementKey?: string
 }
 
 const LocalConfigSchema = Type.Object({
   'api-keys': Type.Optional(Type.Array(Type.Unknown())),
-  'remote-management': Type.Optional(Type.Object({
-    'secret-key': Type.Optional(Type.String()),
-  })),
 })
 
 export async function readLocalProxyConfig(configPath: string): Promise<LocalProxyConfig> {
@@ -28,19 +24,10 @@ export async function readLocalProxyConfig(configPath: string): Promise<LocalPro
     throw yamlDocument.errors[0]
   const document: unknown = yamlDocument.toJSON() as unknown
   const apiKey = firstApiKey(document)
-  const managementKey = managementSecretKey(document)
   return {
     path: configPath,
     ...(apiKey === undefined ? {} : { apiKey }),
-    ...(managementKey === undefined ? {} : { managementKey }),
   }
-}
-
-function managementSecretKey(value: unknown): string | undefined {
-  const key = asValue(LocalConfigSchema, value)?.['remote-management']?.['secret-key']
-  if (key === undefined || key.trim().length === 0 || key.startsWith('$2'))
-    return undefined
-  return key.trim()
 }
 
 function firstApiKey(value: unknown): string | undefined {

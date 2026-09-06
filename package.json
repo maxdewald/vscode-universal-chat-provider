@@ -154,6 +154,13 @@
             "default": true,
             "order": 4,
             "description": "Search common CLIProxyAPI config locations when no config path is set."
+          },
+          "universalChatProvider.server.managementKey": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 5,
+            "description": "External mode only. Enter your server's existing management key, not its bcrypt hash. Managed mode generates and stores its own key automatically and ignores this setting."
           }
         }
       },

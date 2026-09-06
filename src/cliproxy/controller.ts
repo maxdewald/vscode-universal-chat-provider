@@ -11,8 +11,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
-import { findConfigPath, normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
-import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
+import { normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import { resolveVersion } from '@src/cliproxy/managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT } from '@src/cliproxy/managed/config'
@@ -478,10 +477,10 @@ export class ServerController implements ProxyConnection {
       return endpoint
     }
 
-    const key = await this.externalManagementKey()
+    const key = this.externalManagementKey()
     if (key === undefined) {
       void window.showWarningMessage(
-        'To manage accounts on your own server, set remote-management.secret-key (plaintext) in its config.yaml.',
+        'To manage accounts on your own server, enter its management key in the universalChatProvider.server.managementKey setting.',
       )
       return undefined
     }
@@ -495,19 +494,8 @@ export class ServerController implements ProxyConnection {
     return { baseUrl, key: this.managementKey }
   }
 
-  private async externalManagementKey(): Promise<string | undefined> {
-    const override = await this.context.secrets.get(MGMT_KEY_SECRET)
-    if (override !== undefined && override.length > 0)
-      return override
-    const configPath = await findConfigPath()
-    if (configPath === undefined)
-      return undefined
-    try {
-      return (await readLocalProxyConfig(configPath)).managementKey
-    }
-    catch {
-      return undefined
-    }
+  private externalManagementKey(): string | undefined {
+    return workspace.getConfiguration('universalChatProvider').get<string>('server.managementKey', '').trim() || undefined
   }
 
   private setStatus(status: ServerStatus): void {
@@ -517,7 +505,7 @@ export class ServerController implements ProxyConnection {
 
   private async managementForStatus(): Promise<ManagementEndpoint | undefined> {
     if (this.mode() === 'external') {
-      const key = await this.externalManagementKey()
+      const key = this.externalManagementKey()
       return key === undefined ? undefined : { baseUrl: this.baseUrl(), key }
     }
     return this.currentManagement()

@@ -87,22 +87,23 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 <!-- configs -->
 
-| Key                                           | Description                                                                                                                       | Type      | Default                   |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
+| Key                                           | Description                                                                                                                                                                 | Type      | Default                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------- |
 | ▿ <b>Connection</b>                           |
-| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                                      | `string`  | `"managed"`               |
-| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                               | `string`  | `"http://127.0.0.1:8317"` |
-| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                                | `string`  | `""`                      |
-| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                            | `boolean` | `true`                    |
+| `universalChatProvider.server.mode`           | How CLIProxyAPI is provided.                                                                                                                                                | `string`  | `"managed"`               |
+| `universalChatProvider.baseUrl`               | CLIProxyAPI server URL. Used only in external mode.                                                                                                                         | `string`  | `"http://127.0.0.1:8317"` |
+| `universalChatProvider.configPath`            | Optional CLIProxyAPI config.yaml path for credential and model metadata discovery.                                                                                          | `string`  | `""`                      |
+| `universalChatProvider.autoDetectConfig`      | Search common CLIProxyAPI config locations when no config path is set.                                                                                                      | `boolean` | `true`                    |
+| `universalChatProvider.server.managementKey`  | External mode only. Enter your server's existing management key, not its bcrypt hash. Managed mode generates and stores its own key automatically and ignores this setting. | `string`  | `""`                      |
 | ▿ <b>Managed Server</b>                       |
-| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                      | `string`  | `"automatic"`             |
-| `universalChatProvider.server.version`        | CLIProxyAPI release used when update policy is Manual. Use latest or an exact version.                                            | `string`  | `"latest"`                |
-| `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. Changes prompt before restarting.                                 | `string`  | `""`                      |
+| `universalChatProvider.server.updatePolicy`   | How managed CLIProxyAPI updates are handled.                                                                                                                                | `string`  | `"automatic"`             |
+| `universalChatProvider.server.version`        | CLIProxyAPI release used when update policy is Manual. Use latest or an exact version.                                                                                      | `string`  | `"latest"`                |
+| `universalChatProvider.server.proxyUrl`       | Optional upstream proxy URL for the managed CLIProxyAPI server. Changes prompt before restarting.                                                                           | `string`  | `""`                      |
 | ▿ <b>Status Bar</b>                           |
-| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                     | `boolean` | `true`                    |
-| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                               | `number`  | `10`                      |
+| `universalChatProvider.showQuotaWarnings`     | Warn in the status bar when the model in use is low on quota.                                                                                                               | `boolean` | `true`                    |
+| `universalChatProvider.quotaWarningThreshold` | Remaining-quota percent below which the status bar warning appears.                                                                                                         | `number`  | `10`                      |
 | ▿ <b>Advanced</b>                             |
-| `universalChatProvider.debugLevel`            | Diagnostic detail to collect. Request Logging prompts before restarting the managed server and writes sensitive payloads to disk. | `string`  | `"off"`                   |
+| `universalChatProvider.debugLevel`            | Diagnostic detail to collect. Request Logging prompts before restarting the managed server and writes sensitive payloads to disk.                                           | `string`  | `"off"`                   |
 
 <!-- configs -->
 
@@ -153,7 +154,7 @@ Prefer to run CLIProxyAPI yourself, such as on a remote or shared machine?
 2. Start CLIProxyAPI and complete the provider login there.
 3. Use the **Import API Key** notification action when a local config is found, or run *Configure Connection* to enter the URL and key manually.
 
-The API key is stored in VS Code `SecretStorage`. In external mode, the extension never starts or stops the server. If the server exposes a plaintext `remote-management.secret-key`, the **Add Account** and **Manage Accounts** commands work against it too.
+The API key is stored in VS Code `SecretStorage`. In external mode, the extension never starts or stops the server. To use **Add Account** and **Manage Accounts**, enter your server's existing management key, not its bcrypt hash, in `universalChatProvider.server.managementKey`. Managed mode generates and stores its own key automatically and ignores this setting.
 
 </details>
 

@@ -433,13 +433,33 @@ describe('server controller status snapshot', () => {
   it('reports external mode and skips the account probe when no server answers', async () => {
     vscodeMock.settings.set('universalChatProvider.server.mode', 'external')
     vscodeMock.settings.set('universalChatProvider.baseUrl', 'http://127.0.0.1:9')
-    vscodeMock.secrets.set('universalChatProvider.managementKey', 'mgmt-secret')
+    vscodeMock.settings.set('universalChatProvider.server.managementKey', 'mgmt-secret')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     const snapshot = await controller.statusSnapshot()
 
     expect(snapshot).toMatchObject({ mode: 'external', status: 'external', baseUrl: 'http://127.0.0.1:9' })
     expect(snapshot.accounts).toBeUndefined()
+  })
+
+  it.each([
+    { configured: ' external-secret ', configKey: 'config-secret', expected: 'external-secret' },
+    { configured: ' ', configKey: 'config-secret', expected: undefined },
+    { configured: '', configKey: '', expected: undefined },
+  ])('resolves the external management key with $configured and $configKey', async ({ configured, configKey, expected }) => {
+    const configPath = join(root, 'config.yaml')
+    await writeFile(configPath, JSON.stringify({ 'remote-management': { 'secret-key': configKey } }))
+    vscodeMock.settings.set('universalChatProvider.server.mode', 'external')
+    vscodeMock.settings.set('universalChatProvider.configPath', configPath)
+    vscodeMock.settings.set('universalChatProvider.server.managementKey', configured)
+    vscodeMock.secrets.set('universalChatProvider.managementKey', 'managed-secret')
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+
+    const key = (controller as unknown as { externalManagementKey: () => string | undefined }).externalManagementKey()
+
+    expect(key).toBe(expected)
+    expect(vscodeMock.secrets.get('universalChatProvider.managementKey')).toBe('managed-secret')
+    controller.dispose()
   })
 })
 
