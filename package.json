@@ -87,6 +87,10 @@
         "title": "Universal Chat Provider: Import API Key from Config"
       },
       {
+        "command": "universalChatProvider.setManagementKey",
+        "title": "Universal Chat Provider: Set Management Key"
+      },
+      {
         "command": "universalChatProvider.refresh",
         "title": "Universal Chat Provider: Refresh Models"
       },

@@ -42,6 +42,7 @@ export function registerCommands(
     { command: 'universalChatProvider.resetServer', run: async () => controller.resetServer(), group: 2, modes: ['managed'], label: '$(discard) Reset Managed Server', description: 'Recreate the config and keys' },
     { command: 'universalChatProvider.configure', run: async () => provider.configure(), group: 2, modes: ['external'], label: '$(settings-gear) Configure Connection', description: 'Set the proxy URL and config path' },
     { command: 'universalChatProvider.importConfig', run: async () => provider.importConfig(), group: 2, modes: ['external'], label: '$(key) Import API Key from Config', description: 'Load an API key from config.yaml' },
+    { command: 'universalChatProvider.setManagementKey', run: async () => controller.setManagementKey(), group: 2, modes: ['external'], label: '$(shield) Set Management Key', description: 'Store the plaintext key before CLIProxyAPI hashes it' },
     { command: 'universalChatProvider.openSettings', run: async () => commands.executeCommand('workbench.action.openSettings', `@ext:${extensionId}`), group: 3, label: '$(gear) Open Settings', description: 'Edit this extension\'s settings' },
     { command: 'universalChatProvider.showLogs', run: () => output.show(true), group: 3, label: '$(output) Show Extension Logs', description: 'Diagnostics from the extension itself' },
     { command: 'universalChatProvider.clearCredentials', run: async () => {

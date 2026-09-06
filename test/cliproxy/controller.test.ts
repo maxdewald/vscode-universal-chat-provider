@@ -441,6 +441,25 @@ describe('server controller status snapshot', () => {
     expect(snapshot).toMatchObject({ mode: 'external', status: 'external', baseUrl: 'http://127.0.0.1:9' })
     expect(snapshot.accounts).toBeUndefined()
   })
+
+  it('stores a trimmed management key from the prompt', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    window.showInputBox.mockResolvedValueOnce('  mgmt-secret  ')
+
+    await controller.setManagementKey()
+
+    expect(vscodeMock.secrets.get('universalChatProvider.managementKey')).toBe('mgmt-secret')
+    expect(window.showInformationMessage).toHaveBeenCalledWith('Management key saved.')
+  })
+
+  it('does nothing when the management key prompt is cancelled', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    window.showInputBox.mockResolvedValueOnce(undefined)
+
+    await controller.setManagementKey()
+
+    expect(vscodeMock.secrets.get('universalChatProvider.managementKey')).toBeUndefined()
+  })
 })
 
 function context(root: string): ExtensionContext {

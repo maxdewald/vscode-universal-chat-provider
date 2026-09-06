@@ -124,6 +124,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 | `universalChatProvider.resetServer`      | Universal Chat Provider: Reset Managed Server                                        |
 | `universalChatProvider.configure`        | Universal Chat Provider: Configure Connection                                        |
 | `universalChatProvider.importConfig`     | Universal Chat Provider: Import API Key from Config                                  |
+| `universalChatProvider.setManagementKey` | Universal Chat Provider: Set Management Key                                          |
 | `universalChatProvider.refresh`          | Universal Chat Provider: Refresh Models                                              |
 | `universalChatProvider.setUtilityModel`  | Universal Chat Provider: Set Utility Model (commit messages, chat titles, summaries) |
 | `universalChatProvider.clearCredentials` | Universal Chat Provider: Clear Stored API Key                                        |

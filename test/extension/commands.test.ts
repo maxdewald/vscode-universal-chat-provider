@@ -34,6 +34,7 @@ describe('registerCommands', () => {
     ['manageAccounts', (harness: CommandHarness) => harness.controller.manageAccounts],
     ['configure', (harness: CommandHarness) => harness.provider.configure],
     ['importConfig', (harness: CommandHarness) => harness.provider.importConfig],
+    ['setManagementKey', (harness: CommandHarness) => harness.controller.setManagementKey],
     ['restartServer', (harness: CommandHarness) => harness.controller.restartServer],
     ['updateBinary', (harness: CommandHarness) => harness.controller.updateBinary],
     ['resetServer', (harness: CommandHarness) => harness.controller.resetServer],
@@ -179,6 +180,7 @@ function createCommandHarness() {
     restartServer: vi.fn(async () => {}),
     updateBinary: vi.fn(async () => {}),
     resetServer: vi.fn(async () => {}),
+    setManagementKey: vi.fn(async () => {}),
   }
   const output = createOutputChannelMock('Universal Chat Provider')
   const serverOutput = createOutputChannelMock('CLIProxyAPI Server')

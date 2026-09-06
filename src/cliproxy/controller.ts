@@ -170,6 +170,22 @@ export class ServerController implements ProxyConnection {
     return this.accounts.manageAccounts()
   }
 
+  async setManagementKey(): Promise<void> {
+    const value = await window.showInputBox({
+      title: 'Management Key',
+      // CLIProxyAPI bcrypt-hashes remote-management.secret-key on startup, so the plaintext
+      // only survives in config.yaml until the server's first launch; store it here instead.
+      prompt: 'Enter the CLIProxyAPI management key.',
+      password: true,
+      ignoreFocusOut: true,
+      validateInput: input => input.trim() ? undefined : 'A management key is required.',
+    })
+    if (value === undefined || value.length === 0)
+      return
+    await this.context.secrets.store(MGMT_KEY_SECRET, value.trim())
+    void window.showInformationMessage('Management key saved.')
+  }
+
   async listCodexResets(): Promise<CodexResetOption[]> {
     const management = await this.resolveManagement(false)
     if (management === undefined)
