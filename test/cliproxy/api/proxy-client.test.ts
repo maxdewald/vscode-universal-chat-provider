@@ -171,10 +171,35 @@ describe('cLIProxyClient', () => {
     await stream(body, handlers)
 
     expect(handlers.onText).toHaveBeenCalledWith('Version 2 shipped.')
-    expect(handlers.onThinking.mock.calls.flat()).toEqual(['Web Search: current release', ''])
+    expect(handlers.onThinking.mock.calls.flat()).toEqual(['Search: current release', ''])
     expect(handlers.onToolCall).not.toHaveBeenCalled()
     expect(handlers.onCitation).toHaveBeenCalledTimes(1)
     expect(handlers.onCitation).toHaveBeenCalledWith({ url: 'https://example.com/release' })
+  })
+
+  it.each([
+    [{ type: 'open_page', url: 'https://example.com/docs' }, 'Open page: https://example.com/docs'],
+    [{ type: 'search', query: ' current release ' }, 'Search: current release'],
+    [{ type: 'search', queries: [' first query ', '', 'second query'] }, 'Search: first query, second query'],
+    [{ type: 'find_in_page', url: 'https://example.com/docs', pattern: 'release' }, 'Find in page: https://example.com/docs, release'],
+    [{ type: 'scroll_page', url: 'https://example.com/docs', lines: 20 }, 'Scroll page: https://example.com/docs, 20'],
+    [{ type: 'inspect-page', options: { section: 'news' } }, 'Inspect page: {"section":"news"}'],
+    [{ type: 'open_page', url: '  ', extra: null }, 'Open page'],
+    [{ type: 'search', queries: [], sources: [{ url: 'https://example.com' }] }, 'Search'],
+    [{ queries: ['legacy query'] }, 'Web Search: legacy query'],
+    [undefined, 'Web Search'],
+    [null, 'Web Search'],
+    ['invalid action', 'Web Search'],
+  ])('displays hosted web action %j', async (action, expected) => {
+    const handlers = callbacks()
+
+    await stream(event({
+      type: 'response.output_item.done',
+      item: { type: 'web_search_call', status: 'completed', action },
+    }), handlers)
+
+    expect(handlers.onThinking.mock.calls.flat()).toEqual([expected, ''])
+    expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
   it('falls back to final content annotations and deduplicates citations', async () => {

@@ -77,6 +77,8 @@ const WebSearchActionSchema = Type.Object({
   }, { additionalProperties: true }))),
 }, { additionalProperties: true })
 
+const WebActionSchema = Type.Record(Type.String(), Type.Unknown())
+
 const StreamResponseSchema = Type.Object({
   usage: Type.Optional(Type.Unknown()),
   incomplete_details: Type.Optional(Type.Union([
@@ -286,9 +288,21 @@ function emitWebSearchStep(
 ): void {
   if (item.type !== 'web_search_call')
     return
-  const action = item.action === undefined ? undefined : asValue(WebSearchActionSchema, item.action)
-  const detail = (action?.queries ?? []).map(query => query.trim()).filter(query => query.length > 0).join(', ')
-  callbacks.onThinking?.(detail.length > 0 ? `Web Search: ${detail}` : 'Web Search')
+  const action = asValue(WebActionSchema, item.action)
+  const actionType = typeof action?.['type'] === 'string' ? action['type'].trim().replace(/[_-]+/g, ' ') : ''
+  const label = actionType.length > 0 ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : 'Web Search'
+  const detail = Object.entries(action ?? {})
+    .filter(([key, value]) => key !== 'type' && key !== 'sources' && value != null)
+    .map(([, value]) => {
+      if (typeof value === 'string')
+        return value.trim()
+      if (Array.isArray(value) && value.every(entry => typeof entry === 'string'))
+        return value.map(entry => entry.trim()).filter(Boolean).join(', ')
+      return JSON.stringify(value)
+    })
+    .filter(Boolean)
+    .join(', ')
+  callbacks.onThinking?.(detail.length > 0 ? `${label}: ${detail}` : label)
   callbacks.onThinking?.('')
 }
 
