@@ -91,7 +91,7 @@ export class ModelRegistry {
   }
 
   private async discoverModels(interactive: boolean, token?: CancellationToken): Promise<ProviderModel[]> {
-    await this.connection.ensureReady(interactive)
+    await this.connection.ensureReady()
     let apiKey = await this.credentials.get()
     if (apiKey === undefined && interactive)
       apiKey = await this.hooks.acquireApiKey()

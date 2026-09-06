@@ -37,7 +37,7 @@ describe('server controller lifecycle', () => {
     const dispose = vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
     expect(await readdir(managedPaths(root).leaseDir)).toEqual([String(process.pid)])
 
     controller.dispose()
@@ -49,7 +49,7 @@ describe('server controller lifecycle', () => {
     const shutdown = vi.spyOn(ManagedServer.prototype, 'shutdown').mockReturnValue()
     const dispose = vi.spyOn(ManagedServer.prototype, 'dispose').mockReturnValue()
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     claimLease(managedPaths(root).leaseDir, spawnPersistentNodeProcess().pid)
 
@@ -64,7 +64,7 @@ describe('server controller lifecycle', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v7.2.9' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
     await vi.waitFor(() => {
       expect(vscodeMock.output.appendLine).not.toHaveBeenCalledWith(expect.stringContaining('update check failed'))
       expect(vscodeMock.settings.get('universalChatProvider.server.updatePolicy')).toBe('suggestUpdates')
@@ -85,7 +85,7 @@ describe('server controller lifecycle', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledWith('8.0.0'))
     expect(window.showWarningMessage).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe('server controller lifecycle', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledWith(
       'CLIProxyAPI 8.0.0 is available (you\'re on 7.2.116).',
@@ -169,7 +169,7 @@ describe('server controller lifecycle', () => {
     vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
@@ -180,7 +180,7 @@ describe('server controller lifecycle', () => {
     vscodeMock.settings.set('universalChatProvider.debugLevel', 'requestLogging')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['debug']).toBe(true)
@@ -195,7 +195,7 @@ describe('server controller lifecycle', () => {
     await writeFile(join(logDir, expired), 'expired payload')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     await vi.waitFor(async () => expect(await readdir(logDir)).not.toContain(expired))
     controller.dispose()
@@ -215,7 +215,7 @@ describe('server controller lifecycle', () => {
       vscodeMock.output as never,
     )
 
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['openai-compatibility']).toEqual(providers)
@@ -227,7 +227,7 @@ describe('server controller lifecycle', () => {
     'universalChatProvider.debugLevel',
   ])('prompts before restarting for a managed server change to %s', async (changedSetting) => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
-    await controller.ensureReady(false)
+    await controller.ensureReady()
     vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
     const restart = vi.spyOn(ManagedServer.prototype, 'restart')
     const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
@@ -250,7 +250,7 @@ describe('server controller lifecycle', () => {
 
   it('restarts when a managed configuration prompt is accepted', async () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
-    await controller.ensureReady(false)
+    await controller.ensureReady()
     vi.spyOn(ManagedServer.prototype, 'baseUrl').mockReturnValue('http://127.0.0.1:8317')
     const restart = vi.spyOn(ManagedServer.prototype, 'restart').mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317 })
     window.showWarningMessage.mockResolvedValueOnce('Restart Now')
@@ -411,7 +411,7 @@ describe('server controller status snapshot', () => {
 
   it('reports the managed server as running once it has started', async () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
-    await controller.ensureReady(false)
+    await controller.ensureReady()
 
     const snapshot = await controller.statusSnapshot()
 
@@ -421,7 +421,7 @@ describe('server controller status snapshot', () => {
 
   it('reports an unexpected managed server exit', async () => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
-    await controller.ensureReady(false)
+    await controller.ensureReady()
     const server = (controller as unknown as { server: ManagedServer }).server
     const onUnexpectedExit = (server as unknown as { deps: { onUnexpectedExit: () => void } }).deps.onUnexpectedExit
 

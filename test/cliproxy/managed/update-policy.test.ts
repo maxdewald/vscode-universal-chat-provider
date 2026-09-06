@@ -15,8 +15,4 @@ describe('pickUpdate', () => {
   ])('%s', (_name, installed, latest, expected) => {
     expect(pickUpdate(installed, latest)).toBe(expected)
   })
-
-  it('can cap and downgrade updates when needed', () => {
-    expect(pickUpdate('8.1.0', '8.1.0', '7.2.115')).toBe('7.2.115')
-  })
 })

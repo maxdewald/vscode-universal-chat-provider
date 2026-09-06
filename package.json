@@ -261,6 +261,7 @@
     "generate": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:compat": "UCP_COMPAT_TESTS=1 vitest run test/chat/requests/compaction.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

@@ -147,7 +147,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   }
 
   async initialize(): Promise<void> {
-    await this.connection.ensureReady(false)
+    await this.connection.ensureReady()
     if (await this.credentials.get() === undefined) {
       await this.credentialFlows.showOnboarding()
       return

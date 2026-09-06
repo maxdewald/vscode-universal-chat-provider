@@ -1,5 +1,5 @@
 export interface ProxyConnection {
-  ensureReady: (interactive: boolean) => Promise<void>
+  ensureReady: () => Promise<void>
   baseUrl: () => string
   acquireRequest: () => Promise<() => void>
 }

@@ -91,7 +91,6 @@ interface ModelCandidate {
   detail: ProxyModelMetadata | undefined
   catalogModel: CatalogModel | undefined
   providerName: string
-  advertisedName: string
   baseName: string
   levels: string[]
   totalContext: number
@@ -153,7 +152,6 @@ export function mapProxyModels(
       detail,
       catalogModel,
       providerName,
-      advertisedName,
       baseName,
       levels,
       totalContext,

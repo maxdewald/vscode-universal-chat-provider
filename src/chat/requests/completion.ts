@@ -19,7 +19,7 @@ export async function streamCompletion(
   callbacks: StreamCallbacks,
   token?: CancellationToken,
 ): Promise<void> {
-  await deps.connection.ensureReady(false)
+  await deps.connection.ensureReady()
   const apiKey = await deps.credentials.get()
   if (apiKey === undefined)
     throw LanguageModelError.NoPermissions('Configure a CLIProxyAPI API key first.')

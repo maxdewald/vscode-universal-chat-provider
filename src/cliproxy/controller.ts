@@ -123,7 +123,7 @@ export class ServerController implements ProxyConnection {
     }
   }
 
-  async ensureReady(_interactive: boolean): Promise<void> {
+  async ensureReady(): Promise<void> {
     if (this.mode() === 'external') {
       this.setStatus('external')
       return
@@ -318,7 +318,7 @@ export class ServerController implements ProxyConnection {
       this.bootstrapPromise = undefined
       this.accounts.reset()
       this.managementKey = undefined
-      await this.ensureReady(true)
+      await this.ensureReady()
     }
     catch (error) {
       this.setStatus('error')
@@ -461,7 +461,7 @@ export class ServerController implements ProxyConnection {
   private async resolveManagement(start: boolean): Promise<ManagementEndpoint | undefined> {
     if (this.mode() === 'managed') {
       if (start) {
-        await this.ensureReady(true)
+        await this.ensureReady()
       }
       else {
         try {
@@ -533,7 +533,7 @@ export class ServerController implements ProxyConnection {
       'Use External Server',
     ).then(async (choice) => {
       if (choice === 'Retry')
-        await this.ensureReady(true)
+        await this.ensureReady()
       else if (choice === 'Show Logs')
         this.output.show(true)
       else if (choice === 'Show Server Output')

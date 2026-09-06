@@ -70,16 +70,16 @@ describe('compaction detection', () => {
   })
 })
 
-// An upstream reword would silently disable compaction routing. Skipped when offline.
 describe('copilot summarization prompt contract', () => {
   const SOURCE_URL = 'https://raw.githubusercontent.com/microsoft/vscode-copilot-chat/main/src/extension/prompts/node/agent/summarizedConversationHistory.tsx'
 
   it('still contains every phrase detection relies on', async ({ skip }) => {
-    const response = await fetch(SOURCE_URL).catch(() => undefined)
-    if (response === undefined || !response.ok) {
+    if (process.env['UCP_COMPAT_TESTS'] !== '1') {
       skip()
       return
     }
+    const response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(10_000) })
+    expect(response.ok).toBe(true)
     const source = await response.text()
 
     expect(source).toContain('Your task is to create a comprehensive, detailed summary of the entire conversation')

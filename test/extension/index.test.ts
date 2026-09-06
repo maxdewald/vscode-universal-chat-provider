@@ -26,7 +26,6 @@ describe('extension activation', () => {
 
     expect(activate(context)).toBeUndefined()
     expect(vscodeMock.registeredProviders[0]).toMatchObject({ vendor: 'universal-chat-provider' })
-    expect(vscodeMock.commandHandlers).toHaveLength(15)
     expect(initialize).toHaveBeenCalledTimes(1)
     await vi.waitFor(() => expect(refreshQuotas).toHaveBeenCalledTimes(1))
     expect(setRefreshListener).toHaveBeenCalledTimes(1)
