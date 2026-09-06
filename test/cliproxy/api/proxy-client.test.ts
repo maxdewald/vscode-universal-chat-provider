@@ -123,11 +123,26 @@ describe('cLIProxyClient', () => {
     expect(request.method).toBe('POST')
     expect(request.headers.get('authorization')).toBe('Bearer key')
     expect(request.headers.get('content-type')).toBe('application/json')
+    expect(request.headers.get('x-session-id')).toEqual(expect.any(String))
     expect(handlers.onText).toHaveBeenCalledWith('hello')
     expect(handlers.onThinking).toHaveBeenCalledWith('think')
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
     expect(handlers.onToolCall).toHaveBeenCalledWith('call-1', 'lookup', { q: 'x' })
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
+  })
+
+  it('sends a stable session header when a session id is provided', async () => {
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>().mockResolvedValue(new Response('data: [DONE]\n\n', {
+      headers: { 'content-type': 'text/event-stream' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+
+    await new CLIProxyClient('http://proxy', 'key')
+      .streamResponse({ model: 'x' } as ProxyRequestBody, callbacks(), new AbortController().signal, 'session-123')
+
+    const request = fetchMock.mock.calls[0]![0]
+    expect(request.headers.get('x-session-id')).toBe('session-123')
   })
 
   it('collects hosted search citations without emitting a local tool call', async () => {
@@ -185,6 +200,7 @@ describe('cLIProxyClient', () => {
       start_index: 0,
       end_index: 4,
     }
+
     const body = [
       event({
         type: 'response.content_part.done',

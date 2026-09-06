@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { buildPromptCacheKey, buildRequest, convertMessage } from '@src/chat/requests/request-builder'
+import { buildPromptCacheKey, buildRequest, buildSessionId, convertMessage } from '@src/chat/requests/request-builder'
 import { describe, expect, it } from 'vitest'
 import {
   LanguageModelChatMessageRole,
@@ -304,6 +304,30 @@ describe('response request conversion', () => {
     expect((await buildRequest(model, firstTurn, {
       toolMode: LanguageModelChatToolMode.Auto,
     })).prompt_cache_key).toBe(key)
+  })
+
+  it('keeps the session id stable across turns and model switches', async () => {
+    const firstTurn = [userTextMessage('hello')]
+    const secondTurn = [
+      ...firstTurn,
+      {
+        role: LanguageModelChatMessageRole.Assistant,
+        content: [new LanguageModelTextPart('hi')],
+        name: undefined,
+      },
+      userTextMessage('next'),
+    ]
+    const otherModel = createProviderModel({ proxyModelId: 'other-model' })
+
+    const sessionId = buildSessionId(firstTurn)
+
+    expect(sessionId).toMatch(/^[a-f0-9]{32}$/)
+    expect(buildSessionId(secondTurn)).toBe(sessionId)
+    expect(buildPromptCacheKey(otherModel, firstTurn)).not.toContain(sessionId)
+  })
+
+  it('has no session id when messages carry no derivable seed', () => {
+    expect(buildSessionId([])).toBeUndefined()
   })
 
   it('falls back to a supported reasoning level and supplies a default tool schema', async () => {

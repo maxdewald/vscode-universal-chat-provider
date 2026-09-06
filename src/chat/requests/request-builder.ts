@@ -99,18 +99,27 @@ export function buildPromptCacheKey(
   model: ProviderModel,
   messages: readonly LanguageModelChatRequestMessage[],
 ): string | undefined {
+  const hash = seedHash(messages, model.proxyModelId)
+  return hash === undefined ? undefined : `universal-chat-provider-${hash}`
+}
+
+// Unsalted by model so it stays stable if the user switches models mid-conversation.
+export function buildSessionId(messages: readonly LanguageModelChatRequestMessage[]): string | undefined {
+  return seedHash(messages, 'session')
+}
+
+function seedHash(messages: readonly LanguageModelChatRequestMessage[], salt: string): string | undefined {
   const seed = sessionSeed(messages)
   if (seed === undefined)
     return undefined
 
-  const hash = createHash('sha256')
+  return createHash('sha256')
     .update('universal-chat-provider:prompt-cache:v1\0')
-    .update(model.proxyModelId)
+    .update(salt)
     .update('\0')
     .update(seed)
     .digest('hex')
     .slice(0, 32)
-  return `universal-chat-provider-${hash}`
 }
 
 function isCacheControlPart(part: unknown): boolean {
@@ -188,6 +197,7 @@ export function serializeToolResult(part: LanguageModelToolResultPart): string {
         ? new TextDecoder().decode(value.data)
         : `[${value.mimeType} data]`
     }
+
     return JSON.stringify(value)
   }).join('\n')
 }
@@ -227,6 +237,7 @@ function partFingerprint(part: LanguageModelChatRequestMessage['content'][number
       return `data:${part.mimeType}:${new TextDecoder().decode(part.data)}`
     return `data:${part.mimeType}:${createHash('sha256').update(part.data).digest('hex')}`
   }
+
   if (part instanceof LanguageModelToolResultPart)
     return `tool-result:${part.callId}:${serializeToolResult(part)}`
   if (part instanceof LanguageModelToolCallPart)

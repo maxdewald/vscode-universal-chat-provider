@@ -36,6 +36,19 @@ describe('streamCompletion', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
+  it('forwards the session id to the proxy client', async () => {
+    clientMocks.streamResponse.mockResolvedValueOnce(undefined)
+
+    await streamCompletion(deps('key'), emptyBody, callbacks(), undefined, 'session-123')
+
+    expect(clientMocks.streamResponse).toHaveBeenCalledWith(
+      emptyBody,
+      expect.any(Object),
+      expect.any(AbortSignal),
+      'session-123',
+    )
+  })
+
   it('requires credentials', async () => {
     await expect(streamCompletion(deps(), emptyBody, callbacks())).rejects.toMatchObject({
       code: 'NoPermissions',

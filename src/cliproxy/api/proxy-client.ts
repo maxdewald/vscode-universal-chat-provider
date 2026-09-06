@@ -5,6 +5,7 @@ import type {
 } from '@src/chat/models/model'
 import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
 import type { BeforeErrorHook, KyInstance } from 'ky'
+import { randomUUID } from 'node:crypto'
 import { Type } from '@sinclair/typebox'
 import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
@@ -156,10 +157,14 @@ export class CLIProxyClient {
     body: ProxyRequestBody,
     callbacks: StreamCallbacks,
     signal: AbortSignal,
+    sessionId?: string,
   ): Promise<void> {
+    // Some providers behind CLIProxyAPI (e.g. OpenCode Go) require a stable session header for
+    // sticky routing; fall back to a random id so requests without a derivable seed still carry one.
     const response = await this.fetcher.post('/v1/responses', {
       json: body,
       signal,
+      headers: { 'X-Session-Id': sessionId ?? randomUUID() },
     })
     if (!response.body)
       throw new Error('CLIProxyAPI returned an empty streaming response.')
@@ -185,6 +190,7 @@ export class CLIProxyClient {
       catch {
         continue
       }
+
       if (payload === undefined)
         continue
       const type = payload.type ?? event.event
@@ -235,11 +241,13 @@ export class CLIProxyClient {
             pending.delete(key)
             continue
           }
+
           const current = pending.get(key) ?? {
             callId: item.call_id ?? key,
             name: item.name ?? 'unknown_tool',
             arguments: '',
           }
+
           current.arguments = item.arguments ?? current.arguments
           emitToolCall(current, callbacks, emitted)
         }
@@ -258,6 +266,7 @@ export class CLIProxyClient {
           if (parsed !== undefined)
             emitItemCitations(parsed, callbacks, citations)
         }
+
         callbacks.onUsage?.(completed?.usage)
       }
       else if (type === 'response.incomplete') {
@@ -369,6 +378,7 @@ function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta:
           return
         }
       }
+
       flush(value)
     },
     end() {
@@ -403,6 +413,7 @@ function emitToolCall(
       input = { raw: call.arguments }
     }
   }
+
   callbacks.onToolCall(call.callId, call.name, input)
 }
 

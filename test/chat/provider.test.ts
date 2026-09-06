@@ -80,6 +80,7 @@ describe('language model provider', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
@@ -163,6 +164,7 @@ describe('language model provider', () => {
       expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
@@ -481,6 +483,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
     expect(requestBody()).not.toHaveProperty('tools')
     expect(requestBody()).not.toHaveProperty('tool_choice')
@@ -501,6 +504,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
   })
 
@@ -525,6 +529,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
     expect(requestBody()).not.toHaveProperty('tools')
   })
@@ -551,6 +556,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      expect.any(String),
     )
     expect(requestBody()).toHaveProperty('tools')
   })

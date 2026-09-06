@@ -20,7 +20,7 @@ import { ModelRegistry } from '@src/chat/models/model-registry'
 import { detectCompaction } from '@src/chat/requests/compaction'
 import { streamCompletion } from '@src/chat/requests/completion'
 import { estimateTokens } from '@src/chat/requests/estimate'
-import { buildRequest } from '@src/chat/requests/request-builder'
+import { buildRequest, buildSessionId } from '@src/chat/requests/request-builder'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { remainingForModel } from '@src/cliproxy/quota/quota'
 import { errorMessage } from '@src/shared/errors'
@@ -135,6 +135,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       if (entries.length > 0)
         sections.push({ title: 'Antigravity', entries })
     }
+
     return sections
   }
 
@@ -152,6 +153,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       await this.credentialFlows.showOnboarding()
       return
     }
+
     await this.registry.forceRefresh(false)
   }
 
@@ -167,6 +169,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       await this.onSignIn()
       return withUtilityAliases(await this.registry.forceRefresh(false))
     }
+
     return withUtilityAliases(await this.registry.refresh(!options.silent, token))
   }
 
@@ -199,6 +202,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       omitTools: compaction !== undefined,
       webSearch,
     })
+    const sessionId = buildSessionId(messages)
     const citations: WebCitation[] = []
     const recordUsage = this.cacheMetrics.start({
       model: targetModel.proxyModelId,
@@ -228,6 +232,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
         },
         token,
+        sessionId,
       )
       if (citations.length > 0)
         progress.report(new LanguageModelTextPart(formatCitations(citations)))
