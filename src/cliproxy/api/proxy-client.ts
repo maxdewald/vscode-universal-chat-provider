@@ -289,7 +289,7 @@ function emitWebSearchStep(
   if (item.type !== 'web_search_call')
     return
   const action = asValue(WebActionSchema, item.action)
-  const actionType = typeof action?.['type'] === 'string' ? action['type'].trim().replace(/[_-]+/g, ' ') : ''
+  const actionType = typeof action?.type === 'string' ? action.type.trim().replace(/[_-]+/g, ' ') : ''
   const label = actionType.length > 0 ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : 'Web Search'
   const detail = Object.entries(action ?? {})
     .filter(([key, value]) => key !== 'type' && key !== 'sources' && value != null)
