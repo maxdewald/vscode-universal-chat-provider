@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.43.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.3...v0.43.0) (2026-09-06)
+
+
+### Features
+
+* configure external management key via setting ([c21a750](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c21a750e62e029ee2a22a96340c4831d2e6c0aaf))
+
+
+### Bug Fixes
+
+* access action type via index signature for TS4111 ([9ca9bbb](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9ca9bbb0691a2e653ad354a780b9a8278697e249))
+* show action-specific details for hosted web steps ([d2c66bc](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d2c66bcb694d77029d8d797dc711dba5bc98c841))
+
+
+### Refactoring
+
+* simplify server readiness and test configuration ([3b65e3f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3b65e3fc28688b2697a9238cdd0024a7f23f463e))
+
 ## [0.42.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.2...v0.42.3) (2026-08-30)
 
 
