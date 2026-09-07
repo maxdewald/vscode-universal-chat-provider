@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.43.0...v0.43.1) (2026-09-07)
+
+
+### Refactoring
+
+* average 3 recent cache hit rates in toolbar display ([99589a0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/99589a0ebb38af14759fca229ff74c31dcb9b5c5))
+
 ## [0.43.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.42.3...v0.43.0) (2026-09-06)
 
 
