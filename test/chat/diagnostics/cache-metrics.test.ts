@@ -231,7 +231,40 @@ describe('cacheMetricsTracker', () => {
     })
   })
 
-  it('excludes usage without cache details from the session hit rate', async () => {
+  it('averages the last three cache reports with equal weight', async () => {
+    const metrics = tracker()
+    const reports = [
+      { input_tokens: 100, input_tokens_details: { cached_tokens: 0 } },
+      { input_tokens: 1000, input_tokens_details: { cached_tokens: 600 } },
+      { input_tokens: 200, input_tokens_details: { cached_tokens: 180 } },
+      { input_tokens: 500, input_tokens_details: { cached_tokens: 150 } },
+    ]
+    const expectedRates = ['0%', '30%', '50%', '60%']
+
+    for (const [index, usage] of reports.entries()) {
+      record(metrics, usage, { model: 'model-a' })
+      expect(cacheStatusBar().text).toBe(`$(database) ${expectedRates[index]} cached`)
+      const count = Math.min(index + 1, 3)
+      expect(cacheStatusBar().tooltip).toContain(`last ${count} report${count === 1 ? '' : 's'}`)
+    }
+    await metrics.flush()
+
+    expect((await entries()).map(entry => entry.hitRate)).toEqual([0, 0.6, 0.9, 0.3])
+  })
+
+  it('does not let missing or zero-input cache reports displace valid rates', async () => {
+    const metrics = tracker()
+    record(metrics, { input_tokens: 100, input_tokens_details: { cached_tokens: 80 } }, { model: 'model-a' })
+    record(metrics, undefined, { model: 'model-a' })
+    record(metrics, { input_tokens: 100 }, { model: 'model-a' })
+    record(metrics, { input_tokens: 0, input_tokens_details: { cached_tokens: 0 } }, { model: 'model-a' })
+    await metrics.flush()
+
+    expect(cacheStatusBar().text).toBe('$(database) 80% cached')
+    expect(cacheStatusBar().tooltip).toContain('last 1 report')
+  })
+
+  it('excludes usage without cache details from the average hit rate', async () => {
     const metrics = tracker()
     record(metrics, {
       input_tokens: 300,
@@ -242,10 +275,9 @@ describe('cacheMetricsTracker', () => {
     await metrics.flush()
 
     expect(cacheStatusBar().text).toBe('$(database) 70% cached')
-    expect(cacheStatusBar().tooltip).toContain('cache read 700 · cache write 0 · uncached 300')
   })
 
-  it('shows an unavailable session hit rate until cache details are received', async () => {
+  it('shows an unavailable average hit rate until cache details are received', async () => {
     const metrics = tracker()
     record(metrics, { input_tokens: 900, output_tokens: 50 }, { model: 'unknown-provider' })
     await metrics.flush()
@@ -253,7 +285,7 @@ describe('cacheMetricsTracker', () => {
     expect(cacheStatusBar().text).toBe('$(database) n/a cached')
   })
 
-  it('counts unavailable requests without adding them to usage totals', async () => {
+  it('logs unavailable requests without changing the average', async () => {
     const metrics = tracker()
     record(metrics, undefined, { model: 'codex' })
     record(metrics, {
@@ -265,8 +297,7 @@ describe('cacheMetricsTracker', () => {
     await metrics.flush()
 
     expect(cacheStatusBar().text).toBe('$(database) 70% cached')
-    expect(cacheStatusBar().tooltip).toContain('cache read 700 · cache write 0 · uncached 300 · output 50')
-    expect(cacheStatusBar().tooltip).toContain('2 requests, 1 with usage')
+    expect((await entries()).map(entry => entry.hitRate)).toEqual([null, 0.7])
   })
 
   it('fingerprints the request prefix so a stable lead and a divergent tail are distinguishable', async () => {

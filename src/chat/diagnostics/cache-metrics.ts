@@ -215,7 +215,7 @@ export function formatUsageLine(
 
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
-  private readonly totals = { read: 0, write: 0, uncached: 0, output: 0, requests: 0, requestsWithUsage: 0 }
+  private readonly recentHitRates: number[] = []
   private readonly lastItemsByCacheKey = new Map<string, readonly unknown[]>()
   private writes: Promise<void> = Promise.resolve()
 
@@ -249,7 +249,11 @@ export class CacheMetricsTracker {
     }
     if (diff !== undefined)
       this.output.appendLine(formatPrefixLine(context.model, diff))
-    this.accumulate(summary)
+    if (summary.hitRate !== undefined) {
+      this.recentHitRates.push(summary.hitRate)
+      if (this.recentHitRates.length > 3)
+        this.recentHitRates.shift()
+    }
     this.updateStatusBar()
     this.append(summary, context, usage, diff)
   }
@@ -266,27 +270,11 @@ export class CacheMetricsTracker {
     return workspace.getConfiguration('universalChatProvider').get<string>('debugLevel', 'off') !== 'off'
   }
 
-  private accumulate(summary: UsageSummary): void {
-    this.totals.requests += 1
-    if (summary.shape === 'unavailable')
-      return
-    this.totals.requestsWithUsage += 1
-    if (summary.shape !== 'unknown') {
-      this.totals.read += summary.cacheReadTokens
-      this.totals.write += summary.cacheWriteTokens
-      this.totals.uncached += summary.uncachedInputTokens
-    }
-    this.totals.output += summary.outputTokens
-  }
-
   private updateStatusBar(): void {
-    const { read, write, uncached, output, requests, requestsWithUsage } = this.totals
-    const input = read + write + uncached
-    const rate = input > 0 ? `${Math.round((read / input) * 100)}%` : 'n/a'
+    const count = this.recentHitRates.length
+    const rate = formatHitRate(count > 0 ? this.recentHitRates.reduce((sum, hitRate) => sum + hitRate, 0) / count : undefined)
     this.statusBar.text = `$(database) ${rate} cached`
-    this.statusBar.tooltip = `Prompt cache hit rate this session: ${rate}\n`
-      + `cache read ${read} · cache write ${write} · uncached ${uncached} · output ${output}\n`
-      + `${requests} request${requests === 1 ? '' : 's'}, ${requestsWithUsage} with usage — logged to ${LOG_FILE}`
+    this.statusBar.tooltip = `Average prompt cache hit rate (last ${count} report${count === 1 ? '' : 's'}): ${rate}`
     this.statusBar.show()
   }
 
