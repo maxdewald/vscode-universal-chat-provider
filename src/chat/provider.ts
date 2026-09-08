@@ -199,6 +199,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       omitTools: compaction !== undefined,
       webSearch,
     })
+    const conversationId: unknown = options.modelOptions?.['_conversationId']
     const citations: WebCitation[] = []
     const recordUsage = this.cacheMetrics.start({
       model: targetModel.proxyModelId,
@@ -228,6 +229,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
         },
         token,
+        typeof conversationId === 'string' && conversationId.trim().length > 0 ? conversationId : undefined,
       )
       if (citations.length > 0)
         progress.report(new LanguageModelTextPart(formatCitations(citations)))

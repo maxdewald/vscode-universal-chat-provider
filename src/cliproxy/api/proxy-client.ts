@@ -158,10 +158,12 @@ export class CLIProxyClient {
     body: ProxyRequestBody,
     callbacks: StreamCallbacks,
     signal: AbortSignal,
+    sessionId?: string,
   ): Promise<void> {
     const response = await this.fetcher.post('/v1/responses', {
       json: body,
       signal,
+      headers: sessionId === undefined ? {} : { 'X-Session-Id': sessionId },
     })
     if (!response.body)
       throw new Error('CLIProxyAPI returned an empty streaming response.')

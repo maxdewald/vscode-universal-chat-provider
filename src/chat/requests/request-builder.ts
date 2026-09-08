@@ -52,14 +52,14 @@ export async function buildRequest(
   options: ProvideLanguageModelChatResponseOptions,
   { reasoningEffort, omitTools, webSearch }: BuildRequestOptions = {},
 ): Promise<ProxyRequestBody> {
-  const promptCacheKey = buildPromptCacheKey(model, messages)
+  const promptCacheHash = createPromptCacheHash(messages, model)
   const request: ProxyRequestBody = {
     model: model.proxyModelId,
     input: (await Promise.all(messages.map(convertMessage))).flat(),
     stream: true,
     max_output_tokens: model.maxOutputTokens,
     ...(model.serviceTier !== undefined ? { service_tier: model.serviceTier } : {}),
-    ...(promptCacheKey !== undefined ? { prompt_cache_key: promptCacheKey } : {}),
+    ...(promptCacheHash !== undefined ? { prompt_cache_key: `universal-chat-provider-${promptCacheHash}` } : {}),
   }
 
   const effort = reasoningEffort !== undefined && model.reasoningLevels.includes(reasoningEffort)
@@ -95,22 +95,18 @@ export async function buildRequest(
   return request
 }
 
-export function buildPromptCacheKey(
-  model: ProviderModel,
-  messages: readonly LanguageModelChatRequestMessage[],
-): string | undefined {
+function createPromptCacheHash(messages: readonly LanguageModelChatRequestMessage[], model: ProviderModel): string | undefined {
   const seed = sessionSeed(messages)
-  if (seed === undefined)
-    return undefined
-
-  const hash = createHash('sha256')
-    .update('universal-chat-provider:prompt-cache:v1\0')
-    .update(model.proxyModelId)
-    .update('\0')
-    .update(seed)
-    .digest('hex')
-    .slice(0, 32)
-  return `universal-chat-provider-${hash}`
+  const promptCacheHash = seed === undefined
+    ? undefined
+    : createHash('sha256')
+        .update('universal-chat-provider:prompt-cache:v1\0')
+        .update(model.proxyModelId)
+        .update('\0')
+        .update(seed)
+        .digest('hex')
+        .slice(0, 32)
+  return promptCacheHash
 }
 
 function isCacheControlPart(part: unknown): boolean {

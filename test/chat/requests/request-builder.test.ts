@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { buildPromptCacheKey, buildRequest, convertMessage } from '@src/chat/requests/request-builder'
+import { buildRequest, convertMessage } from '@src/chat/requests/request-builder'
 import { describe, expect, it } from 'vitest'
 import {
   LanguageModelChatMessageRole,
@@ -39,7 +39,8 @@ describe('response request conversion', () => {
       role: 'system',
       content: [{ type: 'input_text', text: 'You are a coding agent.' }],
     }])
-    expect(buildPromptCacheKey(model, messages)).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
+    expect((await buildRequest(model, messages, { toolMode: LanguageModelChatToolMode.Auto })).prompt_cache_key)
+      .toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
   })
 
   it('drops empty text beside assistant tool calls', async () => {
@@ -217,7 +218,7 @@ describe('response request conversion', () => {
       }],
       stream: true,
       max_output_tokens: 4096,
-      prompt_cache_key: buildPromptCacheKey(model, [userTextMessage('hello')]),
+      prompt_cache_key: expect.stringMatching(/^universal-chat-provider-[a-f0-9]{32}$/) as unknown,
       reasoning: { effort: 'high', summary: 'detailed' },
       tools: [{
         type: 'function',
@@ -297,13 +298,11 @@ describe('response request conversion', () => {
       userTextMessage('next'),
     ]
 
-    const key = buildPromptCacheKey(model, firstTurn)
+    const options = { toolMode: LanguageModelChatToolMode.Auto }
+    const key = (await buildRequest(model, firstTurn, options)).prompt_cache_key
 
     expect(key).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
-    expect(buildPromptCacheKey(model, secondTurn)).toBe(key)
-    expect((await buildRequest(model, firstTurn, {
-      toolMode: LanguageModelChatToolMode.Auto,
-    })).prompt_cache_key).toBe(key)
+    expect((await buildRequest(model, secondTurn, options)).prompt_cache_key).toBe(key)
   })
 
   it('falls back to a supported reasoning level and supplies a default tool schema', async () => {

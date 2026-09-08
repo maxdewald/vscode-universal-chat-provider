@@ -80,6 +80,7 @@ describe('language model provider', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
@@ -98,6 +99,60 @@ describe('language model provider', () => {
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       '[usage] model-a: effort=high input=0 cached=n/a write=0 output=3 hit=n/a raw={"output_tokens":3}',
     )
+  })
+
+  it('uses the Copilot conversation id across model switches and compaction', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+
+    for (const [proxyModelId, messages] of [
+      ['model-a', [userTextMessage('hello')]],
+      ['model-b', compactionMessages()],
+    ] as const) {
+      await provider.provideLanguageModelChatResponse(
+        { ...model(), id: proxyModelId, proxyModelId },
+        messages,
+        { ...options(), modelOptions: { _conversationId: 'copilot-session-123' } },
+        { report: vi.fn() },
+        new CancellationTokenSource().token,
+      )
+    }
+
+    expect(clientMocks.streamResponse.mock.calls.map((call): unknown => call[3]))
+      .toEqual(['copilot-session-123', 'copilot-session-123'])
+    expect(clientMocks.streamResponse.mock.calls[1]?.[0]).toHaveProperty('model', 'model-b')
+  })
+
+  it('keeps identical prompts in separate Copilot conversations distinct', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+
+    for (const conversationId of ['chat-1', 'chat-2']) {
+      await provider.provideLanguageModelChatResponse(
+        model(),
+        [userTextMessage('hello')],
+        { ...options(), modelOptions: { _conversationId: conversationId } },
+        { report: vi.fn() },
+        new CancellationTokenSource().token,
+      )
+    }
+
+    expect(clientMocks.streamResponse.mock.calls.map((call): unknown => call[3])).toEqual(['chat-1', 'chat-2'])
+  })
+
+  it.each([undefined, null, '', '   ', 42, false])('does not generate a session id for invalid host metadata %s', async (conversationId) => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+
+    await provider.provideLanguageModelChatResponse(
+      model(),
+      [userTextMessage('hello')],
+      { ...options(), modelOptions: { _conversationId: conversationId } },
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBeUndefined()
   })
 
   it('offers hosted search for supported ordinary models and renders citations', async () => {
@@ -163,6 +218,7 @@ describe('language model provider', () => {
       expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
@@ -481,6 +537,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
     expect(requestBody()).not.toHaveProperty('tools')
     expect(requestBody()).not.toHaveProperty('tool_choice')
@@ -501,6 +558,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
   })
 
@@ -525,6 +583,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
     expect(requestBody()).not.toHaveProperty('tools')
   })
@@ -551,6 +610,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
+      undefined,
     )
     expect(requestBody()).toHaveProperty('tools')
   })

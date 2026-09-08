@@ -123,11 +123,28 @@ describe('cLIProxyClient', () => {
     expect(request.method).toBe('POST')
     expect(request.headers.get('authorization')).toBe('Bearer key')
     expect(request.headers.get('content-type')).toBe('application/json')
+    expect(request.headers.has('x-session-id')).toBe(false)
     expect(handlers.onText).toHaveBeenCalledWith('hello')
     expect(handlers.onThinking).toHaveBeenCalledWith('think')
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
     expect(handlers.onToolCall).toHaveBeenCalledWith('call-1', 'lookup', { q: 'x' })
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
+  })
+
+  it('reuses the supplied session id and omits the header when none is supplied', async () => {
+    const fetchMock = vi.fn(async (_request: Request) => new Response('data: [DONE]\n\n', {
+      headers: { 'content-type': 'text/event-stream' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+    const client = new CLIProxyClient('http://proxy', 'key')
+
+    await client.streamResponse(emptyBody, callbacks(), new AbortController().signal, 'session-123')
+    await client.streamResponse(emptyBody, callbacks(), new AbortController().signal, 'session-123')
+    await client.streamResponse(emptyBody, callbacks(), new AbortController().signal)
+
+    expect(fetchMock.mock.calls.map(([request]) => request.headers.get('x-session-id')))
+      .toEqual(['session-123', 'session-123', null])
   })
 
   it('collects hosted search citations without emitting a local tool call', async () => {
