@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.43.1...v0.44.0) (2026-09-08)
+
+
+### Features
+
+* pass conversationID ([05fa834](https://github.com/maxdewald/vscode-universal-chat-provider/commit/05fa8349abf5e4fc8286e1cf6f744243203d5a48))
+
 ## [0.43.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.43.0...v0.43.1) (2026-09-07)
 
 
