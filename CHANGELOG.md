@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.44.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.0...v0.44.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* remove manual web search citation rendering ([090fe86](https://github.com/maxdewald/vscode-universal-chat-provider/commit/090fe8658e3c4d315fd459be0f930b40aa8ebf87))
+* use prompt cache key for requests without conversation ID ([4cec7f6](https://github.com/maxdewald/vscode-universal-chat-provider/commit/4cec7f6c22807c4019154be08f86c9b58839821a))
+
 ## [0.44.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.43.1...v0.44.0) (2026-09-08)
 
 
