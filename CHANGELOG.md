@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.1...v0.44.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* use model-scoped prompt cache keys for session IDs or conversationIDs ([78aab98](https://github.com/maxdewald/vscode-universal-chat-provider/commit/78aab987bdcd47d3379d2419e4aeb14250dff767))
+
 ## [0.44.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.0...v0.44.1) (2026-09-10)
 
 
