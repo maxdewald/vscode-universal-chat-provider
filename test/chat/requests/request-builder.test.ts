@@ -40,7 +40,7 @@ describe('response request conversion', () => {
       content: [{ type: 'input_text', text: 'You are a coding agent.' }],
     }])
     expect((await buildRequest(model, messages, { toolMode: LanguageModelChatToolMode.Auto })).prompt_cache_key)
-      .toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
+      .toMatch(/^[a-f0-9]{32}$/)
   })
 
   it('drops empty text beside assistant tool calls', async () => {
@@ -218,7 +218,7 @@ describe('response request conversion', () => {
       }],
       stream: true,
       max_output_tokens: 4096,
-      prompt_cache_key: expect.stringMatching(/^universal-chat-provider-[a-f0-9]{32}$/) as unknown,
+      prompt_cache_key: expect.stringMatching(/^[a-f0-9]{32}$/) as unknown,
       reasoning: { effort: 'high', summary: 'detailed' },
       tools: [{
         type: 'function',
@@ -301,8 +301,34 @@ describe('response request conversion', () => {
     const options = { toolMode: LanguageModelChatToolMode.Auto }
     const key = (await buildRequest(model, firstTurn, options)).prompt_cache_key
 
-    expect(key).toMatch(/^universal-chat-provider-[a-f0-9]{32}$/)
+    expect(key).toMatch(/^[a-f0-9]{32}$/)
     expect((await buildRequest(model, secondTurn, options)).prompt_cache_key).toBe(key)
+  })
+
+  it('uses model-scoped conversation ids independently of prompt content', async () => {
+    const options = { toolMode: LanguageModelChatToolMode.Auto, modelOptions: { _conversationId: 'chat-1' } }
+    const key = (await buildRequest(model, [userTextMessage('hello')], options)).prompt_cache_key
+
+    expect(key).toMatch(/^[a-f0-9]{32}$/)
+    expect((await buildRequest(model, [userTextMessage('rewritten context')], options)).prompt_cache_key).toBe(key)
+    expect((await buildRequest(model, [], options)).prompt_cache_key).toBe(key)
+    expect((await buildRequest({ ...model, proxyModelId: 'other-model' }, [], options)).prompt_cache_key).not.toBe(key)
+    expect((await buildRequest(model, [userTextMessage('hello')], {
+      ...options,
+      modelOptions: { _conversationId: 'chat-2' },
+    })).prompt_cache_key).not.toBe(key)
+  })
+
+  it.each([undefined, null, '', '   ', 42, false])('preserves content-based keys for invalid conversation id %s', async (conversationId) => {
+    const messages = [userTextMessage('hello')]
+    const options = { toolMode: LanguageModelChatToolMode.Auto }
+    const key = (await buildRequest(model, messages, options)).prompt_cache_key
+
+    expect(key).toBeDefined()
+    expect((await buildRequest(model, messages, {
+      ...options,
+      modelOptions: { _conversationId: conversationId },
+    })).prompt_cache_key).toBe(key)
   })
 
   it('falls back to a supported reasoning level and supplies a default tool schema', async () => {

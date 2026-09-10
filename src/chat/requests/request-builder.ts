@@ -52,14 +52,16 @@ export async function buildRequest(
   options: ProvideLanguageModelChatResponseOptions,
   { reasoningEffort, omitTools, webSearch }: BuildRequestOptions = {},
 ): Promise<ProxyRequestBody> {
-  const promptCacheHash = createPromptCacheHash(messages, model)
+  const hostId: unknown = options.modelOptions?.['_conversationId']
+  const identity = typeof hostId === 'string' && hostId.trim().length > 0 ? hostId : openingMessagesFingerprint(messages)
+  const promptCacheKey = createPromptCacheKey(identity, model.proxyModelId)
   const request: ProxyRequestBody = {
     model: model.proxyModelId,
     input: (await Promise.all(messages.map(convertMessage))).flat(),
     stream: true,
     max_output_tokens: model.maxOutputTokens,
     ...(model.serviceTier !== undefined ? { service_tier: model.serviceTier } : {}),
-    ...(promptCacheHash !== undefined ? { prompt_cache_key: `universal-chat-provider-${promptCacheHash}` } : {}),
+    ...(promptCacheKey !== undefined ? { prompt_cache_key: promptCacheKey } : {}),
   }
 
   const effort = reasoningEffort !== undefined && model.reasoningLevels.includes(reasoningEffort)
@@ -95,18 +97,16 @@ export async function buildRequest(
   return request
 }
 
-function createPromptCacheHash(messages: readonly LanguageModelChatRequestMessage[], model: ProviderModel): string | undefined {
-  const seed = sessionSeed(messages)
-  const promptCacheHash = seed === undefined
-    ? undefined
-    : createHash('sha256')
-        .update('universal-chat-provider:prompt-cache:v1\0')
-        .update(model.proxyModelId)
-        .update('\0')
-        .update(seed)
-        .digest('hex')
-        .slice(0, 32)
-  return promptCacheHash
+function createPromptCacheKey(identity: string | undefined, modelId: string): string | undefined {
+  if (identity === undefined)
+    return undefined
+  return createHash('sha256')
+    .update('universal-chat-provider:prompt-cache:v1\0')
+    .update(modelId)
+    .update('\0')
+    .update(identity)
+    .digest('hex')
+    .slice(0, 32)
 }
 
 function isCacheControlPart(part: unknown): boolean {
@@ -188,19 +188,19 @@ export function serializeToolResult(part: LanguageModelToolResultPart): string {
   }).join('\n')
 }
 
-function sessionSeed(messages: readonly LanguageModelChatRequestMessage[]): string | undefined {
-  const leadingUserMessages: string[] = []
+function openingMessagesFingerprint(messages: readonly LanguageModelChatRequestMessage[]): string | undefined {
+  const fingerprints: string[] = []
   for (const message of messages) {
     if (message.role === LanguageModelChatMessageRole.Assistant)
       break
 
     const fingerprint = messageFingerprint(message)
     if (fingerprint !== undefined)
-      leadingUserMessages.push(fingerprint)
+      fingerprints.push(fingerprint)
   }
 
-  if (leadingUserMessages.length > 0)
-    return leadingUserMessages.join('\n---\n')
+  if (fingerprints.length > 0)
+    return fingerprints.join('\n---\n')
 
   const first = messages.find(message => message.role !== LanguageModelChatMessageRole.Assistant)
   return first !== undefined ? messageFingerprint(first) : undefined

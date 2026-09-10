@@ -197,7 +197,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       omitTools: compaction !== undefined,
       webSearch,
     })
-    const conversationId: unknown = options.modelOptions?.['_conversationId']
     const recordUsage = this.cacheMetrics.start({
       model: targetModel.proxyModelId,
       promptCacheKey: request.prompt_cache_key,
@@ -225,7 +224,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
         },
         token,
-        typeof conversationId === 'string' && conversationId.trim().length > 0 ? conversationId : request.prompt_cache_key,
+        request.prompt_cache_key,
       )
     }
     catch (error) {

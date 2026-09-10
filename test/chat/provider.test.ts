@@ -102,7 +102,7 @@ describe('language model provider', () => {
     )
   })
 
-  it('uses the Copilot conversation id across model switches and compaction', async () => {
+  it('forwards model-scoped cache keys as session ids across model switches and compaction', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockResolvedValue(undefined)
 
@@ -119,8 +119,11 @@ describe('language model provider', () => {
       )
     }
 
-    expect(clientMocks.streamResponse.mock.calls.map((call): unknown => call[3]))
-      .toEqual(['copilot-session-123', 'copilot-session-123'])
+    const calls = clientMocks.streamResponse.mock.calls
+    const sessionIds = calls.map((call): unknown => call[3])
+    expect(sessionIds).toEqual([expect.any(String), expect.any(String)])
+    expect(sessionIds).toEqual(calls.map(call => (call[0] as ProxyRequestBody).prompt_cache_key))
+    expect(new Set(sessionIds).size).toBe(2)
     expect(clientMocks.streamResponse.mock.calls[1]?.[0]).toHaveProperty('model', 'model-b')
   })
 
@@ -138,23 +141,9 @@ describe('language model provider', () => {
       )
     }
 
-    expect(clientMocks.streamResponse.mock.calls.map((call): unknown => call[3])).toEqual(['chat-1', 'chat-2'])
-  })
-
-  it.each([undefined, null, '', '   ', 42, false])('uses the prompt cache key for invalid host metadata %s', async (conversationId) => {
-    const provider = createProvider('secret')
-    clientMocks.streamResponse.mockResolvedValue(undefined)
-
-    await provider.provideLanguageModelChatResponse(
-      model(),
-      [userTextMessage('hello')],
-      { ...options(), modelOptions: { _conversationId: conversationId } },
-      { report: vi.fn() },
-      new CancellationTokenSource().token,
-    )
-
-    expect(requestBody().prompt_cache_key).toBeDefined()
-    expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBe(requestBody().prompt_cache_key)
+    const sessionIds = clientMocks.streamResponse.mock.calls.map((call): unknown => call[3])
+    expect(sessionIds).toEqual([expect.any(String), expect.any(String)])
+    expect(new Set(sessionIds).size).toBe(2)
   })
 
   it('does not invent a session id when neither conversation id nor prompt cache key exists', async () => {
