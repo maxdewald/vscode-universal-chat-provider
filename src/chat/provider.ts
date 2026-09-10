@@ -1,6 +1,5 @@
 import type { ProviderModel } from '@src/chat/models/model'
 import type { CompletionDeps } from '@src/chat/requests/completion'
-import type { WebCitation } from '@src/cliproxy/api/proxy-client'
 import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import type {
@@ -24,7 +23,6 @@ import { buildRequest } from '@src/chat/requests/request-builder'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { remainingForModel } from '@src/cliproxy/quota/quota'
 import { errorMessage } from '@src/shared/errors'
-import { urlHostname } from '@src/shared/url'
 import * as vscode from 'vscode'
 import {
   LanguageModelTextPart,
@@ -200,7 +198,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       webSearch,
     })
     const conversationId: unknown = options.modelOptions?.['_conversationId']
-    const citations: WebCitation[] = []
     const recordUsage = this.cacheMetrics.start({
       model: targetModel.proxyModelId,
       promptCacheKey: request.prompt_cache_key,
@@ -220,7 +217,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
           onToolCall: (callId, name, input) =>
             progress.report(new LanguageModelToolCallPart(callId, name, input)),
-          onCitation: citation => citations.push(citation),
           onUsage: (usage) => {
             recordUsage(usage)
             const part = createContextUsagePart(usage)
@@ -231,8 +227,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
         token,
         typeof conversationId === 'string' && conversationId.trim().length > 0 ? conversationId : undefined,
       )
-      if (citations.length > 0)
-        progress.report(new LanguageModelTextPart(formatCitations(citations)))
     }
     catch (error) {
       const effort = request.reasoning?.effort
@@ -300,16 +294,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       onCredentialsRejected: () => void this.credentialFlows.showCredentialRecovery(),
     }
   }
-}
-
-function formatCitations(citations: readonly WebCitation[]): string {
-  return `\n\n**Sources**\n${citations.map((citation, index) =>
-    `${index + 1}. [${escapeMarkdownLinkText(citation.title ?? urlHostname(citation.url) ?? citation.url)}](${citation.url})`,
-  ).join('\n')}`
-}
-
-function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/[\\[\]]/g, '\\$&')
 }
 
 function withUtilityAliases(models: readonly ProviderModel[]): ProviderModel[] {

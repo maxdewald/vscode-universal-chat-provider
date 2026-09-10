@@ -10,7 +10,6 @@ import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/m
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { asValue } from '@src/shared/json'
 import { kyFetch } from '@src/shared/kyFetch'
-import { isHttpUrl } from '@src/shared/url'
 import { EventSourceParserStream } from 'eventsource-parser/stream'
 import { isHTTPError } from 'ky'
 
@@ -19,16 +18,10 @@ export interface DiscoveryResult {
   metadata: ProxyModelMetadata[]
 }
 
-export interface WebCitation {
-  url: string
-  title?: string
-}
-
 export interface StreamCallbacks {
   onText: (delta: string) => void
   onThinking?: (delta: string) => void
   onToolCall: (callId: string, name: string, input: object) => void
-  onCitation?: (citation: WebCitation) => void
   onUsage?: (usage: unknown) => void
 }
 
@@ -54,28 +47,8 @@ const StreamItemSchema = Type.Object({
   name: Type.Optional(Type.String()),
   arguments: Type.Optional(Type.String()),
   id: Type.Optional(Type.String()),
-  content: Type.Optional(Type.Array(Type.Unknown())),
   action: Type.Optional(Type.Unknown()),
 })
-
-const UrlCitationSchema = Type.Object({
-  type: Type.Literal('url_citation'),
-  url: Type.String(),
-  title: Type.Optional(Type.String()),
-}, { additionalProperties: true })
-
-const OutputTextPartSchema = Type.Object({
-  type: Type.Optional(Type.String()),
-  annotations: Type.Optional(Type.Array(Type.Unknown())),
-}, { additionalProperties: true })
-
-const WebSearchActionSchema = Type.Object({
-  queries: Type.Optional(Type.Array(Type.String())),
-  sources: Type.Optional(Type.Array(Type.Object({
-    type: Type.Optional(Type.String()),
-    url: Type.String(),
-  }, { additionalProperties: true }))),
-}, { additionalProperties: true })
 
 const WebActionSchema = Type.Record(Type.String(), Type.Unknown())
 
@@ -86,7 +59,6 @@ const StreamResponseSchema = Type.Object({
     Type.Object({ reason: Type.Optional(Type.String()) }),
   ])),
   error: Type.Optional(Type.Union([Type.Null(), Type.String(), ErrorObjectSchema])),
-  output: Type.Optional(Type.Array(Type.Unknown())),
 })
 
 const StreamEventSchema = Type.Object({
@@ -96,8 +68,6 @@ const StreamEventSchema = Type.Object({
   item_id: Type.Optional(Type.String()),
   output_index: Type.Optional(Type.Unknown()),
   response: Type.Optional(Type.Unknown()),
-  annotation: Type.Optional(Type.Unknown()),
-  part: Type.Optional(Type.Unknown()),
   error: Type.Optional(Type.Union([Type.String(), ErrorObjectSchema])),
   message: Type.Optional(Type.String()),
 })
@@ -170,7 +140,6 @@ export class CLIProxyClient {
 
     const pending = new Map<string, PendingToolCall>()
     const emitted = new Set<string>()
-    const citations = new Set<string>()
     const thinking = thinkingSentinelFilter(callbacks.onThinking)
 
     const events = response.body
@@ -196,12 +165,6 @@ export class CLIProxyClient {
       if (type === 'response.output_text.delta') {
         if (payload.delta !== undefined && payload.delta.length > 0)
           callbacks.onText(payload.delta)
-      }
-      else if (type === 'response.output_text.annotation.added') {
-        emitCitation(payload.annotation, callbacks, citations)
-      }
-      else if (type === 'response.content_part.done') {
-        emitPartCitations(payload.part, callbacks, citations)
       }
       else if (type === 'response.reasoning_summary_text.delta' || type === 'response.reasoning_text.delta') {
         if (payload.delta !== undefined && payload.delta.length > 0)
@@ -249,7 +212,6 @@ export class CLIProxyClient {
         }
         else if (item !== undefined) {
           emitWebSearchStep(item, callbacks)
-          emitItemCitations(item, callbacks, citations)
         }
       }
       else if (type === 'response.completed') {
@@ -257,11 +219,6 @@ export class CLIProxyClient {
         for (const call of pending.values())
           emitToolCall(call, callbacks, emitted)
         const completed = asValue(StreamResponseSchema, payload.response)
-        for (const item of completed?.output ?? []) {
-          const parsed = asValue(StreamItemSchema, item)
-          if (parsed !== undefined)
-            emitItemCitations(parsed, callbacks, citations)
-        }
         callbacks.onUsage?.(completed?.usage)
       }
       else if (type === 'response.incomplete') {
@@ -306,60 +263,6 @@ function emitWebSearchStep(
     .join(', ')
   callbacks.onThinking?.(detail.length > 0 ? `${label}: ${detail}` : label)
   callbacks.onThinking?.('')
-}
-
-function emitItemCitations(
-  item: StreamItem,
-  callbacks: StreamCallbacks,
-  emitted: Set<string>,
-): void {
-  for (const part of item.content ?? [])
-    emitPartCitations(part, callbacks, emitted)
-
-  if (item.action === undefined)
-    return
-  const action = asValue(WebSearchActionSchema, item.action)
-  for (const source of action?.sources ?? [])
-    emitWebCitation({ url: source.url }, callbacks, emitted)
-}
-
-function emitPartCitations(
-  value: unknown,
-  callbacks: StreamCallbacks,
-  emitted: Set<string>,
-): void {
-  const part = asValue(OutputTextPartSchema, value)
-  if (part?.type !== 'output_text')
-    return
-  for (const annotation of part.annotations ?? [])
-    emitCitation(annotation, callbacks, emitted)
-}
-
-function emitCitation(
-  value: unknown,
-  callbacks: StreamCallbacks,
-  emitted: Set<string>,
-): void {
-  const citation = asValue(UrlCitationSchema, value)
-  if (citation === undefined)
-    return
-  emitWebCitation(citation, callbacks, emitted)
-}
-
-function emitWebCitation(
-  citation: WebCitation,
-  callbacks: StreamCallbacks,
-  emitted: Set<string>,
-): void {
-  const url = citation.url.trim()
-  const title = citation.title?.trim()
-  if (!isHttpUrl(url) || emitted.has(url))
-    return
-  emitted.add(url)
-  callbacks.onCitation?.({
-    url,
-    ...(title !== undefined && title.length > 0 ? { title } : {}),
-  })
 }
 
 function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta: string) => void, end: () => void } {

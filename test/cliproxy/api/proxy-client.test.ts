@@ -147,7 +147,7 @@ describe('cLIProxyClient', () => {
       .toEqual(['session-123', 'session-123', null])
   })
 
-  it('collects hosted search citations without emitting a local tool call', async () => {
+  it('reports hosted search progress without emitting sources or a local tool call', async () => {
     const body = [
       event({
         type: 'response.output_item.added',
@@ -171,27 +171,15 @@ describe('cLIProxyClient', () => {
         },
       }),
       event({ type: 'response.output_text.delta', delta: 'Version 2 shipped.' }),
-      event({
-        type: 'response.output_text.annotation.added',
-        annotation: {
-          type: 'url_citation',
-          url: 'https://example.com/release',
-          title: 'Release notes',
-          start_index: 0,
-          end_index: 9,
-        },
-      }),
       event({ type: 'response.completed', response: {} }),
     ].join('')
     const handlers = callbacks()
 
     await stream(body, handlers)
 
-    expect(handlers.onText).toHaveBeenCalledWith('Version 2 shipped.')
+    expect(handlers.onText).toHaveBeenCalledExactlyOnceWith('Version 2 shipped.')
     expect(handlers.onThinking.mock.calls.flat()).toEqual(['Search: current release', ''])
     expect(handlers.onToolCall).not.toHaveBeenCalled()
-    expect(handlers.onCitation).toHaveBeenCalledTimes(1)
-    expect(handlers.onCitation).toHaveBeenCalledWith({ url: 'https://example.com/release' })
   })
 
   it.each([
@@ -219,41 +207,6 @@ describe('cLIProxyClient', () => {
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
-  it('falls back to final content annotations and deduplicates citations', async () => {
-    const citation = {
-      type: 'url_citation',
-      url: 'https://example.com/docs',
-      title: 'Documentation',
-      start_index: 0,
-      end_index: 4,
-    }
-    const body = [
-      event({
-        type: 'response.content_part.done',
-        part: { type: 'output_text', text: 'docs', annotations: [citation] },
-      }),
-      event({
-        type: 'response.output_item.done',
-        item: { type: 'message', content: [{ type: 'output_text', annotations: [citation] }] },
-      }),
-      event({
-        type: 'response.completed',
-        response: {
-          output: [{ type: 'message', content: [{ type: 'output_text', annotations: [citation] }] }],
-        },
-      }),
-    ].join('')
-    const handlers = callbacks()
-
-    await stream(body, handlers)
-
-    expect(handlers.onCitation).toHaveBeenCalledTimes(1)
-    expect(handlers.onCitation).toHaveBeenCalledWith({
-      url: 'https://example.com/docs',
-      title: 'Documentation',
-    })
-  })
-
   it('does not validate absent actions on ordinary response items', async () => {
     const reportValidationError = vi.fn()
     const { setJsonValidationErrorReporter } = await import('@src/shared/json')
@@ -265,17 +218,6 @@ describe('cLIProxyClient', () => {
     }), callbacks())
 
     expect(reportValidationError).not.toHaveBeenCalled()
-  })
-
-  it('rejects non-web citation schemes', async () => {
-    const handlers = callbacks()
-
-    await stream(event({
-      type: 'response.output_text.annotation.added',
-      annotation: { type: 'url_citation', url: 'command:workbench.action.openSettings', title: 'Settings' },
-    }), handlers)
-
-    expect(handlers.onCitation).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -537,7 +479,6 @@ function callbacks() {
     onText: vi.fn(),
     onThinking: vi.fn(),
     onToolCall: vi.fn(),
-    onCitation: vi.fn(),
     onUsage: vi.fn(),
   }
 }

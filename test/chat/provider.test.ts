@@ -155,12 +155,10 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBeUndefined()
   })
 
-  it('offers hosted search for supported ordinary models and renders citations', async () => {
+  it('offers hosted search for supported ordinary models without appending sources', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
       callbacks.onText('Current answer')
-      callbacks.onCitation?.({ url: 'https://example.com/release', title: 'Release [notes]' })
-      callbacks.onCitation?.({ url: 'https://docs.example.com/reference' })
     })
     const report = vi.fn()
 
@@ -176,9 +174,7 @@ describe('language model provider', () => {
       tools: [{ type: 'web_search' }],
       tool_choice: 'auto',
     })
-    expect(report).toHaveBeenLastCalledWith(new LanguageModelTextPart(
-      '\n\n**Sources**\n1. [Release \\[notes\\]](https://example.com/release)\n2. [docs.example.com](https://docs.example.com/reference)',
-    ))
+    expect(report).toHaveBeenCalledExactlyOnceWith(new LanguageModelTextPart('Current answer'))
   })
 
   it.each([
