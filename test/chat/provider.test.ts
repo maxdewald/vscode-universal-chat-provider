@@ -1,3 +1,4 @@
+import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
 import type { StreamCallbacks } from '@src/cliproxy/api/proxy-client'
 import type { LanguageModelChatMessageRole, OutputChannel } from 'vscode'
 import { UniversalChatProvider, utilityModelId } from '@src/chat/provider'
@@ -80,7 +81,7 @@ describe('language model provider', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
@@ -140,7 +141,7 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse.mock.calls.map((call): unknown => call[3])).toEqual(['chat-1', 'chat-2'])
   })
 
-  it.each([undefined, null, '', '   ', 42, false])('does not generate a session id for invalid host metadata %s', async (conversationId) => {
+  it.each([undefined, null, '', '   ', 42, false])('uses the prompt cache key for invalid host metadata %s', async (conversationId) => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockResolvedValue(undefined)
 
@@ -152,6 +153,23 @@ describe('language model provider', () => {
       new CancellationTokenSource().token,
     )
 
+    expect(requestBody().prompt_cache_key).toBeDefined()
+    expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBe(requestBody().prompt_cache_key)
+  })
+
+  it('does not invent a session id when neither conversation id nor prompt cache key exists', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+
+    await provider.provideLanguageModelChatResponse(
+      model(),
+      [],
+      options(),
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    expect(requestBody().prompt_cache_key).toBeUndefined()
     expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBeUndefined()
   })
 
@@ -214,7 +232,7 @@ describe('language model provider', () => {
       expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
@@ -533,7 +551,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
     expect(requestBody()).not.toHaveProperty('tools')
     expect(requestBody()).not.toHaveProperty('tool_choice')
@@ -554,7 +572,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
   })
 
@@ -579,7 +597,7 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
     expect(requestBody()).not.toHaveProperty('tools')
   })
@@ -606,14 +624,14 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      undefined,
+      requestBody().prompt_cache_key,
     )
     expect(requestBody()).toHaveProperty('tools')
   })
 })
 
-function requestBody(): object {
-  return clientMocks.streamResponse.mock.calls[0]?.[0] as object
+function requestBody(): ProxyRequestBody {
+  return clientMocks.streamResponse.mock.calls[0]?.[0] as ProxyRequestBody
 }
 
 function compactionMessages() {

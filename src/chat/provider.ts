@@ -225,7 +225,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
         },
         token,
-        typeof conversationId === 'string' && conversationId.trim().length > 0 ? conversationId : undefined,
+        typeof conversationId === 'string' && conversationId.trim().length > 0 ? conversationId : request.prompt_cache_key,
       )
     }
     catch (error) {
