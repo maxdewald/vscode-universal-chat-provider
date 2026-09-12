@@ -72,7 +72,17 @@ interface AcquireResult {
 }
 
 export async function acquireBinary(options: AcquireOptions): Promise<AcquireResult> {
-  const version = await resolveVersion(options.requestedVersion, options.signal)
+  let version: string
+  try {
+    version = await resolveVersion(options.requestedVersion, options.signal)
+  }
+  catch (error) {
+    const cachedVersion = await readInstalledVersion(options.binDir)
+    if (cachedVersion === undefined)
+      throw error
+    options.output.appendLine(`Could not resolve latest CLIProxyAPI release (${error instanceof Error ? error.message : String(error)}). Using cached CLIProxyAPI ${cachedVersion}.`)
+    version = cachedVersion
+  }
   const asset = resolveAsset(osPlatform(), osArch(), version)
   const versionDir = join(options.binDir, version)
   const binaryPath = join(versionDir, asset.binaryName)
