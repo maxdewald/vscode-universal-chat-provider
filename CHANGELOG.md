@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.45.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.2...v0.45.0) (2026-09-14)
+
+
+### Features
+
+* add support Devin accounts ([7c0cdb0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7c0cdb0dcefae706c33af9f98fc221813ef02889))
+
+
+### Bug Fixes
+
+* **managed:** fall back to cached binary when release resolution fails ([#152](https://github.com/maxdewald/vscode-universal-chat-provider/issues/152)) ([dde9102](https://github.com/maxdewald/vscode-universal-chat-provider/commit/dde91023b91f7da24f633c8530f015dde3f81ed2))
+
+
+### Documentation
+
+* update provider badge icons ([27915c1](https://github.com/maxdewald/vscode-universal-chat-provider/commit/27915c134a984bc51b3428bf0252d950b48940c9))
+
 ## [0.44.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.1...v0.44.2) (2026-09-10)
 
 
