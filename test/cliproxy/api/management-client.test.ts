@@ -13,14 +13,14 @@ beforeEach(() => {
 })
 
 describe('management client', () => {
-  it('requests an auth URL with the management bearer key', async () => {
+  it.each(['codex-auth-url', 'devin-auth-url'])('requests %s with the management bearer key', async (endpoint) => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({ status: 'ok', url: 'https://login', state: 'oauth-state' }))
     vi.stubGlobal('fetch', fetchMock)
     const client = createClient()
 
-    await expect(client.requestAuthUrl('codex-auth-url')).resolves.toEqual({ url: 'https://login', state: 'oauth-state' })
+    await expect(client.requestAuthUrl(endpoint)).resolves.toEqual({ url: 'https://login', state: 'oauth-state' })
     const request = fetchMock.mock.calls[0]![0]
-    expect(request.url).toBe('http://127.0.0.1:8317/v0/management/codex-auth-url?is_webui=true')
+    expect(request.url).toBe(`http://127.0.0.1:8317/v0/management/${endpoint}?is_webui=true`)
     expect(request.method).toBe('GET')
     expect(request.headers.get('authorization')).toBe('Bearer mgmt-key')
   })
@@ -133,6 +133,7 @@ describe('management client', () => {
       'antigravity-auth-url',
       'kimi-auth-url',
       'xai-auth-url',
+      'devin-auth-url',
     ])
     expect(LOGIN_PROVIDERS.find(provider => provider.label === 'Anthropic Claude')?.endpoint).toBe('anthropic-auth-url')
   })

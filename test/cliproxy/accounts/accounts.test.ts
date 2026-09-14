@@ -1,7 +1,7 @@
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetVSCodeMock, window } from '../../support/vscode'
+import { env, resetVSCodeMock, window } from '../../support/vscode'
 
 describe('accounts login completion', () => {
   beforeEach(() => {
@@ -23,6 +23,8 @@ describe('accounts login completion', () => {
   it.each([
     {
       name: 'a same-email auth overwrite',
+      label: 'OpenAI Codex',
+      endpoint: 'codex-auth-url',
       before: [
         { name: 'codex-user.json', provider: 'codex', email: 'same@example.com', expires_at: '2026-01-01T00:00:00Z' },
       ],
@@ -32,10 +34,21 @@ describe('accounts login completion', () => {
     },
     {
       name: 'a new auth file',
+      label: 'OpenAI Codex',
+      endpoint: 'codex-auth-url',
       before: [],
       after: [{ name: 'codex-new.json', provider: 'codex' }],
     },
-  ])('completes login after $name appears', async ({ before, after }) => {
+    {
+      name: 'a new Devin auth file',
+      label: 'Devin',
+      endpoint: 'devin-auth-url',
+      before: [],
+      after: [{ name: 'devin-user.json', provider: 'devin' }],
+    },
+  ])('completes login after $name appears', async ({ before, after, label, endpoint }) => {
+    window.showQuickPick.mockImplementationOnce(async items => (items as Array<{ label: string }>).find(item => item.label === label))
+    const requestAuthUrl = vi.spyOn(ManagementClient.prototype, 'requestAuthUrl')
     const list = vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw')
       .mockResolvedValueOnce(before)
       .mockResolvedValue(after)
@@ -53,7 +66,9 @@ describe('accounts login completion', () => {
     await done
 
     expect(list).toHaveBeenCalled()
-    expect(window.showInformationMessage).toHaveBeenCalledWith('OpenAI Codex account connected.')
+    expect(requestAuthUrl).toHaveBeenCalledWith(endpoint)
+    expect(env.openExternal.mock.calls[0]?.[0].toString()).toBe('https://example.com/auth')
+    expect(window.showInformationMessage).toHaveBeenCalledWith(`${label} account connected.`)
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
     expect(window.showWarningMessage).not.toHaveBeenCalled()
   })

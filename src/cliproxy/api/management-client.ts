@@ -11,6 +11,7 @@ export const LOGIN_PROVIDERS = [
   { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url', provider: 'antigravity' },
   { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url', provider: 'kimi' },
   { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url', provider: 'xai' },
+  { label: 'Devin', detail: 'Devin / Cognition account', endpoint: 'devin-auth-url', provider: 'devin' },
 ]
 
 export interface ManagementEndpoint {

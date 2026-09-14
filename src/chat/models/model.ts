@@ -76,7 +76,7 @@ export interface ModelMappingOptions {
 }
 
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
-const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity'])
+const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity', 'cognition'])
 const WEB_SEARCH_TOOL_TYPES = new Set(['text', 'text_and_image'])
 const PROVIDER_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/claude|anthropic/, 'chat-model-provider-claude'],

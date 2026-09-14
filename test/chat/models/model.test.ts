@@ -13,6 +13,25 @@ function mapProxyModels(
 }
 
 describe('model mapping', () => {
+  it('keeps Cognition-owned Devin models using proxy metadata without external catalogs', () => {
+    const models = mapProxyModels(
+      [{ id: 'devin/swe-2', owned_by: 'cognition', context_length: 128_000, max_completion_tokens: 8192 }],
+      [{ slug: 'devin/swe-2', display_name: 'SWE-2', input_modalities: ['text', 'image'] }],
+      new Map(),
+      {},
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      proxyModelId: 'devin/swe-2',
+      proxyOwner: 'cognition',
+      name: 'SWE-2',
+      maxInputTokens: 128_000,
+      maxOutputTokens: 8192,
+      capabilities: { imageInput: true, toolCalling: true },
+    })
+  })
+
   it('uses models.dev exclusively for OpenAI-compatible models', () => {
     const [model] = mapModels(
       [{ id: 'opencode.ai/deepseek-v4-flash', owned_by: 'opencode.ai', context_length: 272_000 }],
