@@ -1,9 +1,10 @@
-import { mkdir, readFile } from 'node:fs/promises'
+import type { OutputChannel } from 'vscode'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '@src/cliproxy/managed/binary'
+import { acquireBinary, extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '@src/cliproxy/managed/binary'
 import { zipSync } from 'fflate'
 import { createTarGzip } from 'nanotar'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTempDirectories } from '../../support/temp'
 
 const makeTempDirectory = useTempDirectories()
@@ -86,5 +87,49 @@ describe('readInstalledVersion', () => {
     await mkdir(join(binDir, '7.10.0'))
     await mkdir(join(binDir, 'tmp'))
     expect(await readInstalledVersion(binDir)).toBe('7.10.0')
+  })
+})
+
+describe('acquireBinary', () => {
+  let binDir: string
+  const output = { appendLine: vi.fn(), append: vi.fn() } as unknown as OutputChannel
+
+  beforeEach(async () => {
+    binDir = await makeTempDirectory('ucp-bin-')
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('uses cached binary when release resolution fails (e.g. rate limit)', async () => {
+    const version = '7.2.5'
+    const asset = resolveAsset(process.platform, process.arch, version)
+    const versionDir = join(binDir, version)
+    await mkdir(versionDir, { recursive: true })
+    const binaryPath = join(versionDir, asset.binaryName)
+    await writeFile(binaryPath, 'mock binary')
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('rate limit exceeded', { status: 403 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await acquireBinary({
+      binDir,
+      requestedVersion: 'latest',
+      output,
+    })
+
+    expect(result).toEqual({ binaryPath, version })
+  })
+
+  it('rethrows error when release resolution fails and no cached binary exists', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('rate limit exceeded', { status: 403 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(acquireBinary({
+      binDir,
+      requestedVersion: 'latest',
+      output,
+    })).rejects.toThrow()
   })
 })
