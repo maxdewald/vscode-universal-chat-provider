@@ -7,6 +7,7 @@ import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
+import { emitWebSearchStep } from '@src/cliproxy/api/codex-response'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import { asValue } from '@src/shared/json'
 import { kyFetch } from '@src/shared/kyFetch'
@@ -49,8 +50,6 @@ const StreamItemSchema = Type.Object({
   id: Type.Optional(Type.String()),
   action: Type.Optional(Type.Unknown()),
 })
-
-const WebActionSchema = Type.Record(Type.String(), Type.Unknown())
 
 const StreamResponseSchema = Type.Object({
   usage: Type.Optional(Type.Unknown()),
@@ -140,14 +139,20 @@ export class CLIProxyClient {
 
     const pending = new Map<string, PendingToolCall>()
     const emitted = new Set<string>()
-    const thinking = thinkingSentinelFilter(callbacks.onThinking)
+    let hasThinking = false
+    const endThinking = (): void => {
+      if (hasThinking) {
+        callbacks.onThinking?.('')
+        hasThinking = false
+      }
+    }
 
     const events = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(new EventSourceParserStream())
     for await (const event of events) {
       if (event.data === '[DONE]') {
-        thinking.end()
+        endThinking()
         break
       }
 
@@ -167,15 +172,17 @@ export class CLIProxyClient {
           callbacks.onText(payload.delta)
       }
       else if (type === 'response.reasoning_summary_text.delta' || type === 'response.reasoning_text.delta') {
-        if (payload.delta !== undefined && payload.delta.length > 0)
-          thinking.push(payload.delta)
+        if (payload.delta !== undefined && payload.delta.length > 0) {
+          callbacks.onThinking?.(payload.delta)
+          hasThinking = true
+        }
       }
       else if (
         type === 'response.reasoning_summary_text.done'
         || type === 'response.reasoning_summary_part.done'
         || type === 'response.reasoning_text.done'
       ) {
-        thinking.end()
+        endThinking()
       }
       else if (type === 'response.output_item.added') {
         const item = asValue(StreamItemSchema, payload.item)
@@ -210,19 +217,19 @@ export class CLIProxyClient {
           current.arguments = item.arguments ?? current.arguments
           emitToolCall(current, callbacks, emitted)
         }
-        else if (item !== undefined) {
-          emitWebSearchStep(item, callbacks)
+        else if (item?.type === 'web_search_call') {
+          emitWebSearchStep(item.action, callbacks.onThinking)
         }
       }
       else if (type === 'response.completed') {
-        thinking.end()
+        endThinking()
         for (const call of pending.values())
           emitToolCall(call, callbacks, emitted)
         const completed = asValue(StreamResponseSchema, payload.response)
         callbacks.onUsage?.(completed?.usage)
       }
       else if (type === 'response.incomplete') {
-        thinking.end()
+        endThinking()
         const incomplete = asValue(StreamResponseSchema, payload.response)
         callbacks.onUsage?.(incomplete?.usage)
         const reason = incomplete?.incomplete_details?.reason
@@ -238,69 +245,6 @@ export class CLIProxyClient {
         throw new Error(streamErrorMessage(payload))
       }
     }
-  }
-}
-
-function emitWebSearchStep(
-  item: StreamItem,
-  callbacks: StreamCallbacks,
-): void {
-  if (item.type !== 'web_search_call')
-    return
-  const action = asValue(WebActionSchema, item.action)
-  const actionType = typeof action?.['type'] === 'string' ? action['type'].trim().replace(/[_-]+/g, ' ') : ''
-  const label = actionType.length > 0 ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : 'Web Search'
-  const detail = Object.entries(action ?? {})
-    .filter(([key, value]) => key !== 'type' && key !== 'sources' && value != null)
-    .map(([, value]) => {
-      if (typeof value === 'string')
-        return value.trim()
-      if (Array.isArray(value) && value.every(entry => typeof entry === 'string'))
-        return value.map(entry => entry.trim()).filter(Boolean).join(', ')
-      return JSON.stringify(value)
-    })
-    .filter(Boolean)
-    .join(', ')
-  callbacks.onThinking?.(detail.length > 0 ? `${label}: ${detail}` : label)
-  callbacks.onThinking?.('')
-}
-
-function thinkingSentinelFilter(emit?: (delta: string) => void): { push: (delta: string) => void, end: () => void } {
-  const sentinel = '<!-- -->'
-  let tail = ''
-  let flushedSinceBoundary = false
-  const flush = (value: string): void => {
-    if (value.length > 0) {
-      emit?.(value)
-      flushedSinceBoundary = true
-    }
-  }
-
-  return {
-    push(delta) {
-      const value = tail + delta
-      tail = ''
-      for (let start = value.length - 1; start >= 0; start--) {
-        const suffix = value.slice(start)
-        if (sentinel.startsWith(suffix) || (suffix.startsWith(sentinel) && suffix.slice(sentinel.length).trim() === '')) {
-          tail = suffix
-          flush(value.slice(0, start))
-          return
-        }
-      }
-      flush(value)
-    },
-    end() {
-      if (tail !== sentinel && !(tail.startsWith(sentinel) && tail.slice(sentinel.length).trim() === ''))
-        flush(tail)
-      tail = ''
-      // An empty thinking part tells VS Code the section ended, so the next
-      // reasoning summary renders as its own block instead of being appended.
-      if (flushedSinceBoundary) {
-        emit?.('')
-        flushedSinceBoundary = false
-      }
-    },
   }
 }
 

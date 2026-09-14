@@ -222,17 +222,17 @@ describe('cLIProxyClient', () => {
 
   it.each([
     {
-      name: 'drops a trailing empty-summary sentinel',
+      name: 'preserves a trailing HTML comment',
       deltas: ['**Checking settings**\n\n<!-- -->'],
-      expected: '**Checking settings**\n\n',
+      expected: '**Checking settings**\n\n<!-- -->',
     },
     {
-      name: 'drops a sentinel split across deltas',
+      name: 'preserves an HTML comment split across deltas',
       deltas: ['**Checking settings**\n\n<!-', '- -->'],
-      expected: '**Checking settings**\n\n',
+      expected: '**Checking settings**\n\n<!-- -->',
     },
     {
-      name: 'preserves a literal sentinel in prose',
+      name: 'preserves a literal HTML comment in prose',
       deltas: ['**Plan**\n\nUse `<!-- -->` in JSX.'],
       expected: '**Plan**\n\nUse `<!-- -->` in JSX.',
     },
@@ -250,6 +250,7 @@ describe('cLIProxyClient', () => {
       .streamResponse(emptyBody, handlers, new AbortController().signal)
 
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe(expected)
+    expect(handlers.onThinking.mock.calls.flat()).toEqual([...deltas, ''])
   })
 
   it('streams full reasoning_text deltas as thinking', async () => {
@@ -269,12 +270,12 @@ describe('cLIProxyClient', () => {
     expect(handlers.onThinking.mock.calls.flat().join('')).toBe('step one step two')
   })
 
-  it('keeps consecutive reasoning headings streaming without sentinels between them', async () => {
+  it('emits only one boundary for repeated reasoning end events', async () => {
     const body = [
-      event({ type: 'response.reasoning_summary_text.delta', delta: '**First**\n\n<!-- -->' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: '**First**\n\n' }),
       event({ type: 'response.reasoning_summary_text.done' }),
       event({ type: 'response.reasoning_summary_part.done' }),
-      event({ type: 'response.reasoning_summary_text.delta', delta: '**Second**\n\n<!-- -->' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: '**Second**\n\n' }),
       event({ type: 'response.reasoning_summary_part.done' }),
       event({ type: 'response.completed' }),
     ].join('')
@@ -285,7 +286,7 @@ describe('cLIProxyClient', () => {
     await new CLIProxyClient('http://proxy', 'key')
       .streamResponse(emptyBody, handlers, new AbortController().signal)
 
-    expect(handlers.onThinking.mock.calls.flat().join('')).toBe('**First**\n\n**Second**\n\n')
+    expect(handlers.onThinking.mock.calls.flat()).toEqual(['**First**\n\n', '', '**Second**\n\n', ''])
   })
 
   it('separates reasoning sections with an empty thinking boundary', async () => {
@@ -311,9 +312,9 @@ describe('cLIProxyClient', () => {
     ])
   })
 
-  it('does not emit an empty thinking block for a sentinel-only part', async () => {
+  it('does not emit an empty thinking block for an empty part', async () => {
     const body = [
-      event({ type: 'response.reasoning_summary_text.delta', delta: '<!-- -->' }),
+      event({ type: 'response.reasoning_summary_text.delta', delta: '' }),
       event({ type: 'response.reasoning_summary_part.done' }),
       event({ type: 'response.completed' }),
     ].join('')
