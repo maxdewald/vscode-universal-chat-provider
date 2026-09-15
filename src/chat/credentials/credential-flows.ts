@@ -1,9 +1,6 @@
 import type { ModelRegistry } from '@src/chat/models/model-registry'
 import type { CredentialStore } from '@src/cliproxy/configuration/credentials'
-import type { LocalProxyConfig } from '@src/cliproxy/configuration/local-config'
-import type { OutputChannel } from 'vscode'
 import { configureConnection } from '@src/cliproxy/configuration/credentials'
-import { errorMessage } from '@src/shared/errors'
 import { window } from 'vscode'
 
 export class CredentialFlows {
@@ -13,7 +10,6 @@ export class CredentialFlows {
   constructor(
     private readonly credentials: CredentialStore,
     private readonly registry: ModelRegistry,
-    private readonly output: OutputChannel,
   ) {}
 
   markCredentialsAccepted(): void {
@@ -34,10 +30,6 @@ export class CredentialFlows {
     await this.registry.forceRefresh(true)
   }
 
-  async importConfig(): Promise<void> {
-    await this.importAndRefresh(true)
-  }
-
   async clearCredentials(): Promise<void> {
     await this.credentials.clear()
     this.registry.reset()
@@ -49,36 +41,12 @@ export class CredentialFlows {
       return
     this.onboardingShown = true
 
-    let config: LocalProxyConfig | undefined
-    try {
-      config = await this.credentials.inspectLocalConfig()
-    }
-    catch (error) {
-      this.output.appendLine(`Could not inspect CLIProxyAPI config: ${errorMessage(error)}`)
-    }
-
-    if (config?.apiKey !== undefined) {
-      const choice = await window.showInformationMessage(
-        'A local CLIProxyAPI config was found. Import its API key to load models?',
-        'Import API Key',
-        'Configure',
-      )
-      if (choice === 'Import API Key')
-        await this.importAndRefresh(true)
-      else if (choice === 'Configure')
-        await this.configure()
-      return
-    }
-
     const choice = await window.showInformationMessage(
       'CLIProxyAPI setup is incomplete. Configure a connection to load local models.',
       'Configure Connection',
-      'Retry',
     )
     if (choice === 'Configure Connection')
       await this.configure()
-    else if (choice === 'Retry')
-      await this.showOnboarding(true)
   }
 
   async showCredentialRecovery(): Promise<void> {
@@ -86,23 +54,18 @@ export class CredentialFlows {
       return
     this.credentialRecoveryShown = true
     const choice = await window.showWarningMessage(
-      'CLIProxyAPI rejected the stored API key. Re-import it from the local config or configure the connection.',
-      'Re-import API Key',
+      'CLIProxyAPI rejected the stored API key. Enter a new API key or configure the connection.',
+      'Enter API Key',
       'Configure',
     )
-    if (choice === 'Re-import API Key')
-      await this.importAndRefresh(false)
-    else if (choice === 'Configure')
+    if (choice === 'Enter API Key') {
+      if (await this.credentials.prompt() === undefined)
+        return
+      this.markCredentialsAccepted()
+      await this.registry.forceRefresh(false)
+    }
+    else if (choice === 'Configure') {
       await this.configure()
-  }
-
-  private async importAndRefresh(showSuccess: boolean): Promise<void> {
-    if (await this.credentials.importFromConfig(true) === undefined)
-      return
-
-    this.markCredentialsAccepted()
-    await this.registry.forceRefresh(false)
-    if (showSuccess)
-      void window.showInformationMessage('CLIProxyAPI API key imported and models refreshed.')
+    }
   }
 }

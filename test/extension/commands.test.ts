@@ -33,7 +33,6 @@ describe('registerCommands', () => {
     ['login', (harness: CommandHarness) => harness.controller.login],
     ['manageAccounts', (harness: CommandHarness) => harness.controller.manageAccounts],
     ['configure', (harness: CommandHarness) => harness.provider.configure],
-    ['importConfig', (harness: CommandHarness) => harness.provider.importConfig],
     ['restartServer', (harness: CommandHarness) => harness.controller.restartServer],
     ['updateBinary', (harness: CommandHarness) => harness.controller.updateBinary],
     ['resetServer', (harness: CommandHarness) => harness.controller.resetServer],
@@ -126,7 +125,7 @@ describe('manageProvider', () => {
     {
       mode: 'external',
       snapshot: { mode: 'external', status: 'external', baseUrl: 'http://127.0.0.1:8317' },
-      present: ['$(settings-gear) Configure Connection', '$(key) Import API Key from Config'],
+      present: ['$(settings-gear) Configure Connection'],
       absent: '$(debug-restart) Restart Server',
     },
   ] as const)('shows $mode actions', async ({ mode, snapshot, present, absent }) => {
@@ -140,6 +139,7 @@ describe('manageProvider', () => {
     const labels = quickPickLabels()
     expect(labels).toEqual(expect.arrayContaining([...present]))
     expect(labels).not.toContain(absent)
+    expect(labels).not.toContain('$(key) Import API Key from Config')
   })
 
   it.each([
@@ -162,7 +162,6 @@ function createCommandHarness() {
     quotaSections: vi.fn((): QuotaSection[] => []),
     forceRefresh: vi.fn(async () => [] as Array<{ id: string }>),
     configure: vi.fn(async () => {}),
-    importConfig: vi.fn(async () => {}),
     getModels: vi.fn(async () => []),
     getUtilityEffort: vi.fn(() => undefined),
     updateUtilityEffort: vi.fn(async () => {}),

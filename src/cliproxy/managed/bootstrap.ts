@@ -27,7 +27,6 @@ export interface ProvisionOptions {
   context: ExtensionContext
   output: OutputChannel
   requestedVersion: () => string
-  proxyUrl: () => string | undefined
   inspectServer: (baseUrl: string) => Promise<string | undefined | false>
   onUnexpectedExit: () => void
 }
@@ -45,7 +44,6 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
   const writeConfig = async (port: number): Promise<void> => {
     const apiKey = await ensureSecret(context, SECRET_KEY)
     managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
-    const proxyUrl = options.proxyUrl()
     const providers = await openAICompatibility.get()
     await writeFile(paths.configPath, buildManagedConfig({
       host: DEFAULT_HOST,
@@ -54,8 +52,9 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
       managementKey,
       authDir: paths.authDir,
       openAICompatibility: providers,
+      extraConfig: workspace.getConfiguration('universalChatProvider').get<string>('server.extraConfig', ''),
       requestLogging: workspace.getConfiguration('universalChatProvider').get<string>('debugLevel', 'off') === 'requestLogging',
-      ...(proxyUrl !== undefined ? { proxyUrl } : {}),
+      proxyUrl: workspace.getConfiguration('universalChatProvider').get<string>('server.proxyUrl', ''),
     }))
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)
   }

@@ -67,7 +67,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       onCredentialsRejected: () => void this.credentialFlows.showCredentialRecovery(),
       onCredentialsAccepted: () => this.credentialFlows.markCredentialsAccepted(),
     })
-    this.credentialFlows = new CredentialFlows(this.credentials, this.registry, output)
+    this.credentialFlows = new CredentialFlows(this.credentials, this.registry)
     this.cacheMetrics = new CacheMetricsTracker(context, output)
     this.disposables.push(
       this.registry.onDidChange(() => this.modelsChanged.fire()),
@@ -263,10 +263,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   async configure(): Promise<void> {
     return this.credentialFlows.configure()
-  }
-
-  async importConfig(): Promise<void> {
-    return this.credentialFlows.importConfig()
   }
 
   async clearCredentials(): Promise<void> {

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { buildManagedConfig, generateSecret, managedPaths } from '@src/cliproxy/managed/config'
+import { buildManagedConfig, generateSecret, managedPaths, parseExtraConfig } from '@src/cliproxy/managed/config'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 
@@ -62,6 +62,31 @@ describe('managed config', () => {
     const config = parse(yaml) as Record<string, unknown>
     expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
   })
+
+  it('deep merges extra YAML with unrestricted overrides and array replacement', () => {
+    const config = parse(buildManagedConfig({
+      host: '127.0.0.1',
+      port: 8317,
+      apiKey: 'proxy-key',
+      managementKey: 'mgmt-key',
+      authDir: '/tmp/store/auth',
+      extraConfig: 'port: 9000\nrouting:\n  strategy: fill-first\napi-keys: [custom-key]\nremote-management:\n  secret-key: custom-secret\nrequest-retry: 0\nproxy-url: null\ncustom: true',
+    })) as Record<string, unknown>
+    expect(config).toMatchObject({
+      'port': 9000,
+      'routing': { 'strategy': 'fill-first', 'session-affinity': true },
+      'api-keys': ['custom-key'],
+      'remote-management': { 'allow-remote': false, 'secret-key': 'custom-secret' },
+      'request-retry': 0,
+      'proxy-url': null,
+      'custom': true,
+    })
+  })
+
+  it.each(['[invalid', '- item'])(
+    'rejects invalid extra config: %s',
+    source => expect(() => parseExtraConfig(source)).toThrow('server.extraConfig'),
+  )
 
   it('generates unique random 32-byte hex secrets', () => {
     const a = generateSecret()

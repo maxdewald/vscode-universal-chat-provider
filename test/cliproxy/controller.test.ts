@@ -224,6 +224,7 @@ describe('server controller lifecycle', () => {
 
   it.each([
     'universalChatProvider.server.proxyUrl',
+    'universalChatProvider.server.extraConfig',
     'universalChatProvider.debugLevel',
   ])('prompts before restarting for a managed server change to %s', async (changedSetting) => {
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
@@ -245,6 +246,19 @@ describe('server controller lifecycle', () => {
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       'Managed CLIProxyAPI configuration changed; it will apply after the next server restart.',
     )
+    controller.dispose()
+  })
+
+  it('does not manually restart with invalid extra YAML', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    await controller.ensureReady()
+    const restart = vi.spyOn(ManagedServer.prototype, 'restart')
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', '- invalid')
+    window.showWarningMessage.mockResolvedValueOnce('Restart')
+
+    await controller.restartServer()
+
+    expect(restart).not.toHaveBeenCalled()
     controller.dispose()
   })
 
@@ -443,14 +457,11 @@ describe('server controller status snapshot', () => {
   })
 
   it.each([
-    { configured: ' external-secret ', configKey: 'config-secret', expected: 'external-secret' },
-    { configured: ' ', configKey: 'config-secret', expected: undefined },
-    { configured: '', configKey: '', expected: undefined },
-  ])('resolves the external management key with $configured and $configKey', async ({ configured, configKey, expected }) => {
-    const configPath = join(root, 'config.yaml')
-    await writeFile(configPath, JSON.stringify({ 'remote-management': { 'secret-key': configKey } }))
+    { configured: ' external-secret ', expected: 'external-secret' },
+    { configured: ' ', expected: undefined },
+    { configured: '', expected: undefined },
+  ])('resolves the external management key with $configured', async ({ configured, expected }) => {
     vscodeMock.settings.set('universalChatProvider.server.mode', 'external')
-    vscodeMock.settings.set('universalChatProvider.configPath', configPath)
     vscodeMock.settings.set('universalChatProvider.server.managementKey', configured)
     vscodeMock.secrets.set('universalChatProvider.managementKey', 'managed-secret')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)

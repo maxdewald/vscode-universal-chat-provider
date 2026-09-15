@@ -27,12 +27,13 @@ describe('managed bootstrap', () => {
       context: createExtensionContext({ globalStoragePath: root, secrets }),
       output: vscodeMock.output as never,
       requestedVersion: () => '7.2.5',
-      proxyUrl: () => undefined,
       inspectServer: async () => false,
       onUnexpectedExit: vi.fn(),
     })
     secrets.set('universalChatProvider.apiKey', 'new-api-key')
     secrets.set('universalChatProvider.managementKey', 'new-management-key')
+    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', ' http://127.0.0.1:7890 ')
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'routing:\n  strategy: fill-first\nrequest-retry: 7')
 
     const writeConfig = (state.server as unknown as { deps: { writeConfig: (port: number) => Promise<void> } }).deps.writeConfig
     await writeConfig(8317)
@@ -40,5 +41,8 @@ describe('managed bootstrap', () => {
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
     expect(config['api-keys']).toEqual(['new-api-key'])
     expect(config['remote-management']).toMatchObject({ 'secret-key': 'new-management-key' })
+    expect(config['routing']).toEqual({ 'strategy': 'fill-first', 'session-affinity': true })
+    expect(config['request-retry']).toBe(7)
+    expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
   })
 })

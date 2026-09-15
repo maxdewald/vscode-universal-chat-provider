@@ -14,7 +14,7 @@ import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import { resolveVersion } from '@src/cliproxy/managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
-import { DEFAULT_HOST, DEFAULT_PORT } from '@src/cliproxy/managed/config'
+import { DEFAULT_HOST, DEFAULT_PORT, parseExtraConfig } from '@src/cliproxy/managed/config'
 import { releaseLease, withOperationLock } from '@src/cliproxy/managed/leases'
 import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
@@ -75,6 +75,7 @@ export class ServerController implements ProxyConnection {
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
       const managedConfigChanged = event.affectsConfiguration('universalChatProvider.server.proxyUrl')
+        || event.affectsConfiguration('universalChatProvider.server.extraConfig')
         || event.affectsConfiguration('universalChatProvider.debugLevel')
       if (managedConfigChanged && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
         void this.promptForConfigRestart()
@@ -288,6 +289,7 @@ export class ServerController implements ProxyConnection {
         return
     }
     try {
+      parseExtraConfig(workspace.getConfiguration('universalChatProvider').get<string>('server.extraConfig', ''))
       await this.bootstrap()
       await this.server!.restart(reason)
       this.setStatus('running')
@@ -350,11 +352,6 @@ export class ServerController implements ProxyConnection {
     return this.updatePolicy() === 'manual' ? this.configuredVersion() : 'latest'
   }
 
-  private configuredProxyUrl(): string | undefined {
-    const proxyUrl = workspace.getConfiguration('universalChatProvider').get<string>('server.proxyUrl', '').trim()
-    return proxyUrl.length > 0 ? proxyUrl : undefined
-  }
-
   private async bootstrap(): Promise<void> {
     if (this.bootstrapPromise === undefined) {
       this.bootstrapPromise = this.doBootstrap().catch((error: unknown) => {
@@ -370,7 +367,6 @@ export class ServerController implements ProxyConnection {
       context: this.context,
       output: this.output,
       requestedVersion: () => this.requestedVersion(),
-      proxyUrl: () => this.configuredProxyUrl(),
       inspectServer: async baseUrl => this.inspectServer(baseUrl),
       onUnexpectedExit: () => this.setStatus('error'),
     })

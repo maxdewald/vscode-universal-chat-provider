@@ -1,10 +1,4 @@
-import type { LocalProxyConfig } from '@src/cliproxy/configuration/local-config'
 import type { ExtensionContext } from 'vscode'
-import { access } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { isAbsolute, join, normalize, resolve } from 'node:path'
-import { readLocalProxyConfig } from '@src/cliproxy/configuration/local-config'
-import { errorMessage } from '@src/shared/errors'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 
 export const SECRET_KEY = 'universalChatProvider.apiKey'
@@ -24,39 +18,6 @@ export class CredentialStore {
     return this.context.secrets.delete(SECRET_KEY)
   }
 
-  async inspectLocalConfig(): Promise<LocalProxyConfig | undefined> {
-    const configPath = await findConfigPath()
-    if (configPath === undefined)
-      return undefined
-    return readLocalProxyConfig(configPath)
-  }
-
-  async importFromConfig(showErrors: boolean): Promise<string | undefined> {
-    let config: LocalProxyConfig | undefined
-    try {
-      config = await this.inspectLocalConfig()
-    }
-    catch (error) {
-      if (showErrors)
-        void window.showErrorMessage(`Could not read CLIProxyAPI config: ${errorMessage(error)}`)
-      return undefined
-    }
-
-    if (config === undefined) {
-      if (showErrors)
-        void window.showWarningMessage('No CLIProxyAPI config.yaml was found. Configure its path in settings.')
-      return undefined
-    }
-    if (config.apiKey === undefined) {
-      if (showErrors)
-        void window.showWarningMessage(`No usable API key was found in ${config.path}.`)
-      return undefined
-    }
-
-    await this.set(config.apiKey)
-    return config.apiKey
-  }
-
   async prompt(): Promise<string | undefined> {
     const value = await window.showInputBox({
       title: 'CLIProxyAPI API Key',
@@ -72,34 +33,6 @@ export class CredentialStore {
   }
 }
 
-export async function findConfigPath(): Promise<string | undefined> {
-  const candidates = configCandidates()
-  for (const candidate of candidates) {
-    try {
-      await access(candidate)
-      return candidate
-    }
-    catch {}
-  }
-  return undefined
-}
-
-export function configCandidates(): string[] {
-  const settings = workspace.getConfiguration('universalChatProvider')
-  const configured = settings.get<string>('configPath', '').trim()
-  if (configured.length > 0) {
-    const expanded = configured.replace(/^~(?=$|[/\\])/, homedir())
-    return [isAbsolute(expanded) ? normalize(expanded) : resolve(expanded)]
-  }
-  return settings.get<boolean>('autoDetectConfig', true)
-    ? [
-        join(homedir(), 'cliproxyapi', 'config.yaml'),
-        join(homedir(), '.config', 'cliproxyapi', 'config.yaml'),
-        join(homedir(), '.cli-proxy-api', 'config.yaml'),
-      ]
-    : []
-}
-
 export async function configureConnection(): Promise<boolean> {
   const settings = workspace.getConfiguration('universalChatProvider')
   const baseUrl = await window.showInputBox({
@@ -113,14 +46,6 @@ export async function configureConnection(): Promise<boolean> {
     return false
   await settings.update('baseUrl', normalizeBaseUrl(baseUrl), ConfigurationTarget.Global)
 
-  const configPath = await window.showInputBox({
-    title: 'CLIProxyAPI Config Path',
-    value: settings.get<string>('configPath', ''),
-    prompt: 'Optional path to config.yaml. Leave blank to use automatic detection.',
-    ignoreFocusOut: true,
-  })
-  if (configPath !== undefined)
-    await settings.update('configPath', configPath.trim(), ConfigurationTarget.Global)
   return true
 }
 

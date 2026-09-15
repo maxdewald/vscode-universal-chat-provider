@@ -1,7 +1,8 @@
 import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
-import { stringify } from 'yaml'
+import { merge } from 'moderndash'
+import { isMap, parseDocument, stringify } from 'yaml'
 
 export const DEFAULT_PORT = 8317
 export const DEFAULT_HOST = '127.0.0.1'
@@ -45,6 +46,7 @@ export interface ManagedConfigOptions {
   openAICompatibility?: OpenAICompatibilityProvider[]
   proxyUrl?: string
   requestLogging?: boolean
+  extraConfig?: string
 }
 
 export function buildManagedConfig(options: ManagedConfigOptions): string {
@@ -73,5 +75,16 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
     config['proxy-url'] = proxyUrl
   if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
     config['openai-compatibility'] = options.openAICompatibility
-  return stringify(config)
+  return stringify(merge(config, parseExtraConfig(options.extraConfig ?? '')))
+}
+
+export function parseExtraConfig(source: string): Record<string, unknown> {
+  if (source.trim().length === 0)
+    return {}
+  const document = parseDocument(source, { stringKeys: true, prettyErrors: false })
+  if (document.errors.length > 0)
+    throw new Error(`Invalid server.extraConfig YAML: ${document.errors[0]!.message}`)
+  if (!isMap(document.contents))
+    throw new Error('server.extraConfig must contain a YAML mapping.')
+  return document.toJS() as Record<string, unknown>
 }

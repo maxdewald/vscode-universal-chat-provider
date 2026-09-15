@@ -34,7 +34,6 @@ beforeEach(() => {
   resetVSCodeMock()
   clientMocks.discover.mockReset()
   clientMocks.streamResponse.mockReset()
-  vscodeMock.settings.set('universalChatProvider.autoDetectConfig', false)
   vscodeMock.settings.set('universalChatProvider.baseUrl', 'http://proxy/')
 })
 
