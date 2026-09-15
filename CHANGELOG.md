@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.45.0...v0.45.1) (2026-09-14)
+
+
+### Refactoring
+
+* extract Codex response stream helpers and fix citations ([a46a856](https://github.com/maxdewald/vscode-universal-chat-provider/commit/a46a8561ca733d5229beefa9e9205c059a54dc78))
+
 ## [0.45.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.44.2...v0.45.0) (2026-09-14)
 
 
