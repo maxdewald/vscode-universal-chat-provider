@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.46.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.45.1...v0.46.0) (2026-09-15)
+
+
+### Features
+
+* support extra managed server configuration ([626cc4f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/626cc4f887e2ece9747778c1248469b355a254cf))
+
+
+### Bug Fixes
+
+* delegate session headers to proxy configuration ([e378d1a](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e378d1ae67793cdb0a76d710e700b323615b1eca))
+
 ## [0.45.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.45.0...v0.45.1) (2026-09-14)
 
 
