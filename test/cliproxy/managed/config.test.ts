@@ -63,6 +63,32 @@ describe('managed config', () => {
     expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
   })
 
+  it('applies session defaults to restored providers before extra config overrides', () => {
+    const providers = [
+      { 'name': 'zen', 'base-url': 'https://opencode.ai/zen/v1' },
+      { 'name': 'router', 'base-url': 'https://openrouter.ai/api/v1', 'headers': { 'X-Session-ID': '' } },
+    ]
+    const options = {
+      host: '127.0.0.1',
+      port: 8317,
+      apiKey: 'proxy-key',
+      managementKey: 'mgmt-key',
+      authDir: '/tmp/store/auth',
+      openAICompatibility: providers,
+    }
+    expect(parse(buildManagedConfig(options))).toMatchObject({
+      'openai-compatibility': [
+        { ...providers[0], headers: { 'x-opencode-session': '$CPA-SESSION-ID' } },
+        providers[1],
+      ],
+    })
+    expect(providers[0]).not.toHaveProperty('headers')
+    const extraConfig = 'openai-compatibility:\n  - name: manual\n    base-url: https://opencode.ai/zen/v1\n    headers:\n      x-opencode-session: custom-session'
+    const config = parse(buildManagedConfig({ ...options, extraConfig })) as Record<string, unknown>
+    const extra = parse(extraConfig) as Record<string, unknown>
+    expect(config['openai-compatibility']).toEqual(extra['openai-compatibility'])
+  })
+
   it('deep merges extra YAML with unrestricted overrides and array replacement', () => {
     const config = parse(buildManagedConfig({
       host: '127.0.0.1',

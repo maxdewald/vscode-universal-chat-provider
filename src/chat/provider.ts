@@ -224,7 +224,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           },
         },
         token,
-        request.prompt_cache_key,
       )
     }
     catch (error) {

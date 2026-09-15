@@ -1,6 +1,7 @@
 import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
+import { withSessionHeaderDefaults } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { merge } from 'moderndash'
 import { isMap, parseDocument, stringify } from 'yaml'
 
@@ -74,7 +75,7 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
   if (proxyUrl !== undefined && proxyUrl.length > 0)
     config['proxy-url'] = proxyUrl
   if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
-    config['openai-compatibility'] = options.openAICompatibility
+    config['openai-compatibility'] = options.openAICompatibility.map(withSessionHeaderDefaults)
   return stringify(merge(config, parseExtraConfig(options.extraConfig ?? '')))
 }
 

@@ -137,6 +137,21 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 
 ## Advanced
 
+### Session identity
+
+Session handling targets CLIProxyAPI **v7.3.3 or newer**. The extension sends a model-scoped `prompt_cache_key` derived from Copilot's conversation ID, with an opening-message fingerprint fallback. It does not also send `X-Session-ID` to the proxy.
+
+Endpoints added through the extension receive these CLIProxyAPI header defaults, matched by exact hostname:
+
+| Hostname | Upstream header | Value |
+| --- | --- | --- |
+| `opencode.ai` | `x-opencode-session` | `$CPA-SESSION-ID` |
+| `openrouter.ai` | `x-session-id` | `$CPA-SESSION-ID` |
+
+The proxy resolves `$CPA-SESSION-ID` from its session identity. Existing managed endpoints receive missing defaults when their config is regenerated. Existing headers take precedence regardless of casing, including empty values; `server.extraConfig` remains the final override. Other endpoints are unchanged.
+
+Existing external-server endpoints are not rewritten. Add the relevant mapping under that provider's `headers` in your CLIProxyAPI configuration, or re-add the endpoint through the extension. Migrate custom mappings that copy `$X-Session-ID` to `$CPA-SESSION-ID`, since the extension no longer supplies the former header. Update older pinned or external proxies before relying on this behavior. A one-time session/cache reset may occur when changing identity sources.
+
 ### Extra managed configuration
 
 Set `universalChatProvider.server.extraConfig` to a YAML mapping in the multiline settings field. For example:

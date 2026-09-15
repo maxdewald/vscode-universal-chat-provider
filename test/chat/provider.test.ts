@@ -80,7 +80,6 @@ describe('language model provider', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
@@ -101,7 +100,7 @@ describe('language model provider', () => {
     )
   })
 
-  it('forwards model-scoped cache keys as session ids across model switches and compaction', async () => {
+  it('forwards model-scoped body cache keys across model switches and compaction', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockResolvedValue(undefined)
 
@@ -119,9 +118,8 @@ describe('language model provider', () => {
     }
 
     const calls = clientMocks.streamResponse.mock.calls
-    const sessionIds = calls.map((call): unknown => call[3])
+    const sessionIds = calls.map(call => (call[0] as ProxyRequestBody).prompt_cache_key)
     expect(sessionIds).toEqual([expect.any(String), expect.any(String)])
-    expect(sessionIds).toEqual(calls.map(call => (call[0] as ProxyRequestBody).prompt_cache_key))
     expect(new Set(sessionIds).size).toBe(2)
     expect(clientMocks.streamResponse.mock.calls[1]?.[0]).toHaveProperty('model', 'model-b')
   })
@@ -140,7 +138,7 @@ describe('language model provider', () => {
       )
     }
 
-    const sessionIds = clientMocks.streamResponse.mock.calls.map((call): unknown => call[3])
+    const sessionIds = clientMocks.streamResponse.mock.calls.map(call => (call[0] as ProxyRequestBody).prompt_cache_key)
     expect(sessionIds).toEqual([expect.any(String), expect.any(String)])
     expect(new Set(sessionIds).size).toBe(2)
   })
@@ -158,7 +156,7 @@ describe('language model provider', () => {
     )
 
     expect(requestBody().prompt_cache_key).toBeUndefined()
-    expect(clientMocks.streamResponse.mock.calls[0]?.[3]).toBeUndefined()
+    expect(clientMocks.streamResponse.mock.calls[0]).toHaveLength(3)
   })
 
   it('offers hosted search for supported ordinary models without appending sources', async () => {
@@ -220,7 +218,6 @@ describe('language model provider', () => {
       expect.objectContaining({ reasoning: { effort: 'xhigh', summary: 'detailed' } }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
     expect(vscodeMock.output.appendLine).toHaveBeenCalledWith(
       '[usage] model-a: effort=xhigh input=0 cached=n/a write=0 output=1 hit=n/a raw={"output_tokens":1}',
@@ -539,7 +536,6 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
     expect(requestBody()).not.toHaveProperty('tools')
     expect(requestBody()).not.toHaveProperty('tool_choice')
@@ -560,7 +556,6 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
   })
 
@@ -585,7 +580,6 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
     expect(requestBody()).not.toHaveProperty('tools')
   })
@@ -612,7 +606,6 @@ describe('conversation compaction', () => {
       }),
       expect.any(Object),
       expect.any(AbortSignal),
-      requestBody().prompt_cache_key,
     )
     expect(requestBody()).toHaveProperty('tools')
   })

@@ -131,20 +131,26 @@ describe('cLIProxyClient', () => {
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
   })
 
-  it('reuses the supplied session id and omits the header when none is supplied', async () => {
-    const fetchMock = vi.fn(async (_request: Request) => new Response('data: [DONE]\n\n', {
-      headers: { 'content-type': 'text/event-stream' },
-    }))
+  it('preserves the body cache key without duplicating it in a session header', async () => {
+    const bodies: unknown[] = []
+    const fetchMock = vi.fn(async (request: Request) => {
+      bodies.push(await request.clone().json())
+      return new Response('data: [DONE]\n\n', {
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    })
     vi.stubGlobal('fetch', fetchMock)
     const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const client = new CLIProxyClient('http://proxy', 'key')
 
-    await client.streamResponse(emptyBody, callbacks(), new AbortController().signal, 'session-123')
-    await client.streamResponse(emptyBody, callbacks(), new AbortController().signal, 'session-123')
+    const body = { ...emptyBody, prompt_cache_key: 'session-123' }
+    await client.streamResponse(body, callbacks(), new AbortController().signal)
+    await client.streamResponse(body, callbacks(), new AbortController().signal)
     await client.streamResponse(emptyBody, callbacks(), new AbortController().signal)
 
     expect(fetchMock.mock.calls.map(([request]) => request.headers.get('x-session-id')))
-      .toEqual(['session-123', 'session-123', null])
+      .toEqual([null, null, null])
+    expect(bodies).toEqual([body, body, emptyBody])
   })
 
   it('reports hosted search progress without emitting sources or a local tool call', async () => {

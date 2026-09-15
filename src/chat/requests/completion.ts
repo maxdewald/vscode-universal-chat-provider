@@ -18,7 +18,6 @@ export async function streamCompletion(
   body: ProxyRequestBody,
   callbacks: StreamCallbacks,
   token?: CancellationToken,
-  sessionId?: string,
 ): Promise<void> {
   await deps.connection.ensureReady()
   const apiKey = await deps.credentials.get()
@@ -31,7 +30,7 @@ export async function streamCompletion(
 
   try {
     const client = new CLIProxyClient(deps.connection.baseUrl(), apiKey)
-    await client.streamResponse(body, callbacks, controller.signal, sessionId)
+    await client.streamResponse(body, callbacks, controller.signal)
   }
   catch (error) {
     if (token?.isCancellationRequested)

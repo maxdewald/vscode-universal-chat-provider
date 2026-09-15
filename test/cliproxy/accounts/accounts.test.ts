@@ -171,6 +171,7 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'opencode.ai',
         'base-url': 'https://opencode.ai/v1',
+        'headers': { 'x-opencode-session': '$CPA-SESSION-ID' },
         'api-key-entries': [{ 'api-key': 'sk-test' }],
         'models': [
           { name: 'claude-opus-4-8', alias: 'opencode.ai/claude-opus-4-8' },
@@ -208,6 +209,7 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'openrouter.ai',
         'base-url': 'https://openrouter.ai/api/v1',
+        'headers': { 'x-session-id': '$CPA-SESSION-ID' },
         'api-key-entries': [{ 'api-key': 'sk-or' }],
         'models': [
           { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },

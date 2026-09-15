@@ -218,7 +218,9 @@ describe('server controller lifecycle', () => {
     await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
-    expect(config['openai-compatibility']).toEqual(providers)
+    expect(config['openai-compatibility']).toEqual([
+      { ...providers[0], headers: { 'x-session-id': '$CPA-SESSION-ID' } },
+    ])
     controller.dispose()
   })
 

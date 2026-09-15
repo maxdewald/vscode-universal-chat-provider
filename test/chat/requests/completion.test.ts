@@ -36,16 +36,16 @@ describe('streamCompletion', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('forwards the session id to the proxy client', async () => {
+  it('forwards the body cache key to the proxy client', async () => {
     clientMocks.streamResponse.mockResolvedValueOnce(undefined)
 
-    await streamCompletion(deps('key'), emptyBody, callbacks(), undefined, 'session-123')
+    const body = { ...emptyBody, prompt_cache_key: 'session-123' }
+    await streamCompletion(deps('key'), body, callbacks())
 
     expect(clientMocks.streamResponse).toHaveBeenCalledWith(
-      emptyBody,
+      body,
       expect.any(Object),
       expect.any(AbortSignal),
-      'session-123',
     )
   })
 

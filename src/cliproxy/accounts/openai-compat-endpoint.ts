@@ -1,6 +1,7 @@
 import type { OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { Memento } from 'vscode'
 import { Type } from '@sinclair/typebox'
+import { SUPPLIER_HEADERS } from '@src/cliproxy/configuration/supplier-headers'
 import { asValue } from '@src/shared/json'
 import { kyFetch } from '@src/shared/kyFetch'
 import { isHttpUrl } from '@src/shared/url'
@@ -82,7 +83,19 @@ export function buildOpenAICompatibilityProvider(
     'api-key-entries': [{ 'api-key': draft.apiKey }],
     models,
   }
-  return provider
+  return withSessionHeaderDefaults(provider)
+}
+
+export function withSessionHeaderDefaults(provider: OpenAICompatibilityProvider): OpenAICompatibilityProvider {
+  const url = URL.parse(provider['base-url'])
+  if (url === null || !['http:', 'https:'].includes(url.protocol) || !Object.hasOwn(SUPPLIER_HEADERS, url.hostname))
+    return provider
+  const existing = new Set(Object.keys(provider.headers ?? {}).map(name => name.toLowerCase()))
+  const defaults = Object.entries(SUPPLIER_HEADERS[url.hostname] ?? {})
+    .filter(([name]) => !existing.has(name.toLowerCase()))
+  if (defaults.length === 0)
+    return provider
+  return { ...provider, headers: { ...provider.headers, ...Object.fromEntries(defaults) } }
 }
 
 const UpstreamModelsSchema = Type.Object({

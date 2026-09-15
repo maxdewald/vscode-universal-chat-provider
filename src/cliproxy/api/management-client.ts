@@ -42,6 +42,7 @@ export interface OpenAICompatibilityModel {
 export interface OpenAICompatibilityProvider {
   'name': string
   'base-url': string
+  'headers'?: Record<string, string>
   'api-key-entries'?: Array<{ 'api-key': string }>
   'models'?: OpenAICompatibilityModel[]
 }
