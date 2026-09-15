@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.46.0...v0.47.0) (2026-09-15)
+
+
+### Features
+
+* support Meta Muse ([1e0cd2c](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1e0cd2c3d7a909f7ff16c213c494ec5939dd5bf2))
+
 ## [0.46.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.45.1...v0.46.0) (2026-09-15)
 
 
