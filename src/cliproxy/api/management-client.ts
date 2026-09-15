@@ -12,6 +12,7 @@ export const LOGIN_PROVIDERS = [
   { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url', provider: 'kimi' },
   { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url', provider: 'xai' },
   { label: 'Devin', detail: 'Devin / Cognition account', endpoint: 'devin-auth-url', provider: 'devin' },
+  { label: 'Meta Muse', detail: 'Muse Code account', endpoint: 'meta-auth-url', provider: 'meta' },
 ]
 
 export interface ManagementEndpoint {
@@ -22,6 +23,7 @@ export interface ManagementEndpoint {
 export interface AuthSession {
   url: string
   state: string
+  userCode?: string
 }
 
 export type AuthStatus
@@ -78,6 +80,7 @@ const ManagementErrorSchema = Type.Object({
 const AuthUrlPayloadSchema = Type.Object({
   url: Type.Optional(Type.Unknown()),
   state: Type.Optional(Type.Unknown()),
+  user_code: Type.Optional(Type.Unknown()),
 })
 
 const AuthStatusPayloadSchema = Type.Object({
@@ -134,7 +137,8 @@ export class ManagementClient {
     const payload = asValue(AuthUrlPayloadSchema, await this.fetcher.get(`/${endpoint}?is_webui=true`, { signal: signal ?? null }).json())
     if (typeof payload?.url !== 'string' || typeof payload.state !== 'string' || payload.state.trim() === '')
       throw new Error('CLIProxyAPI returned an invalid auth URL response.')
-    return { url: payload.url, state: payload.state }
+    const userCode = typeof payload.user_code === 'string' ? payload.user_code.trim() : ''
+    return { url: payload.url, state: payload.state, ...(userCode ? { userCode } : {}) }
   }
 
   async getAuthStatus(state: string, signal?: AbortSignal): Promise<AuthStatus> {

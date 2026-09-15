@@ -77,7 +77,11 @@ export class AccountsService {
 
     const result = await window.withProgress(
       { location: ProgressLocation.Notification, cancellable: true, title: `Waiting for ${picked.provider.label} sign-in…` },
-      async (_progress, token) => this.waitForLogin(client, session, picked.provider.provider, before, token),
+      async (progress, token) => {
+        if (session.userCode !== undefined && session.userCode !== '')
+          progress.report({ message: `Enter code ${session.userCode} in your browser.` })
+        return this.waitForLogin(client, session, picked.provider.provider, before, token)
+      },
     )
 
     if (result.status === 'ok') {

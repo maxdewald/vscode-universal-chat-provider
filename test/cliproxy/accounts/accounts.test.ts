@@ -46,6 +46,13 @@ describe('accounts login completion', () => {
       before: [],
       after: [{ name: 'devin-user.json', provider: 'devin' }],
     },
+    {
+      name: 'a new Meta auth file',
+      label: 'Meta Muse',
+      endpoint: 'meta-auth-url',
+      before: [],
+      after: [{ name: 'meta-user.json', provider: 'meta' }],
+    },
   ])('completes login after $name appears', async ({ before, after, label, endpoint }) => {
     window.showQuickPick.mockImplementationOnce(async items => (items as Array<{ label: string }>).find(item => item.label === label))
     const requestAuthUrl = vi.spyOn(ManagementClient.prototype, 'requestAuthUrl')
@@ -71,6 +78,21 @@ describe('accounts login completion', () => {
     expect(window.showInformationMessage).toHaveBeenCalledWith(`${label} account connected.`)
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
     expect(window.showWarningMessage).not.toHaveBeenCalled()
+  })
+
+  it('displays the device code while waiting for authorization', async () => {
+    vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue({ url: 'https://example.com/auth', state: 'meta-state', userCode: 'ABCD-EFGH' })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'error', error: 'expired' })
+    const report = vi.fn()
+    window.withProgress.mockImplementationOnce(async (_options, task) => task({ report }, { isCancellationRequested: false }))
+    const { service } = serviceWith()
+
+    const done = service.login()
+    await vi.advanceTimersByTimeAsync(1_500)
+    await done
+
+    expect(report).toHaveBeenCalledWith({ message: 'Enter code ABCD-EFGH in your browser.' })
   })
 
   it('reports server-declared login errors without refreshing models', async () => {

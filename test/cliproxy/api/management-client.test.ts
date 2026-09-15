@@ -13,7 +13,7 @@ beforeEach(() => {
 })
 
 describe('management client', () => {
-  it.each(['codex-auth-url', 'devin-auth-url'])('requests %s with the management bearer key', async (endpoint) => {
+  it.each(['codex-auth-url', 'devin-auth-url', 'meta-auth-url'])('requests %s with the management bearer key', async (endpoint) => {
     const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({ status: 'ok', url: 'https://login', state: 'oauth-state' }))
     vi.stubGlobal('fetch', fetchMock)
     const client = createClient()
@@ -23,6 +23,16 @@ describe('management client', () => {
     expect(request.url).toBe(`http://127.0.0.1:8317/v0/management/${endpoint}?is_webui=true`)
     expect(request.method).toBe('GET')
     expect(request.headers.get('authorization')).toBe('Bearer mgmt-key')
+  })
+
+  it.each([
+    [' ABCD-EFGH ', 'ABCD-EFGH'],
+    ['', undefined],
+    [42, undefined],
+  ])('handles optional device code %s', async (userCode, expected) => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ url: 'https://login', state: 'meta-state', user_code: userCode })))
+    const session = await createClient().requestAuthUrl('meta-auth-url')
+    expect(session.userCode).toBe(expected)
   })
 
   it('rejects auth URL responses without state', async () => {
@@ -134,6 +144,7 @@ describe('management client', () => {
       'kimi-auth-url',
       'xai-auth-url',
       'devin-auth-url',
+      'meta-auth-url',
     ])
     expect(LOGIN_PROVIDERS.find(provider => provider.label === 'Anthropic Claude')?.endpoint).toBe('anthropic-auth-url')
   })

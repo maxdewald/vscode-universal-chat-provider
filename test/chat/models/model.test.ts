@@ -13,19 +13,22 @@ function mapProxyModels(
 }
 
 describe('model mapping', () => {
-  it('keeps Cognition-owned Devin models using proxy metadata without external catalogs', () => {
+  it.each([
+    ['devin/swe-2', 'cognition', 'SWE-2'],
+    ['muse-spark-1.3', 'meta', 'Muse Spark 1.3'],
+  ])('keeps %s using proxy metadata without external catalogs', (id, owner, name) => {
     const models = mapProxyModels(
-      [{ id: 'devin/swe-2', owned_by: 'cognition', context_length: 128_000, max_completion_tokens: 8192 }],
-      [{ slug: 'devin/swe-2', display_name: 'SWE-2', input_modalities: ['text', 'image'] }],
+      [{ id, owned_by: owner, context_length: 128_000, max_completion_tokens: 8192 }],
+      [{ slug: id, display_name: name, input_modalities: ['text', 'image'] }],
       new Map(),
       {},
     )
 
     expect(models).toHaveLength(1)
     expect(models[0]).toMatchObject({
-      proxyModelId: 'devin/swe-2',
-      proxyOwner: 'cognition',
-      name: 'SWE-2',
+      proxyModelId: id,
+      proxyOwner: owner,
+      name,
       maxInputTokens: 128_000,
       maxOutputTokens: 8192,
       capabilities: { imageInput: true, toolCalling: true },
