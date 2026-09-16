@@ -69,8 +69,11 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
   if (name === undefined)
     return undefined
   const provider = QUOTA_PROVIDERS[name]
-  const report = reports.find(candidate => candidate.provider === name && candidate.error === undefined)
-  return report === undefined ? undefined : provider.remaining(report, model.proxyModelId)
+  const remaining = reports
+    .filter(report => report.provider === name && report.error === undefined)
+    .map(report => provider.remaining(report, model.proxyModelId))
+    .filter((percent): percent is number => percent !== undefined)
+  return remaining.length > 0 ? Math.max(...remaining) : undefined
 }
 
 async function fetchProviderQuota(

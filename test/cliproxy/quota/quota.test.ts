@@ -452,6 +452,54 @@ describe('remainingForModel', () => {
     expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
   })
 
+  it.each([100, 10, 5, 0, undefined])('uses the best known account quota when another is empty: %s', (remainingPercent) => {
+    const accounts: QuotaReport[] = [
+      { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 0 }] },
+      { provider: 'codex', windows: remainingPercent === undefined ? [] : [{ label: '5h Quota', remainingPercent }] },
+      { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 100 }], error: 'HTTP 401' },
+      { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 100 }] },
+    ]
+    const model = { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' }
+    expect(remainingForModel(accounts, model)).toBe(remainingPercent ?? 0)
+    expect(remainingForModel(accounts.toReversed(), model)).toBe(remainingPercent ?? 0)
+  })
+
+  it('takes each account\'s tightest window before selecting the best account', () => {
+    const accounts: QuotaReport[] = [
+      { provider: 'codex', windows: [
+        { label: '5h Quota', remainingPercent: 100 },
+        { label: '7d Quota', remainingPercent: 5 },
+      ] },
+      { provider: 'codex', windows: [
+        { label: '5h Quota', remainingPercent: 10 },
+        { label: '7d Quota', remainingPercent: 100 },
+      ] },
+    ]
+    expect(remainingForModel(accounts, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(10)
+  })
+
+  it('preserves model-specific quotas across accounts', () => {
+    const accounts: QuotaReport[] = [
+      ...reports,
+      { provider: 'claude', windows: [
+        { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 20 },
+        { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 5 },
+      ] },
+      { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 60 }, 'other': { remainingPercent: 100 } } },
+    ]
+    expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-opus-4-6' })).toBe(20)
+    expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-sonnet-4-6' })).toBe(40)
+    expect(remainingForModel(accounts, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(60)
+  })
+
+  it('returns undefined when no account has known quota', () => {
+    const accounts: QuotaReport[] = [
+      { provider: 'codex', windows: [] },
+      { provider: 'codex', windows: [], error: 'HTTP 401' },
+    ]
+    expect(remainingForModel(accounts, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
+  })
+
   it('returns the tightest kimi window for any moonshot model', () => {
     expect(remainingForModel(reports, { proxyOwner: 'moonshot', proxyModelId: 'kimi-k2.5' })).toBe(22)
   })
