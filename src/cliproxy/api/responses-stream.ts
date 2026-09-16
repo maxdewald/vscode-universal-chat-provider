@@ -1,5 +1,46 @@
+import type { Static } from '@sinclair/typebox'
 import { Type } from '@sinclair/typebox'
 import { asValue } from '@src/shared/json'
+
+const ErrorObjectSchema = Type.Object({
+  message: Type.Optional(Type.String()),
+})
+
+export const StreamItemSchema = Type.Object({
+  type: Type.Optional(Type.String()),
+  status: Type.Optional(Type.String()),
+  call_id: Type.Optional(Type.String()),
+  name: Type.Optional(Type.String()),
+  arguments: Type.Optional(Type.String()),
+  id: Type.Optional(Type.String()),
+  action: Type.Optional(Type.Unknown()),
+  content: Type.Optional(Type.Array(Type.Unknown())),
+})
+
+export const StreamResponseSchema = Type.Object({
+  usage: Type.Optional(Type.Unknown()),
+  incomplete_details: Type.Optional(Type.Union([
+    Type.Null(),
+    Type.Object({ reason: Type.Optional(Type.String()) }),
+  ])),
+  error: Type.Optional(Type.Union([Type.Null(), Type.String(), ErrorObjectSchema])),
+})
+
+export const StreamEventSchema = Type.Object({
+  type: Type.Optional(Type.String()),
+  delta: Type.Optional(Type.String()),
+  item: Type.Optional(Type.Unknown()),
+  item_id: Type.Optional(Type.String()),
+  output_index: Type.Optional(Type.Unknown()),
+  content_index: Type.Optional(Type.Unknown()),
+  part: Type.Optional(Type.Unknown()),
+  response: Type.Optional(Type.Unknown()),
+  error: Type.Optional(Type.Union([Type.String(), ErrorObjectSchema])),
+  message: Type.Optional(Type.String()),
+})
+
+export type StreamItem = Static<typeof StreamItemSchema>
+export type StreamEvent = Static<typeof StreamEventSchema>
 
 const TextContentSchema = Type.Object({
   type: Type.Literal('output_text'),
@@ -7,23 +48,32 @@ const TextContentSchema = Type.Object({
   annotations: Type.Optional(Type.Array(Type.Unknown())),
 })
 
-const CitationSchema = Type.Object({
-  type: Type.Literal('url_citation'),
-  start_index: Type.Integer({ minimum: 0 }),
-  end_index: Type.Integer({ minimum: 0 }),
-  url: Type.String(),
-  title: Type.String(),
-})
-
 const WebActionSchema = Type.Record(Type.String(), Type.Unknown())
 
 const PlainObjectSchema = Type.Object({})
 
-interface ToolCallItem {
-  call_id?: string | undefined
-  name?: string | undefined
-  arguments?: string | undefined
-  status?: string | undefined
+export interface TextRenderer {
+  marker: string
+  render: (text: string, emittedUtf16Length: number, annotations: unknown[]) => string
+}
+
+export function streamKey(payload: StreamEvent, item?: StreamItem, contentIndex?: unknown): string {
+  const key = payload.item_id
+    ?? item?.id
+    ?? item?.call_id
+    ?? `output-${String(payload.output_index ?? 'unknown')}`
+  return contentIndex === undefined ? key : `${key}:${String(contentIndex)}`
+}
+
+export function streamErrorMessage(payload: StreamEvent): string {
+  const nested = asValue(StreamResponseSchema, payload.response)
+  const error = typeof payload.error === 'string'
+    ? undefined
+    : payload.error ?? (typeof nested?.error === 'string' ? undefined : nested?.error)
+  const stringError = typeof payload.error === 'string'
+    ? payload.error
+    : typeof nested?.error === 'string' ? nested.error : undefined
+  return error?.message ?? stringError ?? payload.message ?? 'CLIProxyAPI response failed.'
 }
 
 interface PendingToolCall {
@@ -33,14 +83,14 @@ interface PendingToolCall {
 }
 
 export function toolCallAssembler(emit: (callId: string, name: string, input: object) => void): {
-  add: (key: string, item: ToolCallItem) => void
+  add: (key: string, item: StreamItem) => void
   push: (key: string, delta: string) => void
-  end: (key: string, item: ToolCallItem) => void
+  end: (key: string, item: StreamItem) => void
   flush: () => void
 } {
   const pending = new Map<string, PendingToolCall>()
   const emitted = new Set<string>()
-  const create = (key: string, item: ToolCallItem): PendingToolCall => ({
+  const create = (key: string, item: StreamItem): PendingToolCall => ({
     callId: item.call_id ?? key,
     name: item.name ?? 'unknown_tool',
     arguments: item.arguments ?? '',
@@ -88,7 +138,7 @@ function parseToolInput(raw: string): object {
   }
 }
 
-export function citationTextFilter(emit: (delta: string) => void): {
+export function textPartBuffer(emit: (delta: string) => void, renderer: TextRenderer): {
   push: (key: string, delta: string) => void
   end: (key: string, value: unknown) => void
   flush: () => void
@@ -99,7 +149,7 @@ export function citationTextFilter(emit: (delta: string) => void): {
       const current = pending.get(key) ?? { text: '', emittedUtf16Length: 0 }
       current.text += delta
       pending.set(key, current)
-      const marker = current.text.indexOf('\uE200', current.emittedUtf16Length)
+      const marker = current.text.indexOf(renderer.marker, current.emittedUtf16Length)
       const end = marker < 0 ? current.text.length : marker
       if (end > current.emittedUtf16Length) {
         emit(current.text.slice(current.emittedUtf16Length, end))
@@ -113,7 +163,7 @@ export function citationTextFilter(emit: (delta: string) => void): {
       pending.delete(key)
       const content = asValue(TextContentSchema, value)
       const tail = content?.text === current.text
-        ? renderCitations(current.text, current.emittedUtf16Length, content.annotations ?? [])
+        ? renderer.render(current.text, current.emittedUtf16Length, content.annotations ?? [])
         : current.text.slice(current.emittedUtf16Length)
       if (tail.length > 0)
         emit(tail)
@@ -126,38 +176,6 @@ export function citationTextFilter(emit: (delta: string) => void): {
       pending.clear()
     },
   }
-}
-
-function renderCitations(text: string, emittedUtf16Length: number, annotations: unknown[]): string {
-  const characters = Array.from(text)
-  const replacements = new Map<number, { end: number, links: Set<string> }>()
-  for (const value of annotations) {
-    const citation = asValue(CitationSchema, value)
-    if (citation === undefined || citation.end_index > characters.length || citation.end_index <= citation.start_index)
-      continue
-    const marker = characters.slice(citation.start_index, citation.end_index).join('')
-    if (!/^\uE200cite\uE202[^\uE201]*\uE201$/.test(marker))
-      continue
-    const url = URL.parse(citation.url)
-    if (url === null || (url.protocol !== 'https:' && url.protocol !== 'http:'))
-      continue
-    const title = (citation.title.trim() || url.hostname)
-      .replace(/\s+/g, ' ')
-      .replace(/[\\`*_[\]<>]/g, '\\$&')
-    const replacement = replacements.get(citation.start_index) ?? { end: citation.end_index, links: new Set<string>() }
-    replacement.links.add(`[${title}](<${url.href}>)`)
-    replacements.set(citation.start_index, replacement)
-  }
-  let codePointOffset = Array.from(text.slice(0, emittedUtf16Length)).length
-  let result = ''
-  const orderedReplacements = [...replacements].sort(([left], [right]) => left - right)
-  for (const [start, replacement] of orderedReplacements) {
-    if (start < codePointOffset)
-      continue
-    result += characters.slice(codePointOffset, start).join('') + [...replacement.links].join(' ')
-    codePointOffset = replacement.end
-  }
-  return result + characters.slice(codePointOffset).join('')
 }
 
 export function emitWebSearchStep(

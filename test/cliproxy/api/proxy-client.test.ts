@@ -131,6 +131,115 @@ describe('cLIProxyClient', () => {
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
   })
 
+  it.each([
+    { completion: 'content part', partDone: true, itemDone: false, itemId: 'message-1' },
+    { completion: 'message item', partDone: false, itemDone: true, itemId: 'message-1' },
+    { completion: 'both events', partDone: true, itemDone: true, itemId: 'message-1' },
+    { completion: 'output index fallback', partDone: false, itemDone: true, itemId: undefined },
+  ])('renders citation markers once on $completion completion', async ({ partDone, itemDone, itemId }) => {
+    const prefix = 'Release notes. '
+    const marker = '\uE200cite\uE202turn2view2\uE201'
+    const part = {
+      type: 'output_text',
+      text: `${prefix}${marker} More details.`,
+      annotations: [{
+        type: 'url_citation',
+        start_index: prefix.length,
+        end_index: prefix.length + marker.length,
+        url: 'https://example.com/release',
+        title: 'Release notes',
+      }],
+    }
+    const location = { item_id: itemId, output_index: 0, content_index: 0 }
+    const body = [
+      event({ type: 'response.output_text.delta', ...location, delta: `${prefix}\uE200ci` }),
+      event({ type: 'response.output_text.delta', ...location, delta: 'te\uE202turn2view2\uE201 More details.' }),
+      partDone
+        ? event({ type: 'response.content_part.done', ...location, part })
+        : '',
+      itemDone
+        ? event({
+            type: 'response.output_item.done',
+            output_index: 0,
+            item: { id: itemId, type: 'message', content: [part] },
+          })
+        : '',
+      event({ type: 'response.completed', response: {} }),
+    ].join('')
+    const handlers = callbacks()
+
+    await stream(body, handlers)
+
+    expect(handlers.onText.mock.calls.flat()).toEqual([
+      prefix,
+      '[Release notes](<https://example.com/release>) More details.',
+    ])
+  })
+
+  it('keeps citation metadata scoped to its content part', async () => {
+    const marker = '\uE200cite\uE202turn2view2\uE201'
+    const location = { item_id: 'message-1', output_index: 0 }
+    const content = ['First', 'Second'].map(title => ({
+      type: 'output_text',
+      text: marker,
+      annotations: [{
+        type: 'url_citation',
+        start_index: 0,
+        end_index: marker.length,
+        url: `https://example.com/${title.toLowerCase()}`,
+        title,
+      }],
+    }))
+    const body = [
+      ...content.map((part, contentIndex) => event({
+        type: 'response.output_text.delta',
+        ...location,
+        content_index: contentIndex,
+        delta: part.text,
+      })),
+      event({
+        type: 'response.output_item.done',
+        output_index: 0,
+        item: { id: 'message-1', type: 'message', content },
+      }),
+    ].join('')
+    const handlers = callbacks()
+
+    await stream(body, handlers)
+
+    expect(handlers.onText.mock.calls.flat()).toEqual([
+      '[First](<https://example.com/first>)',
+      '[Second](<https://example.com/second>)',
+    ])
+  })
+
+  it.each([
+    ['end of stream', ''],
+    ['DONE sentinel', 'data: [DONE]\n\n'],
+    ['completed response', event({ type: 'response.completed', response: {} })],
+    ['output limit', event({ type: 'response.incomplete', response: { incomplete_details: { reason: 'max_output_tokens' } } })],
+  ])('preserves unannotated buffered text on %s', async (_name, ending) => {
+    const text = 'Answer. \uE200cite\uE202turn2view2\uE201 More details.'
+    const handlers = callbacks()
+
+    await stream(event({ type: 'response.output_text.delta', delta: text }) + ending, handlers)
+
+    expect(handlers.onText.mock.calls.flat().join('')).toBe(text)
+  })
+
+  it('preserves buffered text when the stream fails', async () => {
+    const text = 'Answer. \uE200cite\uE202turn2view2\uE201 More details.'
+    const handlers = callbacks()
+    const body = [
+      event({ type: 'response.output_text.delta', delta: text }),
+      event({ type: 'response.failed', response: { error: { message: 'generation failed' } } }),
+    ].join('')
+
+    await expect(stream(body, handlers)).rejects.toThrow('generation failed')
+
+    expect(handlers.onText.mock.calls.flat().join('')).toBe(text)
+  })
+
   it('preserves the body cache key without duplicating it in a session header', async () => {
     const bodies: unknown[] = []
     const fetchMock = vi.fn(async (request: Request) => {
