@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.47.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.47.0...v0.47.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* aggregate quota across accounts ([3f97fb2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3f97fb2612bd8ef941fb9778904530f46943b43d))
+
 ## [0.47.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.46.0...v0.47.0) (2026-09-16)
 
 
