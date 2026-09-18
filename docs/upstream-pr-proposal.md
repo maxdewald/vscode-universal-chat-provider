@@ -43,22 +43,6 @@ These are the changes worth evaluating for contribution. They should be ported a
 - **Why upstream:** Potentially useful provider support for the upstream project.
 - **Status:** Separate feature proposal, not part of the first compatibility PR. It is a large cross-cutting feature and should be discussed with upstream before implementation.
 
-## Changes Not To Push Upstream
-
-These changes are specific to the downstream distribution, local environment, or this repository's operating model.
-
-- `my-universal-chat-provider` package name, author, version history, VSIX artifacts, and marketplace identity.
-- Internal CLIProxyAPI fork selection and the `7.3.4-ucp.1` release channel.
-- Strict `*-ucp.N` binary identity rules, archive checksum sidecars, and release asset validation.
-- Downstream CLIProxyAPI fork documentation and instructions for maintaining `jerstadgeirivar-gmail/cliproxy-api`.
-- Windows and WSL profile installation automation, live IPC refresh, and local extension deployment scripts.
-- Squad installation, `.squad/` state, agent charters, workflow skills, routing, and generated coordination files.
-- Downstream-only troubleshooting guides for this local fork and its managed runtime.
-- Release workflow changes that publish this repository's private/downstream artifacts.
-- Local VSIX files, `dist/`, generated coverage, and other build artifacts.
-- Package metadata or configuration changes required only by this fork's branding or local deployment process.
-- Broad refactors or dependency churn that are not required by one of the focused upstream fixes.
-
 ## Proposed PR Shape
 
 ### Recommended first PR
