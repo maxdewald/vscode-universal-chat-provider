@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.0...v0.48.1) (2026-09-22)
+
+
+### Documentation
+
+* simplify Codex web search description ([22aba08](https://github.com/maxdewald/vscode-universal-chat-provider/commit/22aba089fa6fb11f48835979a08effd95e78770c))
+
 ## [0.48.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.47.1...v0.48.0) (2026-09-22)
 
 
