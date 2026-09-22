@@ -1,14 +1,7 @@
 ignoreWorkspaceRootCheck: true
 
-minimumReleaseAgeExcludePrune: true
-minimumReleaseAgeExclude:
-  # Babel 8.0.0 line (published 2026-06-16) pulled in by tsdown -> rolldown-plugin-dts.
-  - '@babel/*'
-
 trustPolicy: no-downgrade
 trustPolicyExclude:
-  # Required by @vscode/vsce through parse-semver@1.1.1.
-  - semver@5.7.2
   # Required by @dword-design/eslint-plugin-import-alias through @babel/core.
   - semver@6.3.1
 
