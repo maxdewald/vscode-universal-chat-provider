@@ -1,4 +1,5 @@
 ignoreWorkspaceRootCheck: true
+minimumReleaseAgeExcludePrune: true
 
 trustPolicy: no-downgrade
 trustPolicyExclude:
