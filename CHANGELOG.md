@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.48.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.47.1...v0.48.0) (2026-09-22)
+
+
+### Features
+
+* add configuration for Codex web search ([e5cd7ec](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e5cd7ec4c640d2c3c1a2e0173ae28e8fd0cbb126))
+
 ## [0.47.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.47.0...v0.47.1) (2026-09-16)
 
 
