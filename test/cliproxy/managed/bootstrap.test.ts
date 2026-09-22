@@ -32,8 +32,7 @@ describe('managed bootstrap', () => {
     })
     secrets.set('universalChatProvider.apiKey', 'new-api-key')
     secrets.set('universalChatProvider.managementKey', 'new-management-key')
-    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', ' http://127.0.0.1:7890 ')
-    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'routing:\n  strategy: fill-first\nrequest-retry: 7')
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'proxy-url: http://127.0.0.1:7890\nrouting:\n  strategy: fill-first\nrequest-retry: 7')
 
     const writeConfig = (state.server as unknown as { deps: { writeConfig: (port: number) => Promise<void> } }).deps.writeConfig
     await writeConfig(8317)

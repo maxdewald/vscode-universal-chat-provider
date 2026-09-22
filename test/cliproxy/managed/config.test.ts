@@ -49,14 +49,14 @@ describe('managed config', () => {
     })
   })
 
-  it('includes a configured proxy URL', () => {
+  it('includes a proxy URL from extra config', () => {
     const yaml = buildManagedConfig({
       host: '127.0.0.1',
       port: 8317,
       apiKey: 'proxy-key',
       managementKey: 'mgmt-key',
       authDir: '/tmp/store/auth',
-      proxyUrl: ' http://127.0.0.1:7890 ',
+      extraConfig: 'proxy-url: http://127.0.0.1:7890',
     })
 
     const config = parse(yaml) as Record<string, unknown>
@@ -109,7 +109,12 @@ describe('managed config', () => {
     })
   })
 
-  it.each(['[invalid', '- item'])(
+  it.each(['', '  ', '# proxy-url: http://127.0.0.1:7890\n# request-retry: 3'])(
+    'treats empty or commented extra config as no overrides: %s',
+    source => expect(parseExtraConfig(source)).toEqual({}),
+  )
+
+  it.each(['[invalid', '- item', 'null', 'true'])(
     'rejects invalid extra config: %s',
     source => expect(() => parseExtraConfig(source)).toThrow('server.extraConfig'),
   )

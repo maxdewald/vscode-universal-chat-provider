@@ -165,8 +165,8 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('writes the configured upstream proxy to managed config', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.proxyUrl', 'http://127.0.0.1:7890')
+  it('writes the upstream proxy from extra YAML to managed config', async () => {
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'proxy-url: http://127.0.0.1:7890')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
@@ -225,7 +225,6 @@ describe('server controller lifecycle', () => {
   })
 
   it.each([
-    'universalChatProvider.server.proxyUrl',
     'universalChatProvider.server.extraConfig',
     'universalChatProvider.debugLevel',
   ])('prompts before restarting for a managed server change to %s', async (changedSetting) => {
@@ -272,7 +271,7 @@ describe('server controller lifecycle', () => {
     window.showWarningMessage.mockResolvedValueOnce('Restart Now')
     const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
 
-    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.proxyUrl' })
+    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.extraConfig' })
 
     await vi.waitFor(() => expect(restart).toHaveBeenCalledWith('proxy configuration changed'))
     controller.dispose()

@@ -45,7 +45,6 @@ export interface ManagedConfigOptions {
   managementKey: string
   authDir: string
   openAICompatibility?: OpenAICompatibilityProvider[]
-  proxyUrl?: string
   requestLogging?: boolean
   extraConfig?: string
 }
@@ -71,9 +70,6 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
       'secret-key': options.managementKey,
     },
   }
-  const proxyUrl = options.proxyUrl?.trim()
-  if (proxyUrl !== undefined && proxyUrl.length > 0)
-    config['proxy-url'] = proxyUrl
   if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
     config['openai-compatibility'] = options.openAICompatibility.map(withSessionHeaderDefaults)
   return stringify(merge(config, parseExtraConfig(options.extraConfig ?? '')))
@@ -85,6 +81,8 @@ export function parseExtraConfig(source: string): Record<string, unknown> {
   const document = parseDocument(source, { stringKeys: true, prettyErrors: false })
   if (document.errors.length > 0)
     throw new Error(`Invalid server.extraConfig YAML: ${document.errors[0]!.message}`)
+  if (document.contents === null)
+    return {}
   if (!isMap(document.contents))
     throw new Error('server.extraConfig must contain a YAML mapping.')
   return document.toJS() as Record<string, unknown>
