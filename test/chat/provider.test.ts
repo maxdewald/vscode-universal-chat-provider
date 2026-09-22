@@ -159,20 +159,28 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse.mock.calls[0]).toHaveLength(3)
   })
 
-  it('offers hosted search for supported ordinary models without appending sources', async () => {
+  it('offers hosted search only when the setting is enabled, without appending sources', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
       callbacks.onText('Current answer')
     })
     const report = vi.fn()
-
-    await provider.provideLanguageModelChatResponse(
+    const send = async () => provider.provideLanguageModelChatResponse(
       { ...model(), supportsWebSearch: true },
       [userTextMessage('What changed?')],
       options(),
       { report },
       new CancellationTokenSource().token,
     )
+
+    await send()
+
+    expect(requestBody()).not.toHaveProperty('tools')
+
+    clientMocks.streamResponse.mockClear()
+    report.mockClear()
+    vscodeMock.settings.set('universalChatProvider.codex.webSearch', true)
+    await send()
 
     expect(requestBody()).toMatchObject({
       tools: [{ type: 'web_search' }],

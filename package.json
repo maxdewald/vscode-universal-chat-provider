@@ -224,6 +224,18 @@
       },
       {
         "type": "object",
+        "title": "Provider Specific",
+        "order": 4,
+        "properties": {
+          "universalChatProvider.codex.webSearch": {
+            "type": "boolean",
+            "default": false,
+            "description": "Use Codex's native web search, letting the model look things up online and open web pages on its own."
+          }
+        }
+      },
+      {
+        "type": "object",
         "title": "Advanced",
         "order": 5,
         "properties": {
