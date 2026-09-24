@@ -83,7 +83,7 @@ export class CLIProxyClient {
   async discover(signal?: AbortSignal): Promise<DiscoveryResult> {
     const [available, metadata] = await Promise.all([
       this.fetcher.get('/v1/models', { signal: signal ?? null }).json().then(payload => asValue(ModelsListSchema, payload)?.data ?? []),
-      this.fetcher.get('/v1/models?client_version=0.114.0', { signal: signal ?? null }).json().then(payload => asValue(ModelsMetadataSchema, payload)?.models ?? []).catch(() => []),
+      this.fetcher.get('/v1/models?client_version=0.156.1', { signal: signal ?? null }).json().then(payload => asValue(ModelsMetadataSchema, payload)?.models ?? []).catch(() => []),
     ])
     return { available, metadata }
   }
