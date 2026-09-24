@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.48.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.1...v0.48.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* report a Codex client version that keeps every reasoning effort ([#173](https://github.com/maxdewald/vscode-universal-chat-provider/issues/173)) ([ae245ad](https://github.com/maxdewald/vscode-universal-chat-provider/commit/ae245ad5a076f02bc61a92a8e65a8932c2b983a1))
+
+
+### Refactoring
+
+* add explanatory text to manged server override config ([3d919d9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3d919d9a09e3dce6fca3168c0da549bfacf9bb27))
+
 ## [0.48.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.0...v0.48.1) (2026-09-22)
 
 
