@@ -213,6 +213,35 @@ describe('cLIProxyClient', () => {
     ])
   })
 
+  it('appends deduplicated Claude search sources after the text', async () => {
+    const location = { item_id: 'message-1', output_index: 0, content_index: 0 }
+    const source = (url: string, title: string) => ({ type: 'web_search_result_location', url, title, cited_text: 'x' })
+    const body = [
+      event({ type: 'response.output_text.delta', ...location, delta: 'Node 26 is out.' }),
+      event({
+        type: 'response.content_part.done',
+        ...location,
+        part: {
+          type: 'output_text',
+          text: 'Node 26 is out.',
+          annotations: [
+            source('https://nodejs.org/blog', 'Node [Blog]'),
+            source('https://nodejs.org/blog', 'Node [Blog]'),
+            source('javascript:alert(1)', 'Bad'),
+          ],
+        },
+      }),
+    ].join('')
+    const handlers = callbacks()
+
+    await stream(body, handlers)
+
+    expect(handlers.onText.mock.calls.flat()).toEqual([
+      'Node 26 is out.',
+      '\n\n[Node \\[Blog\\]](<https://nodejs.org/blog>)',
+    ])
+  })
+
   it.each([
     ['end of stream', ''],
     ['DONE sentinel', 'data: [DONE]\n\n'],

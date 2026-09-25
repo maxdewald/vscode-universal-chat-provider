@@ -189,10 +189,13 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       : utilityRequest
         ? model.reasoningEffort
         : requestOptions.modelConfiguration?.reasoningEffort ?? targetModel.reasoningEffort
+    const webSearchSetting = targetModel.proxyOwner.toLowerCase() === 'anthropic'
+      ? 'claude.webSearch'
+      : targetModel.supportsWebSearch ? 'codex.webSearch' : undefined
     const webSearch = !utilityRequest
       && compaction === undefined
-      && targetModel.supportsWebSearch
-      && vscode.workspace.getConfiguration('universalChatProvider').get<boolean>('codex.webSearch', false)
+      && webSearchSetting !== undefined
+      && vscode.workspace.getConfiguration('universalChatProvider').get<boolean>(webSearchSetting, false)
     const request = await buildRequest(targetModel, messages, options, {
       reasoningEffort: chosenEffort,
       omitTools: compaction !== undefined,

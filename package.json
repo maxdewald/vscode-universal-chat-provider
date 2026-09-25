@@ -224,6 +224,11 @@
             "type": "boolean",
             "default": false,
             "description": "Let Codex look things up online and open web pages while it answers."
+          },
+          "universalChatProvider.claude.webSearch": {
+            "type": "boolean",
+            "default": false,
+            "description": "Let Claude look things up online while it answers."
           }
         }
       },

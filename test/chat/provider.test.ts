@@ -189,6 +189,27 @@ describe('language model provider', () => {
     expect(report).toHaveBeenCalledExactlyOnceWith(new LanguageModelTextPart('Current answer'))
   })
 
+  it('offers hosted search to Claude only through its own setting', async () => {
+    const provider = createProvider('secret')
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+    const send = async () => provider.provideLanguageModelChatResponse(
+      { ...model(), proxyOwner: 'anthropic' },
+      [userTextMessage('What changed?')],
+      options(),
+      { report: vi.fn() },
+      new CancellationTokenSource().token,
+    )
+
+    vscodeMock.settings.set('universalChatProvider.codex.webSearch', true)
+    await send()
+    expect(requestBody()).not.toHaveProperty('tools')
+
+    clientMocks.streamResponse.mockClear()
+    vscodeMock.settings.set('universalChatProvider.claude.webSearch', true)
+    await send()
+    expect(requestBody()).toMatchObject({ tools: [{ type: 'web_search' }] })
+  })
+
   it.each([
     ['unsupported model', false, 'model-a'],
     ['utility alias', true, utilityModelId('model-a', 'low')],
