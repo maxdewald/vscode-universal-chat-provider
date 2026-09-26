@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.2...v0.49.0) (2026-09-26)
+
+
+### Features
+
+* add web search for Claude models ([7f4afe4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7f4afe4f44b149fd6f733971e7bc7cff9cc8704b))
+
 ## [0.48.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.1...v0.48.2) (2026-09-24)
 
 
