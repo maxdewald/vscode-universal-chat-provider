@@ -41,6 +41,12 @@ export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, '')
 }
 
+export const MIN_CLIPROXY_VERSION = '8.0.3'
+
+export function isSupportedVersion(version: string): boolean {
+  return semver.satisfies(normalizeVersion(version), `>=${MIN_CLIPROXY_VERSION}`)
+}
+
 // ky retries transient failures (5xx/429/network) and honors Retry-After on rate limits.
 const fetcher = kyFetch.extend({
   headers: { 'User-Agent': 'universal-chat-provider-vscode' },
@@ -83,6 +89,8 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
     options.output.appendLine(`Could not resolve latest CLIProxyAPI release (${error instanceof Error ? error.message : String(error)}). Using cached CLIProxyAPI ${cachedVersion}.`)
     version = cachedVersion
   }
+  if (!isSupportedVersion(version))
+    throw new Error(`CLIProxyAPI ${version} is no longer supported. Set universalChatProvider.server.version to latest or ${MIN_CLIPROXY_VERSION}+.`)
   const asset = resolveAsset(osPlatform(), osArch(), version)
   const versionDir = join(options.binDir, version)
   const binaryPath = join(versionDir, asset.binaryName)

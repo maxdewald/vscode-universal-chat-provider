@@ -80,7 +80,7 @@ export function buildOpenAICompatibilityProvider(
   const provider: OpenAICompatibilityProvider = {
     'name': providerName,
     'base-url': draft.baseUrl,
-    'api-key-entries': [{ 'api-key': draft.apiKey }],
+    'keys': [{ 'api-key': draft.apiKey }],
     models,
   }
   return withSessionHeaderDefaults(provider)

@@ -62,7 +62,7 @@ export class AccountsService {
     let before: AuthFileRaw[]
     try {
       before = await client.listAuthFilesRaw()
-      session = await client.requestAuthUrl(picked.provider.endpoint)
+      session = await client.requestAuthUrl(picked.provider.provider)
     }
     catch (error) {
       void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}`)
@@ -215,8 +215,9 @@ export class AccountsService {
       return
     try {
       if (picked.account === 'openai-compatibility') {
-        await client.deleteOpenAICompatibility(picked.label)
-        await this.deps.persistOpenAICompatibility?.(endpoints.filter(endpoint => endpoint.name !== picked.label))
+        const remaining = endpoints.filter(endpoint => endpoint.name !== picked.label)
+        await client.putOpenAICompatibility(remaining)
+        await this.deps.persistOpenAICompatibility?.(remaining)
       }
       else {
         await client.deleteAuthFile(picked.label)

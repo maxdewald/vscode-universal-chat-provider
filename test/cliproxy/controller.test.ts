@@ -60,8 +60,8 @@ describe('server controller lifecycle', () => {
 
   it('prompts before a startup update when suggestUpdates is selected', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'suggestUpdates')
-    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.5')
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v7.2.9' })))
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('8.0.3')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.9' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
@@ -72,52 +72,69 @@ describe('server controller lifecycle', () => {
 
     const { window } = await import('../support/vscode')
     await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledWith(
-      'CLIProxyAPI 7.2.9 is available (you\'re on 7.2.5).',
+      'CLIProxyAPI 8.0.9 is available (you\'re on 8.0.3).',
       'Update',
       'Not Now',
     ))
   })
 
-  it('updates past the former cap when updates are automatic', async () => {
+  it('updates automatically when updates are automatic', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'automatic')
-    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.116')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('8.0.3')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.1.0')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.1.0' })))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
 
-    await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledWith('8.0.0'))
+    await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledWith('8.1.0'))
     expect(window.showWarningMessage).not.toHaveBeenCalled()
     controller.dispose()
   })
 
-  it('asks before updating past the former cap when suggestUpdates is selected', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'suggestUpdates')
-    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.116')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.0' })))
+  it.each(['manual', 'suggestUpdates'])('replaces an unsupported installed version without asking under %s', async (policy) => {
+    vscodeMock.settings.set('universalChatProvider.server.updatePolicy', policy)
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.3.20')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.3')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
 
-    await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledWith(
-      'CLIProxyAPI 8.0.0 is available (you\'re on 7.2.116).',
-      'Update',
-      'Not Now',
-    ))
-    expect(downloadBinary).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(downloadBinary).toHaveBeenCalledOnce())
+    expect(window.showInformationMessage).not.toHaveBeenCalledWith(expect.stringContaining('is available'), 'Update', 'Not Now')
     controller.dispose()
   })
 
   it('keeps a manually configured version', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.version', '8.0.0')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
+    vscodeMock.settings.set('universalChatProvider.server.version', '8.1.0')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.1.0')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.updateBinary()
 
-    expect(downloadBinary).toHaveBeenCalledWith('8.0.0')
+    expect(downloadBinary).toHaveBeenCalledWith('8.1.0')
+    controller.dispose()
+  })
+
+  it.each([
+    ['7.3.20', 'manual', true],
+    ['8.0.3', 'manual', false],
+    ['latest', 'manual', false],
+    ['7.3.20', 'automatic', false],
+  ])('warns when pinning %s under %s: %s', async (version, policy, warns) => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    vscodeMock.settings.set('universalChatProvider.server.updatePolicy', policy)
+    vscodeMock.settings.set('universalChatProvider.server.version', version)
+    const configurationListener = workspace.onDidChangeConfiguration.mock.calls.at(-1)?.[0]
+
+    configurationListener?.({ affectsConfiguration: section => section === 'universalChatProvider.server.version' })
+
+    expect(window.showWarningMessage).toHaveBeenCalledTimes(warns ? 1 : 0)
+    if (warns) {
+      expect(window.showWarningMessage).toHaveBeenCalledWith(
+        'CLIProxyAPI 7.3.20 is not supported. This extension requires CLIProxyAPI 8.0.3 or newer; pin a newer version or use latest.',
+      )
+    }
     controller.dispose()
   })
 
@@ -144,35 +161,35 @@ describe('server controller lifecycle', () => {
   })
 
   it('downloads binary updates without restarting the server', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.version', '8.0.0')
-    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.0.0')
+    vscodeMock.settings.set('universalChatProvider.server.version', '8.1.0')
+    const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.1.0')
     const restart = vi.spyOn(ManagedServer.prototype, 'restart')
-    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('7.2.5')
+    vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('8.0.3')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.updateBinary()
 
-    expect(downloadBinary).toHaveBeenCalledWith('8.0.0')
+    expect(downloadBinary).toHaveBeenCalledWith('8.1.0')
     expect(restart).not.toHaveBeenCalled()
     expect(window.showInformationMessage).toHaveBeenCalledWith(
-      'CLIProxyAPI 8.0.0 downloaded. It will restart automatically when no requests are active.',
+      'CLIProxyAPI 8.1.0 downloaded. It will restart automatically when no requests are active.',
     )
 
     window.showWarningMessage.mockResolvedValueOnce('Restart')
-    restart.mockResolvedValueOnce({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    restart.mockResolvedValueOnce({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.1.0' })
     await controller.restartServer()
     expect(restart).toHaveBeenCalledWith('manual command')
     controller.dispose()
   })
 
   it('writes the upstream proxy from extra YAML to managed config', async () => {
-    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'proxy-url: http://127.0.0.1:7890')
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'requests:\n  proxy-url: http://127.0.0.1:7890')
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
-    expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
+    expect(config['requests']).toEqual({ 'proxy-url': 'http://127.0.0.1:7890' })
     controller.dispose()
   })
 
@@ -183,8 +200,7 @@ describe('server controller lifecycle', () => {
     await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
-    expect(config['debug']).toBe(true)
-    expect(config['request-log']).toBe(true)
+    expect(config['observability']).toMatchObject({ logs: { 'debug': true, 'request-log': true } })
     controller.dispose()
   })
 
@@ -205,7 +221,7 @@ describe('server controller lifecycle', () => {
     const providers = [{
       'name': 'openrouter.ai',
       'base-url': 'https://openrouter.ai/api/v1',
-      'api-key-entries': [{ 'api-key': 'sk-or' }],
+      'keys': [{ 'api-key': 'sk-or' }],
       'models': [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' }],
     }]
     const secrets = new Map([[OPENAI_COMPATIBILITY_SECRET, JSON.stringify(providers)]])
@@ -218,9 +234,9 @@ describe('server controller lifecycle', () => {
     await controller.ensureReady()
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
-    expect(config['openai-compatibility']).toEqual([
-      { ...providers[0], headers: { 'x-session-id': '$CPA-SESSION-ID' } },
-    ])
+    expect(config['api-keys']).toEqual({
+      'openai-compatibility': [{ ...providers[0], headers: { 'x-session-id': '$CPA-SESSION-ID' } }],
+    })
     controller.dispose()
   })
 

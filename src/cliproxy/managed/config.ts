@@ -51,27 +51,27 @@ export interface ManagedConfigOptions {
 
 export function buildManagedConfig(options: ManagedConfigOptions): string {
   const config: Record<string, unknown> = {
-    'host': options.host,
-    'port': options.port,
-    'auth-dir': options.authDir,
-    'api-keys': [options.apiKey],
-    'debug': options.requestLogging ?? false,
-    'logging-to-file': false,
-    'request-log': options.requestLogging ?? false,
-    'request-retry': 3,
-    'max-retry-interval': 30,
-    'transient-error-cooldown-seconds': -1,
+    'config-version': 8,
+    'server': { host: options.host, port: options.port },
+    'management': { 'allow-remote': false, 'secret-key': options.managementKey },
+    'access': { 'api-keys': [options.apiKey] },
+    'oauth': { 'auth-dir': options.authDir },
     'routing': {
       'strategy': 'round-robin',
       'session-affinity': true,
+      'retry': { 'request-retry': 3, 'max-retry-interval': 30 },
+      'cooldown': { 'transient-error-cooldown-seconds': -1 },
     },
-    'remote-management': {
-      'allow-remote': false,
-      'secret-key': options.managementKey,
+    'observability': {
+      logs: {
+        'debug': options.requestLogging ?? false,
+        'logging-to-file': false,
+        'request-log': options.requestLogging ?? false,
+      },
     },
   }
   if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
-    config['openai-compatibility'] = options.openAICompatibility.map(withSessionHeaderDefaults)
+    config['api-keys'] = { 'openai-compatibility': options.openAICompatibility.map(withSessionHeaderDefaults) }
   return stringify(merge(config, parseExtraConfig(options.extraConfig ?? '')))
 }
 

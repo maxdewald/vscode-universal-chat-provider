@@ -8,6 +8,7 @@ export const OPENAI_COMPATIBILITY_SECRET = 'universalChatProvider.openAICompatib
 const ProviderSchema = Type.Object({
   'name': Type.String(),
   'base-url': Type.String(),
+  'api-key-entries': Type.Optional(Type.Array(Type.Object({ 'api-key': Type.String() }))),
 }, { additionalProperties: true })
 
 const ProvidersSchema = Type.Array(ProviderSchema)
@@ -20,7 +21,9 @@ export class OpenAICompatibilityStore {
     if (stored === undefined)
       return []
     try {
-      return asValue(ProvidersSchema, JSON.parse(stored)) ?? []
+      return (asValue(ProvidersSchema, JSON.parse(stored)) ?? []).map(({ 'api-key-entries': legacyKeys, ...provider }) =>
+        legacyKeys === undefined ? provider : { keys: legacyKeys, ...provider },
+      )
     }
     catch {
       return []

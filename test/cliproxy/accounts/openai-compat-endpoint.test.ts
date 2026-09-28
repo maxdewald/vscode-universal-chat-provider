@@ -56,7 +56,7 @@ describe('openai-compatible endpoint provider', () => {
     expect(provider).toEqual({
       'name': 'codegate.dev-3',
       'base-url': 'https://www.CodeGate.dev/v1',
-      'api-key-entries': [{ 'api-key': 'sk-test' }],
+      'keys': [{ 'api-key': 'sk-test' }],
       'models': [
         { name: 'gpt-5.5', alias: 'codegate.dev-3/gpt-5.5' },
         { name: 'custom-model', alias: 'codegate.dev-3/custom-model' },

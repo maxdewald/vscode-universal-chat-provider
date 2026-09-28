@@ -103,7 +103,7 @@ describe('acquireBinary', () => {
   })
 
   it('uses cached binary when release resolution fails (e.g. rate limit)', async () => {
-    const version = '7.2.5'
+    const version = '8.0.3'
     const asset = resolveAsset(process.platform, process.arch, version)
     const versionDir = join(binDir, version)
     await mkdir(versionDir, { recursive: true })
@@ -120,6 +120,14 @@ describe('acquireBinary', () => {
     })
 
     expect(result).toEqual({ binaryPath, version })
+  })
+
+  it.each(['7.3.20', '8.0.2'])('refuses unsupported CLIProxyAPI %s before downloading', async (version) => {
+    const fetchMock = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(acquireBinary({ binDir, requestedVersion: version, output })).rejects.toThrow(`CLIProxyAPI ${version} is no longer supported`)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('rethrows error when release resolution fails and no cached binary exists', async () => {

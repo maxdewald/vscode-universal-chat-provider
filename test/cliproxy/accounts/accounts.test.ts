@@ -11,7 +11,7 @@ describe('accounts login completion', () => {
       label: 'OpenAI Codex',
       detail: 'ChatGPT / Codex account',
       account: 'oauth',
-      provider: { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },
+      provider: { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', provider: 'codex' },
     })
     vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue({ url: 'https://example.com/auth', state: 'oauth-state' })
   })
@@ -24,7 +24,7 @@ describe('accounts login completion', () => {
     {
       name: 'a same-email auth overwrite',
       label: 'OpenAI Codex',
-      endpoint: 'codex-auth-url',
+      endpoint: 'codex',
       before: [
         { name: 'codex-user.json', provider: 'codex', email: 'same@example.com', expires_at: '2026-01-01T00:00:00Z' },
       ],
@@ -35,21 +35,21 @@ describe('accounts login completion', () => {
     {
       name: 'a new auth file',
       label: 'OpenAI Codex',
-      endpoint: 'codex-auth-url',
+      endpoint: 'codex',
       before: [],
       after: [{ name: 'codex-new.json', provider: 'codex' }],
     },
     {
       name: 'a new Devin auth file',
       label: 'Devin',
-      endpoint: 'devin-auth-url',
+      endpoint: 'devin',
       before: [],
       after: [{ name: 'devin-user.json', provider: 'devin' }],
     },
     {
       name: 'a new Meta auth file',
       label: 'Meta Muse',
-      endpoint: 'meta-auth-url',
+      endpoint: 'meta',
       before: [],
       after: [{ name: 'meta-user.json', provider: 'meta' }],
     },
@@ -174,7 +174,7 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'openrouter',
         'base-url': 'https://openrouter.ai/api/v1',
-        'api-key-entries': [{ 'api-key': 'old' }],
+        'keys': [{ 'api-key': 'old' }],
         'models': [{ name: 'x' }],
       },
     ])
@@ -187,14 +187,14 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'openrouter',
         'base-url': 'https://openrouter.ai/api/v1',
-        'api-key-entries': [{ 'api-key': 'old' }],
+        'keys': [{ 'api-key': 'old' }],
         'models': [{ name: 'x' }],
       },
       {
         'name': 'opencode.ai',
         'base-url': 'https://opencode.ai/v1',
         'headers': { 'x-opencode-session': '$CPA-SESSION-ID' },
-        'api-key-entries': [{ 'api-key': 'sk-test' }],
+        'keys': [{ 'api-key': 'sk-test' }],
         'models': [
           { name: 'claude-opus-4-8', alias: 'opencode.ai/claude-opus-4-8' },
           { name: 'gpt-5.5', alias: 'opencode.ai/gpt-5.5' },
@@ -232,7 +232,7 @@ describe('openai-compatible endpoint', () => {
         'name': 'openrouter.ai',
         'base-url': 'https://openrouter.ai/api/v1',
         'headers': { 'x-session-id': '$CPA-SESSION-ID' },
-        'api-key-entries': [{ 'api-key': 'sk-or' }],
+        'keys': [{ 'api-key': 'sk-or' }],
         'models': [
           { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
           { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
@@ -330,7 +330,7 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'codegate.dev',
         'base-url': 'https://codegate.dev/v1',
-        'api-key-entries': [{ 'api-key': 'sk-first' }],
+        'keys': [{ 'api-key': 'sk-first' }],
         'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev/claude-opus-4-8' }],
       },
     ])
@@ -342,13 +342,13 @@ describe('openai-compatible endpoint', () => {
       {
         'name': 'codegate.dev',
         'base-url': 'https://codegate.dev/v1',
-        'api-key-entries': [{ 'api-key': 'sk-first' }],
+        'keys': [{ 'api-key': 'sk-first' }],
         'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev/claude-opus-4-8' }],
       },
       {
         'name': 'codegate.dev-2',
         'base-url': 'https://codegate.dev/v1',
-        'api-key-entries': [{ 'api-key': 'sk-second' }],
+        'keys': [{ 'api-key': 'sk-second' }],
         'models': [{ name: 'claude-opus-4-8', alias: 'codegate.dev-2/claude-opus-4-8' }],
       },
     ])
@@ -361,7 +361,7 @@ describe('openai-compatible endpoint', () => {
     vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([
       { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1' },
     ])
-    const del = vi.spyOn(ManagementClient.prototype, 'deleteOpenAICompatibility').mockResolvedValue()
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
     window.showQuickPick.mockResolvedValue({
       label: 'opencode.ai',
       description: 'openai-compatibility',
@@ -373,7 +373,7 @@ describe('openai-compatible endpoint', () => {
 
     await service.manageAccounts()
 
-    expect(del).toHaveBeenCalledWith('opencode.ai')
+    expect(put).toHaveBeenCalledWith([])
     expect(persistOpenAICompatibility).toHaveBeenCalledWith([])
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
   })

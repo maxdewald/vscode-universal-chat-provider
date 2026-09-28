@@ -104,8 +104,7 @@ export class ManagedServer {
       }
       catch {}
     }
-    const pendingVersion = await this.pendingVersion()
-    const version = requestedVersion ?? pendingVersion ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
+    const version = requestedVersion ?? await this.pendingVersion() ?? this.version ?? await readInstalledVersion(this.deps.paths.binDir)
     this.startPromise = withOperationLock(this.deps.paths.operationLockPath, async () => {
       return this.restartUnlocked(signal, version ?? this.deps.requestedVersion())
     }).finally(() => {
@@ -195,7 +194,7 @@ export class ManagedServer {
 
   private async start(signal?: AbortSignal, requestedVersion: string = this.deps.requestedVersion()): Promise<RunningServer> {
     const pendingVersionPath = join(this.deps.paths.root, 'pending-version')
-    requestedVersion = await readFile(pendingVersionPath, 'utf8').then(value => value.trim() || requestedVersion, () => requestedVersion)
+    requestedVersion = await this.pendingVersion() ?? requestedVersion
     const preferred = this.deps.getPort() ?? DEFAULT_PORT
     const preferredBase = `http://${this.deps.host}:${preferred}`
     if (await isHealthy(this.deps.host, preferred, signal)) {

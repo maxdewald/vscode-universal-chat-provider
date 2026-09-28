@@ -26,22 +26,23 @@ describe('managed bootstrap', () => {
     const state = await provisionManagedState({
       context: createExtensionContext({ globalStoragePath: root, secrets }),
       output: vscodeMock.output as never,
-      requestedVersion: () => '7.2.5',
+      requestedVersion: () => '8.0.3',
       inspectServer: async () => false,
       onUnexpectedExit: vi.fn(),
     })
     secrets.set('universalChatProvider.apiKey', 'new-api-key')
     secrets.set('universalChatProvider.managementKey', 'new-management-key')
-    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'proxy-url: http://127.0.0.1:7890\nrouting:\n  strategy: fill-first\nrequest-retry: 7')
+    vscodeMock.settings.set('universalChatProvider.server.extraConfig', 'requests:\n  proxy-url: http://127.0.0.1:7890\nrouting:\n  strategy: fill-first\n  retry:\n    request-retry: 7')
 
     const writeConfig = (state.server as unknown as { deps: { writeConfig: (port: number) => Promise<void> } }).deps.writeConfig
     await writeConfig(8317)
 
     const config = parse(await readFile(managedPaths(root).configPath, 'utf8')) as Record<string, unknown>
-    expect(config['api-keys']).toEqual(['new-api-key'])
-    expect(config['remote-management']).toMatchObject({ 'secret-key': 'new-management-key' })
-    expect(config['routing']).toEqual({ 'strategy': 'fill-first', 'session-affinity': true })
-    expect(config['request-retry']).toBe(7)
-    expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
+    expect(config).toMatchObject({
+      access: { 'api-keys': ['new-api-key'] },
+      management: { 'secret-key': 'new-management-key' },
+      routing: { 'strategy': 'fill-first', 'session-affinity': true, 'retry': { 'request-retry': 7 } },
+      requests: { 'proxy-url': 'http://127.0.0.1:7890' },
+    })
   })
 })

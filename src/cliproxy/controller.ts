@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
-import { resolveVersion } from '@src/cliproxy/managed/binary'
+import { isSupportedVersion, MIN_CLIPROXY_VERSION, resolveVersion } from '@src/cliproxy/managed/binary'
 import { MGMT_KEY_SECRET, PORT_STATE_KEY, provisionManagedState, watchCredentialFiles } from '@src/cliproxy/managed/bootstrap'
 import { DEFAULT_HOST, DEFAULT_PORT, parseExtraConfig } from '@src/cliproxy/managed/config'
 import { releaseLease, withOperationLock } from '@src/cliproxy/managed/leases'
@@ -78,6 +78,8 @@ export class ServerController implements ProxyConnection {
         || event.affectsConfiguration('universalChatProvider.debugLevel')
       if (managedConfigChanged && this.mode() === 'managed' && this.server?.baseUrl() !== undefined)
         void this.promptForConfigRestart()
+      if (event.affectsConfiguration('universalChatProvider.server.version') || event.affectsConfiguration('universalChatProvider.server.updatePolicy'))
+        this.warnIfPinnedBelowMinimum()
     }))
     this.disposables.push(context.secrets.onDidChange((event) => {
       if (event.key === MGMT_KEY_SECRET)
@@ -216,12 +218,18 @@ export class ServerController implements ProxyConnection {
   }
 
   private async maybeUpdateOnStartup(): Promise<void> {
-    if (this.updateCheckStarted)
-      return
-    const policy = this.updatePolicy()
-    if (this.mode() === 'external' || policy === 'manual')
+    if (this.updateCheckStarted || this.mode() === 'external')
       return
     const installed = this.server?.installedVersion()
+    if (installed !== undefined && !isSupportedVersion(installed)) {
+      this.updateCheckStarted = true
+      this.output.appendLine(`CLIProxyAPI ${installed} is no longer supported; updating.`)
+      await this.applyBinaryUpdate(this.requestedVersion())
+      return
+    }
+    const policy = this.updatePolicy()
+    if (policy === 'manual')
+      return
     this.updateCheckStarted = true
 
     let target: string | null
@@ -335,6 +343,15 @@ export class ServerController implements ProxyConnection {
       this.server?.shutdown()
     else
       this.server?.dispose()
+  }
+
+  private warnIfPinnedBelowMinimum(): void {
+    const pinned = this.configuredVersion()
+    if (this.updatePolicy() !== 'manual' || pinned.toLowerCase() === 'latest' || isSupportedVersion(pinned))
+      return
+    void window.showWarningMessage(
+      `CLIProxyAPI ${pinned} is not supported. This extension requires CLIProxyAPI ${MIN_CLIPROXY_VERSION} or newer; pin a newer version or use latest.`,
+    )
   }
 
   private configuredVersion(): string {

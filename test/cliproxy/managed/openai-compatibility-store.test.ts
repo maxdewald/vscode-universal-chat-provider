@@ -9,13 +9,21 @@ describe('openai compatibility store', () => {
     const providers = [{
       'name': 'openrouter.ai',
       'base-url': 'https://openrouter.ai/api/v1',
-      'api-key-entries': [{ 'api-key': 'sk-or' }],
+      'keys': [{ 'api-key': 'sk-or' }],
       'models': [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5', thinking: { levels: ['high'] } }],
     }]
 
     await store.set(providers)
 
     await expect(store.get()).resolves.toEqual(providers)
+  })
+
+  it('reads providers stored with pre-v8 api-key-entries as keys', async () => {
+    const legacy = [{ 'name': 'zen', 'base-url': 'https://opencode.ai/zen/v1', 'api-key-entries': [{ 'api-key': 'sk' }] }]
+    const secrets = new Map([['universalChatProvider.openAICompatibility', JSON.stringify(legacy)]])
+    const store = new OpenAICompatibilityStore(createExtensionContext({ secrets }).secrets)
+
+    await expect(store.get()).resolves.toEqual([{ 'name': 'zen', 'base-url': 'https://opencode.ai/zen/v1', 'keys': [{ 'api-key': 'sk' }] }])
   })
 
   it('treats missing or invalid data as empty', async () => {

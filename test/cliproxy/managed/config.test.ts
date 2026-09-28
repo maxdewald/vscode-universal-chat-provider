@@ -28,23 +28,19 @@ describe('managed config', () => {
       authDir: '/tmp/store/auth',
     })
     expect(parse(yaml)).toEqual({
-      'host': '127.0.0.1',
-      'port': 8317,
-      'auth-dir': '/tmp/store/auth',
-      'api-keys': ['proxy-key'],
-      'debug': false,
-      'logging-to-file': false,
-      'request-log': false,
-      'request-retry': 3,
-      'max-retry-interval': 30,
-      'transient-error-cooldown-seconds': -1,
+      'config-version': 8,
+      'server': { host: '127.0.0.1', port: 8317 },
+      'management': { 'allow-remote': false, 'secret-key': 'mgmt-key' },
+      'access': { 'api-keys': ['proxy-key'] },
+      'oauth': { 'auth-dir': '/tmp/store/auth' },
       'routing': {
         'strategy': 'round-robin',
         'session-affinity': true,
+        'retry': { 'request-retry': 3, 'max-retry-interval': 30 },
+        'cooldown': { 'transient-error-cooldown-seconds': -1 },
       },
-      'remote-management': {
-        'allow-remote': false,
-        'secret-key': 'mgmt-key',
+      'observability': {
+        logs: { 'debug': false, 'logging-to-file': false, 'request-log': false },
       },
     })
   })
@@ -56,11 +52,10 @@ describe('managed config', () => {
       apiKey: 'proxy-key',
       managementKey: 'mgmt-key',
       authDir: '/tmp/store/auth',
-      extraConfig: 'proxy-url: http://127.0.0.1:7890',
+      extraConfig: 'requests:\n  proxy-url: http://127.0.0.1:7890',
     })
 
-    const config = parse(yaml) as Record<string, unknown>
-    expect(config['proxy-url']).toBe('http://127.0.0.1:7890')
+    expect(parse(yaml)).toMatchObject({ requests: { 'proxy-url': 'http://127.0.0.1:7890' } })
   })
 
   it('applies session defaults to restored providers before extra config overrides', () => {
@@ -77,16 +72,18 @@ describe('managed config', () => {
       openAICompatibility: providers,
     }
     expect(parse(buildManagedConfig(options))).toMatchObject({
-      'openai-compatibility': [
-        { ...providers[0], headers: { 'x-opencode-session': '$CPA-SESSION-ID' } },
-        providers[1],
-      ],
+      'api-keys': {
+        'openai-compatibility': [
+          { ...providers[0], headers: { 'x-opencode-session': '$CPA-SESSION-ID' } },
+          providers[1],
+        ],
+      },
     })
     expect(providers[0]).not.toHaveProperty('headers')
-    const extraConfig = 'openai-compatibility:\n  - name: manual\n    base-url: https://opencode.ai/zen/v1\n    headers:\n      x-opencode-session: custom-session'
+    const extraConfig = 'api-keys:\n  openai-compatibility:\n    - name: manual\n      base-url: https://opencode.ai/zen/v1\n      headers:\n        x-opencode-session: custom-session'
     const config = parse(buildManagedConfig({ ...options, extraConfig })) as Record<string, unknown>
     const extra = parse(extraConfig) as Record<string, unknown>
-    expect(config['openai-compatibility']).toEqual(extra['openai-compatibility'])
+    expect(config['api-keys']).toEqual(extra['api-keys'])
   })
 
   it('deep merges extra YAML with unrestricted overrides and array replacement', () => {
@@ -96,16 +93,15 @@ describe('managed config', () => {
       apiKey: 'proxy-key',
       managementKey: 'mgmt-key',
       authDir: '/tmp/store/auth',
-      extraConfig: 'port: 9000\nrouting:\n  strategy: fill-first\napi-keys: [custom-key]\nremote-management:\n  secret-key: custom-secret\nrequest-retry: 0\nproxy-url: null\ncustom: true',
+      extraConfig: 'server:\n  port: 9000\nrouting:\n  strategy: fill-first\n  retry:\n    request-retry: 0\naccess:\n  api-keys: [custom-key]\nmanagement:\n  secret-key: custom-secret\nrequests:\n  proxy-url: null\ncustom: true',
     })) as Record<string, unknown>
     expect(config).toMatchObject({
-      'port': 9000,
-      'routing': { 'strategy': 'fill-first', 'session-affinity': true },
-      'api-keys': ['custom-key'],
-      'remote-management': { 'allow-remote': false, 'secret-key': 'custom-secret' },
-      'request-retry': 0,
-      'proxy-url': null,
-      'custom': true,
+      server: { host: '127.0.0.1', port: 9000 },
+      routing: { 'strategy': 'fill-first', 'session-affinity': true, 'retry': { 'request-retry': 0, 'max-retry-interval': 30 } },
+      access: { 'api-keys': ['custom-key'] },
+      management: { 'allow-remote': false, 'secret-key': 'custom-secret' },
+      requests: { 'proxy-url': null },
+      custom: true,
     })
   })
 

@@ -29,7 +29,7 @@ describe('managed server lifecycle', () => {
       output: { appendLine } as unknown as OutputChannel,
       getPort: () => 8317,
       writeConfig,
-      inspectServer: async () => '7.2.5',
+      inspectServer: async () => '8.0.3',
     })
 
     await server.restart('manual command')
@@ -41,29 +41,29 @@ describe('managed server lifecycle', () => {
 
   it('uses a downloaded version queued by another window', async () => {
     const server = createServer()
-    Object.assign(server, { version: '7.2.5' })
-    const start = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    Object.assign(server, { version: '8.0.3' })
+    const start = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.1.0' })
     Object.assign(server, { start })
-    await writeFile(join(root, 'pending-version'), '8.0.0')
+    await writeFile(join(root, 'pending-version'), '8.1.0')
 
     await server.restart('manual command')
 
-    expect(start).toHaveBeenCalledWith(undefined, '8.0.0')
+    expect(start).toHaveBeenCalledWith(undefined, '8.1.0')
   })
 
   it('applies a pending update only when no request is active', async () => {
     const server = createServer()
-    const restartUnlocked = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.0.0' })
+    const restartUnlocked = vi.fn().mockResolvedValue({ baseUrl: 'http://127.0.0.1:8317', port: 8317, version: '8.1.0' })
     Object.assign(server, { restartUnlocked })
-    await writeFile(join(root, 'pending-version'), '8.0.0')
+    await writeFile(join(root, 'pending-version'), '8.1.0')
     const release = await server.acquireRequest()
 
     await expect(server.restartPendingWhenIdle()).resolves.toBeUndefined()
     expect(restartUnlocked).not.toHaveBeenCalled()
 
     release()
-    await expect(server.restartPendingWhenIdle()).resolves.toMatchObject({ version: '8.0.0' })
-    expect(restartUnlocked).toHaveBeenCalledWith(undefined, '8.0.0')
+    await expect(server.restartPendingWhenIdle()).resolves.toMatchObject({ version: '8.1.0' })
+    expect(restartUnlocked).toHaveBeenCalledWith(undefined, '8.1.0')
   })
 
   it('retries a restart twice before succeeding', async () => {
@@ -126,7 +126,7 @@ describe('managed server lifecycle', () => {
       paths: managedPaths(root),
       output: { appendLine: vi.fn() } as unknown as OutputChannel,
       host: '127.0.0.1',
-      requestedVersion: () => '7.2.5',
+      requestedVersion: () => '8.0.3',
       getPort: () => undefined,
       setPort: vi.fn(),
       writeConfig: vi.fn(),

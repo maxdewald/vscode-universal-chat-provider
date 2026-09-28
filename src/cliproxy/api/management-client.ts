@@ -6,14 +6,16 @@ import { kyFetch } from '@src/shared/kyFetch'
 import { isHTTPError } from 'ky'
 
 export const LOGIN_PROVIDERS = [
-  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', endpoint: 'codex-auth-url', provider: 'codex' },
-  { label: 'Anthropic Claude', detail: 'Claude Code account', endpoint: 'anthropic-auth-url', provider: 'claude' },
-  { label: 'Antigravity', detail: 'Antigravity account', endpoint: 'antigravity-auth-url', provider: 'antigravity' },
-  { label: 'Kimi', detail: 'Moonshot Kimi account', endpoint: 'kimi-auth-url', provider: 'kimi' },
-  { label: 'xAI Grok', detail: 'Grok Build account', endpoint: 'xai-auth-url', provider: 'xai' },
-  { label: 'Devin', detail: 'Devin / Cognition account', endpoint: 'devin-auth-url', provider: 'devin' },
-  { label: 'Meta Muse', detail: 'Muse Code account', endpoint: 'meta-auth-url', provider: 'meta' },
+  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', provider: 'codex' },
+  { label: 'Anthropic Claude', detail: 'Claude Code account', provider: 'claude' },
+  { label: 'Antigravity', detail: 'Antigravity account', provider: 'antigravity' },
+  { label: 'Kimi', detail: 'Moonshot Kimi account', provider: 'kimi' },
+  { label: 'xAI Grok', detail: 'Grok Build account', provider: 'xai' },
+  { label: 'Devin', detail: 'Devin / Cognition account', provider: 'devin' },
+  { label: 'Meta Muse', detail: 'Muse Code account', provider: 'meta' },
 ]
+
+const OPENAI_COMPATIBILITY_PATH = '/config/api-keys/openai-compatibility'
 
 export interface ManagementEndpoint {
   baseUrl: string
@@ -45,7 +47,7 @@ export interface OpenAICompatibilityProvider {
   'name': string
   'base-url': string
   'headers'?: Record<string, string>
-  'api-key-entries'?: Array<{ 'api-key': string }>
+  'keys'?: Array<{ 'api-key': string }>
   'models'?: OpenAICompatibilityModel[]
 }
 
@@ -106,9 +108,7 @@ const OpenAICompatibilityProviderSchema = Type.Object({
   'base-url': Type.String(),
 }, { additionalProperties: true })
 
-const OpenAICompatibilityPayloadSchema = Type.Object({
-  'openai-compatibility': Type.Optional(Type.Array(Type.Unknown())),
-})
+const OpenAICompatibilityPayloadSchema = Type.Array(Type.Unknown())
 
 const toManagementError: BeforeErrorHook = ({ error }) => {
   if (!isHTTPError(error))
@@ -125,7 +125,7 @@ export class ManagementClient {
     // ponytail: retry:0/timeout:false preserve the old raw-fetch behavior; ky just folds
     // away the bearer header, base path, and !ok error parsing (the beforeError hook).
     this.fetcher = kyFetch.extend({
-      prefix: `${baseUrl}/v0/management`,
+      prefix: `${baseUrl}/v8/management`,
       headers: { Authorization: `Bearer ${key}` },
       retry: 0,
       timeout: false,
@@ -133,8 +133,11 @@ export class ManagementClient {
     })
   }
 
-  async requestAuthUrl(endpoint: string, signal?: AbortSignal): Promise<AuthSession> {
-    const payload = asValue(AuthUrlPayloadSchema, await this.fetcher.get(`/${endpoint}?is_webui=true`, { signal: signal ?? null }).json())
+  async requestAuthUrl(provider: string, signal?: AbortSignal): Promise<AuthSession> {
+    const payload = asValue(
+      AuthUrlPayloadSchema,
+      await this.fetcher.get(`/oauth/auth-url?provider=${encodeURIComponent(provider)}&is_webui=true`, { signal: signal ?? null }).json(),
+    )
     if (typeof payload?.url !== 'string' || typeof payload.state !== 'string' || payload.state.trim() === '')
       throw new Error('CLIProxyAPI returned an invalid auth URL response.')
     const userCode = typeof payload.user_code === 'string' ? payload.user_code.trim() : ''
@@ -144,7 +147,7 @@ export class ManagementClient {
   async getAuthStatus(state: string, signal?: AbortSignal): Promise<AuthStatus> {
     const payload = asValue(
       AuthStatusPayloadSchema,
-      await this.fetcher.get(`/get-auth-status?state=${encodeURIComponent(state)}`, { signal: signal ?? null }).json(),
+      await this.fetcher.get(`/oauth/status?state=${encodeURIComponent(state)}`, { signal: signal ?? null }).json(),
     )
     if (payload?.status === 'wait' || payload?.status === 'ok')
       return { status: payload.status }
@@ -160,13 +163,13 @@ export class ManagementClient {
   }
 
   async cancelAuthSession(state: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.delete(`/oauth-session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
+    await this.fetcher.delete(`/oauth/session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
   }
 
   async listAuthFileModels(name: string, signal?: AbortSignal): Promise<string[]> {
     const payload = asValue(
       AuthFileModelsPayloadSchema,
-      await this.fetcher.get(`/auth-files/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
+      await this.fetcher.get(`/credentials/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
     )
     return (payload?.models ?? []).map(model => model.id)
   }
@@ -178,11 +181,11 @@ export class ManagementClient {
   }
 
   async deleteAuthFile(name: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.delete(`/auth-files?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
+    await this.fetcher.delete(`/credentials?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
   }
 
   async listAuthFilesRaw(signal?: AbortSignal): Promise<AuthFileRaw[]> {
-    const payload = asValue(AuthFilesPayloadSchema, await this.fetcher.get('/auth-files', { signal: signal ?? null }).json())
+    const payload = asValue(AuthFilesPayloadSchema, await this.fetcher.get('/credentials', { signal: signal ?? null }).json())
     return (payload?.files ?? []).flatMap((file) => {
       const entry = asValue(AuthFileRawSchema, file)
       return entry === undefined ? [] : [entry]
@@ -190,7 +193,7 @@ export class ManagementClient {
   }
 
   async serverVersion(signal?: AbortSignal): Promise<string | undefined> {
-    const response = await this.fetcher.get('/auth-files', { signal: signal ?? null })
+    const response = await this.fetcher.get('/credentials', { signal: signal ?? null })
     const version = response.headers.get('x-cpa-version')?.trim()
     return version === undefined || version === '' ? undefined : version
   }
@@ -204,7 +207,7 @@ export class ManagementClient {
     header?: Record<string, string>
     data?: string
   }, signal?: AbortSignal): Promise<{ statusCode: number, header: Record<string, string[]>, body: unknown }> {
-    const json = asValue(ApiCallResponseSchema, await this.fetcher.post('/api-call', {
+    const json = asValue(ApiCallResponseSchema, await this.fetcher.post('/requests/api-call', {
       json: payload,
       signal: signal ?? null,
       // 429/408 must reach the caller so it can honor the upstream's backoff instead of re-hitting it.
@@ -214,22 +217,20 @@ export class ManagementClient {
   }
 
   async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {
-    const payload = asValue(
-      OpenAICompatibilityPayloadSchema,
-      await this.fetcher.get('/openai-compatibility', { signal: signal ?? null }).json(),
-    )
-    return (payload?.['openai-compatibility'] ?? []).flatMap((entry) => {
+    const response = await this.fetcher.get(OPENAI_COMPATIBILITY_PATH, {
+      signal: signal ?? null,
+      throwHttpErrors: status => status !== 404,
+    })
+    if (response.status === 404)
+      return []
+    return (asValue(OpenAICompatibilityPayloadSchema, await response.json()) ?? []).flatMap((entry) => {
       const provider = asValue(OpenAICompatibilityProviderSchema, entry)
       return provider === undefined ? [] : [provider]
     })
   }
 
   async putOpenAICompatibility(providers: OpenAICompatibilityProvider[], signal?: AbortSignal): Promise<void> {
-    await this.fetcher.put('/openai-compatibility', { json: providers, signal: signal ?? null })
-  }
-
-  async deleteOpenAICompatibility(name: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.delete(`/openai-compatibility?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
+    await this.fetcher.put(OPENAI_COMPATIBILITY_PATH, { json: providers, signal: signal ?? null })
   }
 }
 
