@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.2...v1.0.0) (2026-09-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* requires CLIProxyAPI 8.0.3 or newer
+
+### Features
+
+* add web search for Claude models ([7f4afe4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7f4afe4f44b149fd6f733971e7bc7cff9cc8704b))
+* migrate to the CLIProxyAPI v8 management API and config layout ([9625d2b](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9625d2be71fe3c1cd86a04c783a18022e32fe629))
+
 ## [0.48.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.1...v0.48.2) (2026-09-24)
 
 
