@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.0.0...v1.0.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* parse Codex spend control amounts sent as strings ([e110d31](https://github.com/maxdewald/vscode-universal-chat-provider/commit/e110d31f31b4a1d310c0071826c96f3e6e89933f))
+
 ## [1.0.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v0.48.2...v1.0.0) (2026-09-28)
 
 
