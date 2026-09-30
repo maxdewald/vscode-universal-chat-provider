@@ -290,6 +290,24 @@ describe('fetchQuotas', () => {
     ])
   })
 
+  it('parses codex spend control amounts sent as strings', async () => {
+    const body = JSON.stringify({
+      rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18_000 } },
+      spend_control: {
+        reached: false,
+        individual_limit: { source: 'workspace_spend_controls', unit: 'credit', limit: '3000', used: '750.5', remaining: '2249.5' },
+      },
+    })
+    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
+
+    const report = (await fetchQuotas(client))[0]!
+
+    expect(report.windows).toEqual([
+      { label: '5h Quota', remainingPercent: 100 },
+      { key: 'credits', label: 'Credits', remainingPercent: expect.closeTo(74.98, 2) },
+    ])
+  })
+
   it('keeps codex windows when the optional sections arrive as null', async () => {
     const body = JSON.stringify({
       rate_limit: {

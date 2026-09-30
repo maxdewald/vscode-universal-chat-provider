@@ -25,13 +25,16 @@ const AdditionalLimitSchema = Type.Object({
   rate_limit: Nullable(RateLimitSchema),
 })
 
+// Spend amounts arrive as decimal strings ("3000", "28094.62"); older payloads used numbers.
+const AmountSchema = Nullable(Type.Union([Type.String(), Type.Number()]))
+
 const BodySchema = Type.Object({
   rate_limit: Nullable(RateLimitSchema),
   additional_rate_limits: Nullable(Type.Array(Type.Unknown())),
   spend_control: Nullable(Type.Object({
     individual_limit: Nullable(Type.Object({
-      limit: Nullable(Type.Number()),
-      used: Nullable(Type.Number()),
+      limit: AmountSchema,
+      used: AmountSchema,
     })),
   })),
 })
@@ -63,10 +66,17 @@ function parseWindows(data: unknown): QuotaWindow[] {
   // Reported as a used/limit pair in an unspecified unit, so report the ratio rather than
   // guessing whether the amounts are cents or dollars.
   const individual = body.spend_control?.individual_limit
-  const creditsUsed = percentOf(individual?.used ?? 0, individual?.limit ?? undefined)
+  const creditsUsed = percentOf(amount(individual?.used) ?? 0, amount(individual?.limit))
   if (creditsUsed !== undefined)
     windows.push({ key: 'credits', label: 'Credits', remainingPercent: clamp(100 - creditsUsed, 0, 100) })
   return windows
+}
+
+function amount(value: string | number | null | undefined): number | undefined {
+  if (value == null)
+    return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 function rateWindows(rateLimit: Static<typeof RateLimitSchema> | null | undefined): QuotaWindow[] {
