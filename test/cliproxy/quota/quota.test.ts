@@ -304,7 +304,7 @@ describe('fetchQuotas', () => {
 
     expect(report.windows).toEqual([
       { label: '5h Quota', remainingPercent: 100 },
-      { key: 'credits', label: 'Credits', remainingPercent: expect.closeTo(74.98, 2) },
+      { key: 'credits', label: 'Credits', remainingPercent: expect.closeTo(74.98, 2) as number },
     ])
   })
 
