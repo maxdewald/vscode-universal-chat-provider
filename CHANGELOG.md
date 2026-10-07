@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.0.1...v1.1.0) (2026-10-07)
+
+
+### Features
+
+* add Claude limit reset redemption in quota menu ([67baa64](https://github.com/maxdewald/vscode-universal-chat-provider/commit/67baa64a86a92c1ec69c01bbab824c3b8b3f2681))
+
 ## [1.0.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.0.0...v1.0.1) (2026-09-30)
 
 
