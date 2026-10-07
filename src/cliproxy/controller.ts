@@ -3,7 +3,8 @@ import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { ManagedPaths } from '@src/cliproxy/managed/config'
 import type { ManagedServer, RestartReason } from '@src/cliproxy/managed/server'
 import type { UpdatePolicy } from '@src/cliproxy/managed/update-policy'
-import type { CodexResetOption, CodexResetOutcome } from '@src/cliproxy/quota/codex-resets'
+import type { ClaudeResetOption } from '@src/cliproxy/quota/claude-resets'
+import type { CodexResetOption, ResetOutcome } from '@src/cliproxy/quota/codex-resets'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import type { ServerMode, ServerStatus, ServerStatusSnapshot } from '@src/cliproxy/status'
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
@@ -20,6 +21,7 @@ import { LogTailer } from '@src/cliproxy/managed/log-tailer'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
 import { maintainRequestLogs } from '@src/cliproxy/managed/request-log-maintenance'
 import { pickUpdate } from '@src/cliproxy/managed/update-policy'
+import { claimClaudeReset, listClaudeResets } from '@src/cliproxy/quota/claude-resets'
 import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
 import { fetchQuotas, quotaProviderForModel } from '@src/cliproxy/quota/quota'
 import { countAccounts } from '@src/cliproxy/status'
@@ -172,17 +174,37 @@ export class ServerController implements ProxyConnection {
   }
 
   async listCodexResets(): Promise<CodexResetOption[]> {
+    return this.listResets(listCodexResets)
+  }
+
+  async claimCodexReset(option: CodexResetOption, redeemRequestId: string): Promise<ResetOutcome> {
+    return this.claimReset(claimCodexReset, option, redeemRequestId)
+  }
+
+  async listClaudeResets(): Promise<ClaudeResetOption[]> {
+    return this.listResets(listClaudeResets)
+  }
+
+  async claimClaudeReset(option: ClaudeResetOption, requestId: string): Promise<ResetOutcome> {
+    return this.claimReset(claimClaudeReset, option, requestId)
+  }
+
+  private async listResets<T>(list: (client: ManagementClient) => Promise<T[]>): Promise<T[]> {
     const management = await this.resolveManagement(false)
     if (management === undefined)
       return []
-    return listCodexResets(new ManagementClient(management.baseUrl, management.key))
+    return list(new ManagementClient(management.baseUrl, management.key))
   }
 
-  async claimCodexReset(option: CodexResetOption, redeemRequestId: string): Promise<CodexResetOutcome> {
+  private async claimReset<T>(
+    claim: (client: ManagementClient, option: T, requestId: string) => Promise<ResetOutcome>,
+    option: T,
+    requestId: string,
+  ): Promise<ResetOutcome> {
     const management = await this.resolveManagement(false)
     if (management === undefined)
       return 'failed'
-    const outcome = await claimCodexReset(new ManagementClient(management.baseUrl, management.key), option, redeemRequestId)
+    const outcome = await claim(new ManagementClient(management.baseUrl, management.key), option, requestId)
     if (outcome !== 'failed')
       await this.refreshQuotas()
     return outcome

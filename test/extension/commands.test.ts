@@ -64,6 +64,7 @@ describe('registerCommands', () => {
 
     expect(controller.refreshQuotas).toHaveBeenCalledTimes(1)
     expect(controller.listCodexResets).toHaveBeenCalledTimes(1)
+    expect(controller.listClaudeResets).toHaveBeenCalledTimes(1)
     expect(window.showQuickPick.mock.calls[0]?.[0]).toEqual([
       expect.objectContaining({ label: 'Codex · 5h Quota — 75% left' }),
     ])
@@ -175,6 +176,8 @@ function createCommandHarness() {
     refreshQuotas: vi.fn(async () => {}),
     listCodexResets: vi.fn(async () => []),
     claimCodexReset: vi.fn(async () => 'failed' as const),
+    listClaudeResets: vi.fn(async () => []),
+    claimClaudeReset: vi.fn(async () => 'failed' as const),
     restartServer: vi.fn(async () => {}),
     updateBinary: vi.fn(async () => {}),
     resetServer: vi.fn(async () => {}),

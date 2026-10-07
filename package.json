@@ -64,7 +64,7 @@
       },
       {
         "command": "universalChatProvider.showQuota",
-        "title": "Universal Chat Provider: Show Quota"
+        "title": "Universal Chat Provider: Show Quota & Resets"
       },
       {
         "command": "universalChatProvider.restartServer",

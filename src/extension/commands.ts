@@ -29,8 +29,8 @@ export function registerCommands(
         controller,
       ),
       group: 0,
-      label: '$(pulse) Show Quota Usage',
-      description: 'Remaining quota for Codex and Antigravity accounts',
+      label: '$(pulse) Show Quota & Resets',
+      description: 'Remaining quota and limit resets for your accounts',
     },
     { command: 'universalChatProvider.refresh', run: async () => {
       const models = await provider.forceRefresh(true)

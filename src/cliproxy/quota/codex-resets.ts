@@ -13,7 +13,7 @@ export interface CodexResetOption {
   hasRemainingUsage?: boolean
 }
 
-export type CodexResetOutcome = 'success' | 'nothingToReset' | 'noCredit' | 'failed'
+export type ResetOutcome = 'success' | 'nothingToReset' | 'noCredit' | 'failed'
 
 const CreditSchema = Type.Object({
   status: Type.Optional(Type.String()),
@@ -108,7 +108,7 @@ export async function claimCodexReset(
   option: CodexResetOption,
   redeemRequestId: string,
   signal?: AbortSignal,
-): Promise<CodexResetOutcome> {
+): Promise<ResetOutcome> {
   try {
     const response = await client.apiCall({
       auth_index: option.account.authIndex,
@@ -133,18 +133,23 @@ export async function claimCodexReset(
   }
 }
 
-function toCodexAccount(entry: AuthFileRaw): Array<CodexResetOption['account']> {
-  if ((entry.provider ?? entry.type ?? '').trim().toLowerCase() !== 'codex')
+export function authAccount(entry: AuthFileRaw, provider: string, fallbackLabel: string): Array<{ authIndex: string, label: string }> {
+  if ((entry.provider ?? entry.type ?? '').trim().toLowerCase() !== provider)
     return []
   const authIndex = entry.auth_index?.trim() ?? ''
   if (authIndex === '')
     return []
-  const label = entry.email?.trim() ?? entry.label?.trim() ?? entry.name?.trim() ?? 'Codex account'
-  const accountId = entry.chatgpt_account_id?.trim()
-    ?? entry.account_id?.trim()
-    ?? entry.id_token?.chatgpt_account_id?.trim()
-    ?? ''
-  return [{ authIndex, label, ...(accountId === '' ? {} : { accountId }) }]
+  return [{ authIndex, label: entry.email?.trim() ?? entry.label?.trim() ?? entry.name?.trim() ?? fallbackLabel }]
+}
+
+function toCodexAccount(entry: AuthFileRaw): Array<CodexResetOption['account']> {
+  return authAccount(entry, 'codex', 'Codex account').map((account) => {
+    const accountId = entry.chatgpt_account_id?.trim()
+      ?? entry.account_id?.trim()
+      ?? entry.id_token?.chatgpt_account_id?.trim()
+      ?? ''
+    return { ...account, ...(accountId === '' ? {} : { accountId }) }
+  })
 }
 
 function headers(account: CodexResetOption['account']): Record<string, string> {

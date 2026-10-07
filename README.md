@@ -122,7 +122,7 @@ The extension runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) l
 | `universalChatProvider.manage`           | Universal Chat Provider: Manage Provider                                             |
 | `universalChatProvider.login`            | Universal Chat Provider: Add Account (Login)                                         |
 | `universalChatProvider.manageAccounts`   | Universal Chat Provider: Manage Accounts                                             |
-| `universalChatProvider.showQuota`        | Universal Chat Provider: Show Quota                                                  |
+| `universalChatProvider.showQuota`        | Universal Chat Provider: Show Quota &amp; Resets                                     |
 | `universalChatProvider.restartServer`    | Universal Chat Provider: Restart Managed Server                                      |
 | `universalChatProvider.updateBinary`     | Universal Chat Provider: Update Proxy Binary                                         |
 | `universalChatProvider.resetServer`      | Universal Chat Provider: Reset Managed Server                                        |

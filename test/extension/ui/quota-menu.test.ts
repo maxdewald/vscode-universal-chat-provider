@@ -1,5 +1,6 @@
+import type { ClaudeResetOption } from '@src/cliproxy/quota/claude-resets'
 import type { CodexResetOption } from '@src/cliproxy/quota/codex-resets'
-import type { QuotaSection } from '@src/extension/ui/quota-menu'
+import type { QuotaSection, ResetActions } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
 import { showQuotaMenu } from '@src/extension/ui/quota-menu'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,8 +21,18 @@ function source(sections: QuotaSection[]): () => QuotaSection[] {
   return () => sections
 }
 
-function shownItems(call = 0): Array<QuickPickItem & { reset?: CodexResetOption }> {
-  return window.showQuickPick.mock.calls[call]?.[0] as Array<QuickPickItem & { reset?: CodexResetOption }>
+function actions(overrides: Partial<ResetActions>): ResetActions {
+  return {
+    listCodexResets: async () => [],
+    claimCodexReset: vi.fn(),
+    listClaudeResets: async () => [],
+    claimClaudeReset: vi.fn(),
+    ...overrides,
+  }
+}
+
+function shownItems(call = 0): Array<QuickPickItem & { reset?: unknown }> {
+  return window.showQuickPick.mock.calls[call]?.[0] as Array<QuickPickItem & { reset?: unknown }>
 }
 
 function chooseReset(times = 1): void {
@@ -29,7 +40,7 @@ function chooseReset(times = 1): void {
   window.showQuickPick.mockImplementation(async (items) => {
     if (remaining-- <= 0)
       return undefined
-    return (items as Array<QuickPickItem & { reset?: CodexResetOption }>).find(item => item.reset !== undefined)
+    return (items as Array<QuickPickItem & { reset?: unknown }>).find(item => item.reset !== undefined)
   })
 }
 
@@ -82,14 +93,13 @@ describe('showQuotaMenu', () => {
   })
 
   it('shows one reset row per eligible account', async () => {
-    await showQuotaMenu(source([]), async () => {}, {
+    await showQuotaMenu(source([]), async () => {}, actions({
       listCodexResets: async () => [RESET, {
         account: { authIndex: 'codex-2', label: 'two@example.com' },
         credit: { id: 'credit-2' },
         availableCount: 1,
       }],
-      claimCodexReset: vi.fn(),
-    })
+    }))
 
     expect(shownItems().map(item => item.label)).toEqual([
       'Codex · one@example.com — 2 resets available',
@@ -106,7 +116,7 @@ describe('showQuotaMenu', () => {
     chooseReset()
     window.showWarningMessage.mockResolvedValueOnce(undefined)
 
-    await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [RESET], claimCodexReset: claim })
+    await showQuotaMenu(source([]), async () => {}, actions({ listCodexResets: async () => [RESET], claimCodexReset: claim }))
 
     expect(window.showWarningMessage).toHaveBeenCalledWith(expect.stringContaining('consumes one reset credit'), { modal: true }, 'Use Reset')
     expect(claim).not.toHaveBeenCalled()
@@ -117,7 +127,7 @@ describe('showQuotaMenu', () => {
     chooseReset()
     window.showWarningMessage.mockResolvedValueOnce(undefined)
 
-    await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [option], claimCodexReset: vi.fn() })
+    await showQuotaMenu(source([]), async () => {}, actions({ listCodexResets: async () => [option] }))
 
     expect(window.showWarningMessage).toHaveBeenCalledWith(
       'WARNING: one@example.com still has usage remaining. Using a reset now discards that remaining usage and consumes one reset credit. This cannot be undone.',
@@ -132,7 +142,7 @@ describe('showQuotaMenu', () => {
     chooseReset()
     window.showWarningMessage.mockResolvedValueOnce('Use Reset')
 
-    await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 100 }] }]), async () => {}, { listCodexResets: list, claimCodexReset: claim })
+    await showQuotaMenu(source([{ title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 100 }] }]), async () => {}, actions({ listCodexResets: list, claimCodexReset: claim }))
 
     expect(claim).toHaveBeenCalledWith(RESET, expect.any(String))
     expect(list).toHaveBeenCalledTimes(2)
@@ -145,9 +155,30 @@ describe('showQuotaMenu', () => {
     chooseReset(2)
     window.showWarningMessage.mockResolvedValue('Use Reset')
 
-    await showQuotaMenu(source([]), async () => {}, { listCodexResets: async () => [RESET], claimCodexReset: claim })
+    await showQuotaMenu(source([]), async () => {}, actions({ listCodexResets: async () => [RESET], claimCodexReset: claim }))
 
     expect(claim).toHaveBeenCalledTimes(2)
     expect(claim.mock.calls[0]![1]).toBe(claim.mock.calls[1]![1])
+  })
+
+  it('adds Claude resets to the Claude group and keeps blocked ones unselectable', async () => {
+    const usable = { account: { authIndex: 'claude-1', label: 'a@example.com' }, credit: { id: 'g1' }, availableCount: 1 } satisfies ClaudeResetOption
+    const blocked = { ...usable, account: { authIndex: 'claude-2', label: 'b@example.com' }, blocker: 'Usable once you hit a usage limit' }
+    const claim = vi.fn(async () => 'success' as const)
+    chooseReset()
+    window.showWarningMessage.mockResolvedValueOnce('Use Reset')
+
+    await showQuotaMenu(source([{ title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 0 }] }]), async () => {}, actions({
+      listClaudeResets: async () => [usable, blocked],
+      claimClaudeReset: claim,
+    }))
+
+    expect(shownItems().map(item => [item.label, item.description, item.reset !== undefined])).toEqual([
+      ['Claude · 5h Quota — 0% left', undefined, false],
+      ['Claude · a@example.com — 1 reset available', 'Next reset does not expire', true],
+      ['Claude · b@example.com — 1 reset available', 'Usable once you hit a usage limit', false],
+    ])
+    expect(claim).toHaveBeenCalledWith(usable, expect.any(String))
+    expect(window.showInformationMessage).toHaveBeenCalledWith('Claude usage reset for a@example.com.')
   })
 })
