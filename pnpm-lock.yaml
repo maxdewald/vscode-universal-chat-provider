@@ -220,7 +220,7 @@ importers:
         version: 7.8.5
       tokenx:
         specifier: ^2.0.0
-        version: 2.1.0
+        version: 2.1.1
       yaml:
         specifier: ^2.9.0
         version: 2.9.1
@@ -2976,8 +2976,8 @@ packages:
     resolution: {integrity: sha512-dRXchy+C0IgK8WPC6xvCHFRIWYUbqqdEIKPaKo/AcTUNzwLTK6AH7RjdLWsEZcAN/TBdtfUw3PYEgPr5VPr6ww==}
     engines: {node: '>=14.16'}
 
-  tokenx@2.1.0:
-    resolution: {integrity: sha512-iHhqfDuFFbMWHGfjEnVALgatV10KqcO5W5Fl99fYJmFjhE57JXPdnFrDlp6BTFIMmbbazsCg/lZYpJ2mPsPeQQ==}
+  tokenx@2.1.1:
+    resolution: {integrity: sha512-bzQX+Exzr+wF6eFfGkN5G6VDUY3v7BbceMsmWG5q2QqHFsU7UKt7HGl4g63HQLHubdYeU+B1mlU/d6Wax0oJaQ==}
     hasBin: true
 
   toml-eslint-parser@1.0.3:
@@ -6122,7 +6122,7 @@ snapshots:
       '@tokenizer/token': 0.3.0
       ieee754: 1.2.1
 
-  tokenx@2.1.0: {}
+  tokenx@2.1.1: {}
 
   toml-eslint-parser@1.0.3:
     dependencies:
