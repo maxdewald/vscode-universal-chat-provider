@@ -350,30 +350,30 @@ describe('server controller lifecycle', () => {
     vi.spyOn(controller as unknown as { managementForStatus: () => Promise<{ baseUrl: string, key: string }> }, 'managementForStatus')
       .mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', key: 'secret' })
     vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([
-      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
-      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1', supports_quota: true },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1', supports_quota: true },
     ])
-    const apiCall = vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
-      statusCode: 200,
-      header: {},
-      body: JSON.stringify({ rate_limit: {} }),
-    })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFileModelInfo').mockImplementation(async name => [{ id: name === 'codex.json' ? 'gpt-6' : 'claude-opus-5' }])
+    const fetchQuota = vi.spyOn(ManagementClient.prototype, 'fetchCredentialQuota').mockResolvedValue({ groups: [] })
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(1))
-    expect(apiCall.mock.calls[0]?.[0].url).toContain('wham/usage')
+    await controller.refreshQuotas()
+    expect(fetchQuota).toHaveBeenCalledTimes(2)
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
+    controller.scheduleQuotaRefresh({ proxyModelId: 'gpt-6' })
+    await vi.waitFor(() => expect(fetchQuota).toHaveBeenCalledTimes(3))
+    expect(fetchQuota.mock.calls[2]?.[0]).toBe('c1')
+
+    controller.scheduleQuotaRefresh({ proxyModelId: 'gpt-6' })
     await Promise.resolve()
-    expect(apiCall).toHaveBeenCalledTimes(1)
+    expect(fetchQuota).toHaveBeenCalledTimes(3)
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'anthropic' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(2))
-    expect(apiCall.mock.calls[1]?.[0].url).toContain('oauth/usage')
+    controller.scheduleQuotaRefresh({ proxyModelId: 'claude-opus-5' })
+    await vi.waitFor(() => expect(fetchQuota).toHaveBeenCalledTimes(4))
+    expect(fetchQuota.mock.calls[3]?.[0]).toBe('a1')
 
     await vi.advanceTimersByTimeAsync(180_000)
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(3))
+    controller.scheduleQuotaRefresh({ proxyModelId: 'gpt-6' })
+    await vi.waitFor(() => expect(fetchQuota).toHaveBeenCalledTimes(5))
     controller.dispose()
   })
 
@@ -384,14 +384,11 @@ describe('server controller lifecycle', () => {
     vi.spyOn(controller as unknown as { managementForStatus: () => Promise<{ baseUrl: string, key: string }> }, 'managementForStatus')
       .mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', key: 'secret' })
     vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([
-      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
-      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1', supports_quota: true },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1', supports_quota: true },
     ])
-    vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
-      statusCode: 200,
-      header: {},
-      body: JSON.stringify({ rate_limit: {} }),
-    })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFileModelInfo').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'fetchCredentialQuota').mockResolvedValue({ groups: [] })
 
     await controller.refreshQuotas()
 

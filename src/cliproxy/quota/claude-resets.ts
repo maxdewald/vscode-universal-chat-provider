@@ -1,8 +1,8 @@
+import type { TNull, TOptional, TSchema, TUnion } from '@sinclair/typebox'
 import type { ManagementClient } from '@src/cliproxy/api/management-client'
 import type { ResetOutcome } from '@src/cliproxy/quota/codex-resets'
 import { Type } from '@sinclair/typebox'
 import { authAccount } from '@src/cliproxy/quota/codex-resets'
-import { Nullable, parseReset } from '@src/cliproxy/quota/providers/types'
 import { asJsonValue, asValue } from '@src/shared/json'
 
 const API_ORIGIN = 'https://api.anthropic.com'
@@ -132,4 +132,17 @@ function blockerOf(status: typeof StatusSchema.static, grant: typeof GrantSchema
   if (grant.usable_now !== true)
     return 'Not usable right now'
   return undefined
+}
+
+// This API nulls out fields rather than omitting them; absent and null mean the same here.
+function Nullable<T extends TSchema>(schema: T): TOptional<TUnion<[T, TNull]>> {
+  return Type.Optional(Type.Union([schema, Type.Null()]))
+}
+
+// Returns epoch ms for an ISO-8601 time, dropping values already in the past.
+function parseReset(value: string | null | undefined): number | undefined {
+  if (value == null)
+    return undefined
+  const ms = Date.parse(value)
+  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
 }

@@ -2,6 +2,7 @@ import type { ProviderModel } from '@src/chat/models/model'
 import type { CompletionDeps } from '@src/chat/requests/completion'
 import type { ProxyConnection } from '@src/cliproxy/connection'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
+import type { QuotaSection } from '@src/extension/ui/quota-menu'
 import type {
   CancellationToken,
   ExtensionContext,
@@ -53,7 +54,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly disposables: vscode.Disposable[] = []
   private quotaReports: QuotaReport[] = []
   private lastUsedModel: { proxyModelId: string, proxyOwner: string, name: string } | undefined
-  onActivity: ((model: { proxyOwner: string }) => void) | undefined
+  onActivity: ((model: { proxyModelId: string }) => void) | undefined
 
   constructor(
     context: ExtensionContext,
@@ -81,14 +82,14 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   readonly onDidChangeLanguageModelChatInformation = this.modelsChanged.event
 
   setQuotas(reports: QuotaReport[]): void {
-    // Claude's usage endpoint intermittently 401s; keep the last good value per account so a
-    // transient failure doesn't blank the menu. Other providers always take the fresh report.
-    const previousClaude = this.quotaReports.filter(report => report.provider === 'claude')
+    // A quota fetch can fail transiently (e.g. an upstream 401 or 429); keep the last good value
+    // per account so a single failure doesn't blank the menu.
+    const previous = this.quotaReports
     this.quotaReports = reports.map((report) => {
-      if (report.provider !== 'claude' || hasQuota(report))
+      if (hasQuota(report))
         return report
-      const previous = previousClaude.find(prev => prev.account?.authIndex === report.account?.authIndex && hasQuota(prev))
-      return previous ?? report
+      const last = previous.find(prev => prev.provider === report.provider && prev.account?.authIndex === report.account?.authIndex && hasQuota(prev))
+      return last ?? report
     })
   }
 
@@ -99,10 +100,11 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     return remaining === undefined ? undefined : { name: this.lastUsedModel.name, remainingPercent: remaining }
   }
 
-  quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
-    const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
-    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok'], ['kimi', 'Kimi']] as const) {
-      const reports = this.quotaReports.filter(r => r.provider === provider)
+  quotaSections(): QuotaSection[] {
+    const sections: QuotaSection[] = []
+    const titles = [...new Set(this.quotaReports.map(report => report.title))]
+    for (const title of titles) {
+      const reports = this.quotaReports.filter(report => report.title === title)
       const multiple = reports.length > 1
       for (const report of reports) {
         sections.push({
@@ -113,25 +115,10 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
             : report.windows.map(window => ({
                 name: window.label,
                 remainingPercent: window.remainingPercent,
-                ...(window.balance === undefined ? {} : { balance: window.balance }),
                 ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
               })),
         })
       }
-    }
-
-    const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)
-    const models = antigravity?.models
-    if (models !== undefined) {
-      const entries = this.registry.snapshot()
-        .filter(model => model.proxyOwner.toLowerCase() === 'antigravity' && models[model.proxyModelId] !== undefined)
-        .map((model) => {
-          const quota = models[model.proxyModelId]!
-          return { name: model.name, remainingPercent: quota.remainingPercent, ...(quota.resetsAt === undefined ? {} : { resetsAt: quota.resetsAt }) }
-        })
-        .sort((a, b) => (a.remainingPercent ?? 101) - (b.remainingPercent ?? 101))
-      if (entries.length > 0)
-        sections.push({ title: 'Antigravity', entries })
     }
     return sections
   }
@@ -324,5 +311,5 @@ function configuredUtilityAliases(): Set<string> {
 }
 
 function hasQuota(report: QuotaReport): boolean {
-  return report.error === undefined && (report.windows.length > 0 || Object.keys(report.models ?? {}).length > 0)
+  return report.error === undefined && report.windows.length > 0
 }

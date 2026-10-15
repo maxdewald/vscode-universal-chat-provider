@@ -1,60 +1,42 @@
+import type { AuthFileRaw, CredentialQuota, ManagementClient } from '@src/cliproxy/api/management-client'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
-import { fetchQuotas, formatResetCountdown, remainingForModel } from '@src/cliproxy/quota/quota'
+import { fetchQuotas, formatResetCountdown, quotaProviderForModel, quotaWindows, remainingForModel } from '@src/cliproxy/quota/quota'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createManagementClientFake } from '../support/management'
 
-const CODEX_BODY = JSON.stringify({
-  plan_type: 'plus',
-  rate_limit: {
-    primary_window: { used_percent: 1, limit_window_seconds: 18_000 },
-    secondary_window: { used_percent: 49, limit_window_seconds: 604_800 },
-  },
-})
+type ModelInfo = Array<{ id: string, name?: string }>
 
-const ANTIGRAVITY_BODY = JSON.stringify({
-  models: {
-    'claude-sonnet-4-6': { displayName: 'Claude Sonnet 4.6', quotaInfo: { remainingFraction: 0.1, resetTime: '2026-06-02T00:00:00Z' } },
-    'gemini-pro-agent': { displayName: 'Gemini 3.1 Pro (High)', quotaInfo: { remainingFraction: 1 } },
-    'chat_001': { quotaInfo: null },
-  },
-})
+function createClient(
+  files: AuthFileRaw[],
+  quotas: Record<string, CredentialQuota | Error>,
+  models: Record<string, ModelInfo> = {},
+) {
+  const fetchCredentialQuota = vi.fn(async (authIndex: string) => {
+    const quota = quotas[authIndex]
+    if (quota === undefined)
+      throw new Error('no quota provider available for credential')
+    if (quota instanceof Error)
+      throw quota
+    return quota
+  })
+  const listAuthFileModelInfo = vi.fn(async (name: string) => models[name] ?? [])
+  const apiCall = vi.fn()
+  return {
+    client: {
+      listAuthFilesRaw: vi.fn(async () => files),
+      fetchCredentialQuota,
+      listAuthFileModelInfo,
+      apiCall,
+    } as unknown as ManagementClient,
+    fetchCredentialQuota,
+    apiCall,
+  }
+}
 
-const CLAUDE_BODY = JSON.stringify({
-  five_hour: { utilization: 20, resets_at: '2026-06-25T12:00:00Z' },
-  seven_day: { utilization: 5, resets_at: '2026-07-01T00:00:00Z' },
-  seven_day_sonnet: { utilization: 60, resets_at: '2026-07-01T00:00:00Z' },
-  seven_day_opus: { utilization: 90, resets_at: '2026-07-01T00:00:00Z' },
-  extra_usage: { is_enabled: true, utilization: 25, used_credits: 500, monthly_limit: 2000, currency: 'EUR', decimal_places: 2 },
-})
-
-const GROK_BODY = JSON.stringify({
-  config: {
-    creditUsagePercent: 25,
-    onDemandCap: { val: 0 },
-    currentPeriod: { end: '2026-08-01T00:00:00Z' },
-  },
-})
-
-const KIMI_BODY = JSON.stringify({
-  usage: { limit: '100', used: '64', remaining: '36', resetTime: '2026-06-04T06:02:56.054721Z' },
-  limits: [
-    { window: { duration: 300, timeUnit: 'TIME_UNIT_MINUTE' }, detail: { limit: '100', used: '4', remaining: '96' } },
-  ],
-  totalQuota: { limit: '100', remaining: '99' },
-})
-
-function respondOk(url: string) {
-  if (url.includes('wham/usage'))
-    return { statusCode: 200, body: CODEX_BODY }
-  if (url.includes('fetchAvailableModels'))
-    return { statusCode: 200, body: ANTIGRAVITY_BODY }
-  if (url.includes('oauth/usage'))
-    return { statusCode: 200, body: CLAUDE_BODY }
-  if (url.includes('grok.com/v1/billing'))
-    return { statusCode: 200, body: GROK_BODY }
-  if (url.includes('api.kimi.com/coding/v1/usages'))
-    return { statusCode: 200, body: KIMI_BODY }
-  return { statusCode: 404, body: '' }
+const FIVE_HOUR_WEEKLY: CredentialQuota = {
+  groups: [{ displayName: 'Usage', buckets: [
+    { window: '5h', remainingFraction: 0.99, resetTime: '2026-06-01T05:00:00Z' },
+    { window: '7d', remainingFraction: 0.51 },
+  ] }],
 }
 
 describe('fetchQuotas', () => {
@@ -62,492 +44,157 @@ describe('fetchQuotas', () => {
     vi.useFakeTimers({ now: new Date('2026-06-01T00:00:00Z') })
   })
 
-  it('parses codex 5h/7d windows from a string body', async () => {
-    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], respondOk)
+  it('reads normalized windows from CLIProxyAPI for every credential it supports', async () => {
+    const { client, apiCall } = createClient(
+      [{ name: 'codex.json', provider: 'codex', auth_index: 'c1', email: 'a@example.com', supports_quota: true }],
+      { c1: FIVE_HOUR_WEEKLY },
+      { 'codex.json': [{ id: 'gpt-6' }] },
+    )
 
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.provider).toBe('codex')
-    expect(report.windows).toEqual([
-      { label: '5h Quota', remainingPercent: 99 },
-      { label: '7d Quota', remainingPercent: 51 },
-    ])
+    expect(await fetchQuotas(client)).toEqual([{
+      provider: 'codex',
+      title: 'Codex',
+      account: { authIndex: 'c1', label: 'a@example.com' },
+      models: [{ id: 'gpt-6' }],
+      windows: [
+        { label: 'Usage · 5h', group: 'Usage', remainingPercent: 99, resetsAt: Date.parse('2026-06-01T05:00:00Z') },
+        { label: 'Usage · 7d', group: 'Usage', remainingPercent: 51 },
+      ],
+    }])
+    expect(apiCall).not.toHaveBeenCalled()
   })
 
-  it('fetches only the provider used by the active model', async () => {
-    const { client, apiCall } = createManagementClientFake([
-      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
-      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
-    ], respondOk)
+  it('skips credentials the server cannot report quota for, and disabled ones', async () => {
+    const { client, fetchCredentialQuota } = createClient([
+      { name: 'meta.json', provider: 'meta', auth_index: 'm1' },
+      { name: 'devin.json', provider: 'devin', auth_index: 'd1', supports_quota: true },
+      { name: 'off.json', provider: 'codex', auth_index: 'c1', supports_quota: true, disabled: true },
+      { name: 'orphan.json', provider: 'codex', supports_quota: true },
+    ], { d1: FIVE_HOUR_WEEKLY })
+
+    const reports = await fetchQuotas(client)
+
+    expect(reports.map(report => [report.provider, report.title])).toEqual([['devin', 'Devin']])
+    expect(fetchCredentialQuota).toHaveBeenCalledTimes(1)
+  })
+
+  it('titles providers it has never heard of from their server key', async () => {
+    const { client } = createClient([{ name: 'k.json', provider: 'kiro', auth_index: 'k1', supports_quota: true }], { k1: FIVE_HOUR_WEEKLY })
+
+    expect((await fetchQuotas(client))[0]?.title).toBe('Kiro')
+  })
+
+  it('fetches only the requested provider', async () => {
+    const { client, fetchCredentialQuota } = createClient([
+      { name: 'codex.json', provider: 'codex', auth_index: 'c1', supports_quota: true },
+      { name: 'claude.json', provider: 'claude', auth_index: 'a1', supports_quota: true },
+    ], { c1: FIVE_HOUR_WEEKLY, a1: FIVE_HOUR_WEEKLY })
 
     const reports = await fetchQuotas(client, undefined, new Map(), 'claude')
 
     expect(reports.map(report => report.provider)).toEqual(['claude'])
-    expect(apiCall).toHaveBeenCalledTimes(1)
-    expect(apiCall.mock.calls[0]?.[0].url).toContain('oauth/usage')
+    expect(fetchCredentialQuota).toHaveBeenCalledWith('a1', undefined)
   })
 
-  it('parses codex reset_at as epoch seconds, falling back to reset_after_seconds', async () => {
-    const now = Date.now()
-    const body = JSON.stringify({
-      rate_limit: {
-        primary_window: { used_percent: 10, limit_window_seconds: 18_000, reset_at: Math.floor(now / 1000) + 3600 },
-        secondary_window: { used_percent: 20, limit_window_seconds: 604_800, reset_after_seconds: 86_400 },
-      },
-    })
-    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({
-      statusCode: 200,
-      body,
-    }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows[0]?.resetsAt).toBe(now + 3600 * 1000)
-    expect(report.windows[1]?.resetsAt).toBe(now + 86_400 * 1000)
-  })
-
-  it('drops reset times that are already in the past', async () => {
-    const body = JSON.stringify({
-      config: { creditUsagePercent: 10, currentPeriod: { end: '2025-01-01T00:00:00Z' } },
-    })
-    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({
-      statusCode: 200,
-      body,
-    }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 90 }])
-  })
-
-  it('maps antigravity quota by model id, skipping entries without a fraction', async () => {
-    const { client } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1', project_id: 'p1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.models).toEqual({
-      'claude-sonnet-4-6': { remainingPercent: 10, resetsAt: Date.parse('2026-06-02T00:00:00Z') },
-      'gemini-pro-agent': { remainingPercent: 100 },
-    })
-  })
-
-  it('parses claude account windows and enabled extra usage', async () => {
-    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.provider).toBe('claude')
-    expect(report.windows).toEqual([
-      { key: 'five_hour', label: '5h Quota', remainingPercent: 80, resetsAt: Date.parse('2026-06-25T12:00:00Z') },
-      { key: 'seven_day', label: '7d Quota', remainingPercent: 95, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } },
-    ])
-  })
-
-  it('keeps claude used credits when no monthly limit is available', async () => {
-    const body = JSON.stringify({
-      five_hour: { utilization: 20, resets_at: null },
-      seven_day_sonnet: null,
-      extra_usage: {
-        is_enabled: true,
-        monthly_limit: null,
-        used_credits: 755,
-        utilization: null,
-        currency: 'EUR',
-        decimal_places: 2,
-      },
-      unknown_limit: null,
-      rate_limits: [
-        { kind: 'session', percent: 0, resets_at: null, is_active: false },
-        { kind: 'weekly_all', percent: 61, resets_at: '2026-07-25T09:00:00.306312+00:00', is_active: true },
-      ],
-      feature_enabled: false,
-    })
-    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], () => ({
-      statusCode: 200,
-      body,
-    }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
-      { key: 'extra_usage', label: 'Extra Usage', balance: { amount: 7.55, currency: 'EUR', suffix: 'used' } },
-    ])
-  })
-
-  it('parses the grok premium credit pool as a single window', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.provider).toBe('grok')
-    expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-08-01T00:00:00Z') }])
-    expect(apiCall.mock.calls[0]![0]).toMatchObject({
-      url: 'https://cli-chat-proxy.grok.com/v1/billing?format=credits',
-      header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' },
-    })
-  })
-
-  it('prefers the unified credit pool percent and its period end', async () => {
-    const body = JSON.stringify({
-      config: {
-        creditUsagePercent: 40,
-        used: { val: 30 },
-        monthlyLimit: { val: 120 },
-        currentPeriod: { start: '2026-05-25T00:00:00Z', end: '2026-06-08T00:00:00Z' },
-        onDemandCap: { val: 50 },
-        onDemandUsed: { val: 5 },
-        billingPeriodEnd: '2026-08-01T00:00:00Z',
-      },
-    })
-    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { label: 'Credits', remainingPercent: 60, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
-      { label: 'On-Demand', remainingPercent: 90, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
-    ])
-  })
-
-  it('sums grok product usage when the aggregate percent is absent', async () => {
-    const body = JSON.stringify({
-      config: {
-        currentPeriod: { end: '2026-06-08T00:00:00Z' },
-        productUsage: [
-          { product: 'GrokBuild', usagePercent: 17 },
-          { product: 'GrokChat', usagePercent: 1 },
-        ],
-      },
-    })
-    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { label: 'Credits', remainingPercent: 82, resetsAt: Date.parse('2026-06-08T00:00:00Z') },
-    ])
-  })
-
-  it('ignores an empty grok product usage list', async () => {
-    const body = JSON.stringify({ config: { productUsage: [] } })
-    const { client } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([])
-  })
-
-  it('parses kimi windows, labelling each from its own duration', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.provider).toBe('kimi')
-    expect(report.windows).toEqual([
-      { label: 'Weekly Quota', remainingPercent: 36, resetsAt: Date.parse('2026-06-04T06:02:56.054721Z') },
-      { label: '5h Quota', remainingPercent: 96 },
-      { label: 'Total', remainingPercent: 99 },
-    ])
-    expect(apiCall.mock.calls[0]![0]).toMatchObject({ url: 'https://api.kimi.com/coding/v1/usages' })
-  })
-
-  it('drops kimi windows without a usable limit', async () => {
-    const body = JSON.stringify({
-      usage: { limit: '0', used: '12', remaining: '0' },
-      limits: [{ detail: { limit: 'bad', used: '1' } }],
-      totalQuota: { limit: '100', remaining: '25' },
-    })
-    const { client } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([{ label: 'Total', remainingPercent: 25 }])
-  })
-
-  it('parses codex spark and purchased credit windows', async () => {
-    const body = JSON.stringify({
-      rate_limit: {
-        primary_window: { used_percent: 1, limit_window_seconds: 18_000 },
-      },
-      additional_rate_limits: [
-        { limit_name: 'gpt-5-spark', rate_limit: { primary_window: { used_percent: 25, limit_window_seconds: 18_000 } } },
-        { limit_name: 'other', rate_limit: { primary_window: { used_percent: 90, limit_window_seconds: 18_000 } } },
-      ],
-      spend_control: { individual_limit: { limit: 2000, used: 500 } },
-    })
-    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { label: '5h Quota', remainingPercent: 99 },
-      { key: 'spark', label: 'Spark 5h Quota', remainingPercent: 75 },
-      { key: 'credits', label: 'Credits', remainingPercent: 75 },
-    ])
-  })
-
-  it('parses codex spend control amounts sent as strings', async () => {
-    const body = JSON.stringify({
-      rate_limit: { primary_window: { used_percent: 0, limit_window_seconds: 18_000 } },
-      spend_control: {
-        reached: false,
-        individual_limit: { source: 'workspace_spend_controls', unit: 'credit', limit: '3000', used: '750.5', remaining: '2249.5' },
-      },
-    })
-    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { label: '5h Quota', remainingPercent: 100 },
-      { key: 'credits', label: 'Credits', remainingPercent: expect.closeTo(74.98, 2) as number },
-    ])
-  })
-
-  it('keeps codex windows when the optional sections arrive as null', async () => {
-    const body = JSON.stringify({
-      rate_limit: {
-        primary_window: { used_percent: 1, limit_window_seconds: 18_000, reset_at: null, reset_after_seconds: null },
-        secondary_window: null,
-      },
-      additional_rate_limits: null,
-      spend_control: { individual_limit: null },
-    })
-    const { client } = createManagementClientFake([{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([{ label: '5h Quota', remainingPercent: 99 }])
-  })
-
-  it('parses claude model-scoped weekly caps, skipping legacy duplicates', async () => {
-    const body = JSON.stringify({
-      seven_day_opus: { utilization: 90, resets_at: '2026-07-01T00:00:00Z' },
-      limits: [
-        { kind: 'weekly_scoped', percent: 30, resets_at: '2026-07-02T00:00:00Z', scope: { model: { display_name: 'Fable' } } },
-        { kind: 'weekly_scoped', percent: 10, resets_at: '2026-07-01T00:00:00Z', scope: { model: { display_name: 'Opus' } } },
-        { kind: 'weekly_all', percent: 61, resets_at: '2026-07-01T00:00:00Z', scope: null },
-      ],
-    })
-    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], () => ({ statusCode: 200, body }))
-
-    const report = (await fetchQuotas(client))[0]!
-
-    expect(report.windows).toEqual([
-      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10, resetsAt: Date.parse('2026-07-01T00:00:00Z') },
-      { key: 'seven_day_fable', label: '7d Fable', remainingPercent: 70, resetsAt: Date.parse('2026-07-02T00:00:00Z') },
-    ])
-  })
-
-  it('reports an HTTP error instead of throwing', async () => {
-    const { client, apiCall } = createManagementClientFake(
-      [{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }],
-      () => ({ statusCode: 401, body: 'unauthorized' }),
+  it('reports a server error instead of throwing', async () => {
+    const { client } = createClient(
+      [{ name: 'claude.json', provider: 'claude', auth_index: 'a1', supports_quota: true }],
+      { a1: new Error('failed to fetch quota: upstream returned 401') },
     )
 
-    const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ provider: 'codex', error: expect.stringContaining('HTTP 401') as string, windows: [] })
-    expect(apiCall).toHaveBeenCalledTimes(1)
+    expect((await fetchQuotas(client))[0]).toMatchObject({ provider: 'claude', windows: [], error: 'failed to fetch quota: upstream returned 401' })
   })
 
-  it('includes the upstream url and error body in the reported error', async () => {
-    const { client } = createManagementClientFake(
-      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
-      () => ({ statusCode: 429, body: '{"error":{"type":"rate_limit_error"}}' }),
-    )
-
-    const report = (await fetchQuotas(client))[0]!
-    expect(report.error).toContain('https://api.anthropic.com/api/oauth/usage')
-    expect(report.error).toContain('rate_limit_error')
-  })
-
-  it('captures the upstream Retry-After from a 429 as an epoch deadline', async () => {
-    const { client } = createManagementClientFake(
-      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
-      () => ({ statusCode: 429, body: '', header: { 'Retry-After': ['238'] } }),
-    )
+  it('sits out a rate-limited account, then fetches again once the floor has elapsed', async () => {
     const backoff = new Map<string, number>()
-
-    const report = (await fetchQuotas(client, undefined, backoff))[0]!
-    expect(report).toMatchObject({ provider: 'claude', error: expect.stringContaining('HTTP 429') as string })
-    expect(backoff.get('x1')).toBe(Date.now() + 238_000)
-  })
-
-  it('falls back to a floor deadline when a 429 carries no Retry-After', async () => {
-    const { client } = createManagementClientFake(
-      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
-      () => ({ statusCode: 429, body: '' }),
-    )
-    const backoff = new Map<string, number>()
-
-    const report = (await fetchQuotas(client, undefined, backoff))[0]!
-    expect(report).toMatchObject({ provider: 'claude', error: expect.stringContaining('HTTP 429') as string })
-    expect(backoff.get('x1')).toBe(Date.now() + 300_000)
-  })
-
-  it('backs off from an exhausted unified rate limit on a successful response', async () => {
-    const reset = new Date(Date.now() + 90_000).toISOString()
-    const { client } = createManagementClientFake(
-      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
-      () => ({
-        statusCode: 200,
-        body: CLAUDE_BODY,
-        header: {
-          'Anthropic-Ratelimit-Unified-Remaining': ['0'],
-          'Anthropic-Ratelimit-Unified-Reset': [reset],
-        },
-      }),
-    )
-    const backoff = new Map<string, number>()
-
-    const report = (await fetchQuotas(client, undefined, backoff))[0]!
-    expect(report.error).toBeUndefined()
-    expect(backoff.get('x1')).toBe(Date.parse(reset))
-  })
-
-  it('clears the backoff once the upstream stops rate limiting', async () => {
-    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
-    const backoff = new Map([['x1', Date.now() - 1]])
+    const quotas: Record<string, CredentialQuota | Error> = { a1: new Error('failed to fetch quota: upstream returned 429') }
+    const { client, fetchCredentialQuota } = createClient([{ name: 'claude.json', provider: 'claude', auth_index: 'a1', supports_quota: true }], quotas)
 
     await fetchQuotas(client, undefined, backoff)
-    expect(backoff.has('x1')).toBe(false)
+    expect(backoff.get('a1')).toBe(Date.parse('2026-06-01T00:05:00Z'))
+
+    const skipped = await fetchQuotas(client, undefined, backoff)
+    expect(skipped[0]).toMatchObject({ windows: [] })
+    expect(skipped[0]?.error).toBeUndefined()
+    expect(fetchCredentialQuota).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(5 * 60_000 + 1)
+    quotas['a1'] = FIVE_HOUR_WEEKLY
+    await fetchQuotas(client, undefined, backoff)
+    expect(fetchCredentialQuota).toHaveBeenCalledTimes(2)
+    expect(backoff.has('a1')).toBe(false)
+  })
+})
+
+describe('quotaWindows', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date('2026-06-01T00:00:00Z') })
   })
 
-  it('skips the upstream call while an account is inside its Retry-After window', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
-
-    const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() + 60_000]])))[0]!
-    expect(report).toMatchObject({ provider: 'claude', windows: [] })
-    expect(apiCall).not.toHaveBeenCalled()
+  it('clamps fractions, falls back to the bucket description, and drops past resets', () => {
+    expect(quotaWindows({ groups: [
+      { buckets: [{ description: 'Credits', remainingFraction: 1.2 }] },
+      { displayName: 'Weekly', buckets: [{ remainingFraction: -0.1, resetTime: '2026-05-01T00:00:00Z' }] },
+      { displayName: 'Empty' },
+    ] })).toEqual([
+      { label: 'Credits', remainingPercent: 100 },
+      { label: 'Weekly', group: 'Weekly', remainingPercent: 0 },
+    ])
   })
 
-  it('fetches normally once the Retry-After window has elapsed', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+  it('moves server reset times onto the local clock', () => {
+    const [window] = quotaWindows({
+      serverTimeOffsetMs: 60_000,
+      groups: [{ buckets: [{ window: '5h', remainingFraction: 0.5, resetTime: '2026-06-01T01:00:00Z' }] }],
+    })
 
-    const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() - 1]])))[0]!
-    expect(report.error).toBeUndefined()
-    expect(apiCall).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports missing project_id without calling the upstream', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ error: 'missing project_id' })
-    expect(apiCall).not.toHaveBeenCalled()
+    expect(window?.resetsAt).toBe(Date.parse('2026-06-01T00:59:00Z'))
   })
 })
 
 describe('remainingForModel', () => {
-  const reports: QuotaReport[] = [
-    { provider: 'codex', windows: [
-      { label: '5h Quota', remainingPercent: 80 },
-      { label: '7d Quota', remainingPercent: 8 },
-      { key: 'spark', label: 'Spark 5h Quota', remainingPercent: 2 },
-      { key: 'credits', label: 'Credits', remainingPercent: 1 },
-    ] },
-    { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 35 } } },
-    { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] },
-    { provider: 'kimi', windows: [{ label: 'Weekly Quota', remainingPercent: 60 }, { label: '5h Quota', remainingPercent: 22 }] },
-    { provider: 'claude', windows: [
-      { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
-      { key: 'seven_day', label: '7d Quota', remainingPercent: 50 },
-      { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 40 },
-      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 10 },
-      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 5 },
-    ] },
-  ]
+  const codex: QuotaReport = {
+    provider: 'codex',
+    title: 'Codex',
+    models: [{ id: 'gpt-6' }],
+    windows: [{ label: '5h', remainingPercent: 80 }, { label: '7d', remainingPercent: 8 }],
+  }
+  const antigravity: QuotaReport = {
+    provider: 'antigravity',
+    title: 'Antigravity',
+    models: [{ id: 'gemini-pro-agent', name: 'Gemini 3.1 Pro (High)' }, { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' }],
+    windows: [
+      { label: 'Gemini 3.1 Pro (High)', group: 'Gemini 3.1 Pro (High)', remainingPercent: 35 },
+      { label: 'claude-sonnet-4-6', group: 'claude-sonnet-4-6', remainingPercent: 10 },
+    ],
+  }
 
-  it('returns the antigravity per-model percent', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(35)
+  it('takes the tightest account-wide window for a model the credential serves', () => {
+    expect(remainingForModel([codex], { proxyModelId: 'gpt-6' })).toBe(8)
   })
 
-  it('returns the tightest codex window for any openai model, ignoring spark and credits', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
-  })
-
-  it.each([100, 10, 5, 0, undefined])('uses the best known account quota when another is empty: %s', (remainingPercent) => {
-    const accounts: QuotaReport[] = [
-      { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 0 }] },
-      { provider: 'codex', windows: remainingPercent === undefined ? [] : [{ label: '5h Quota', remainingPercent }] },
-      { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 100 }], error: 'HTTP 401' },
-      { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 100 }] },
-    ]
-    const model = { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' }
-    expect(remainingForModel(accounts, model)).toBe(remainingPercent ?? 0)
-    expect(remainingForModel(accounts.toReversed(), model)).toBe(remainingPercent ?? 0)
+  it('scopes windows grouped under a served model to that model only', () => {
+    expect(remainingForModel([antigravity], { proxyModelId: 'gemini-pro-agent' })).toBe(35)
+    expect(remainingForModel([antigravity], { proxyModelId: 'claude-sonnet-4-6' })).toBe(10)
   })
 
   it('takes each account\'s tightest window before selecting the best account', () => {
     const accounts: QuotaReport[] = [
-      { provider: 'codex', windows: [
-        { label: '5h Quota', remainingPercent: 100 },
-        { label: '7d Quota', remainingPercent: 5 },
-      ] },
-      { provider: 'codex', windows: [
-        { label: '5h Quota', remainingPercent: 10 },
-        { label: '7d Quota', remainingPercent: 100 },
-      ] },
+      { ...codex, windows: [{ label: '5h', remainingPercent: 100 }, { label: '7d', remainingPercent: 5 }] },
+      { ...codex, windows: [{ label: '5h', remainingPercent: 10 }, { label: '7d', remainingPercent: 100 }] },
+      { ...codex, windows: [{ label: '5h', remainingPercent: 100 }], error: 'HTTP 401' },
     ]
-    expect(remainingForModel(accounts, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(10)
+    expect(remainingForModel(accounts, { proxyModelId: 'gpt-6' })).toBe(10)
   })
 
-  it('preserves model-specific quotas across accounts', () => {
-    const accounts: QuotaReport[] = [
-      ...reports,
-      { provider: 'claude', windows: [
-        { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 20 },
-        { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 5 },
-      ] },
-      { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 60 }, 'other': { remainingPercent: 100 } } },
-    ]
-    expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-opus-4-6' })).toBe(20)
-    expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-sonnet-4-6' })).toBe(40)
-    expect(remainingForModel(accounts, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(60)
+  it('is undefined for models no credential with quota serves', () => {
+    expect(remainingForModel([codex, antigravity], { proxyModelId: 'grok-5' })).toBeUndefined()
+    expect(remainingForModel([{ ...codex, windows: [] }], { proxyModelId: 'gpt-6' })).toBeUndefined()
   })
 
-  it('returns undefined when no account has known quota', () => {
-    const accounts: QuotaReport[] = [
-      { provider: 'codex', windows: [] },
-      { provider: 'codex', windows: [], error: 'HTTP 401' },
-    ]
-    expect(remainingForModel(accounts, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
-  })
-
-  it('returns the tightest kimi window for any moonshot model', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'moonshot', proxyModelId: 'kimi-k2.5' })).toBe(22)
-  })
-
-  it('returns the grok credit window for any xai model', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'xai', proxyModelId: 'grok-code' })).toBe(75)
-  })
-
-  it('binds an unknown weekly family by name without code changes', () => {
-    const withFable: QuotaReport[] = [{ provider: 'claude', windows: [
-      { key: 'seven_day', label: '7d Quota', remainingPercent: 70 },
-      { key: 'seven_day_fable', label: '7d Fable', remainingPercent: 15 },
-    ] }]
-    expect(remainingForModel(withFable, { proxyOwner: 'anthropic', proxyModelId: 'claude-fable-5' })).toBe(15)
-    expect(remainingForModel(withFable, { proxyOwner: 'anthropic', proxyModelId: 'claude-opus-4-6' })).toBe(70)
-  })
-
-  it('scopes claude weekly caps to the model family, ignoring extra usage', () => {
-    // Opus sees its own 10% weekly cap; Sonnet sees 40%; both gated by the shared 5h/7d windows.
-    expect(remainingForModel(reports, { proxyOwner: 'anthropic', proxyModelId: 'claude-opus-4-6' })).toBe(10)
-    expect(remainingForModel(reports, { proxyOwner: 'anthropic', proxyModelId: 'claude-sonnet-4-6' })).toBe(40)
-    // Haiku has no family cap, so the shared 7d window (50%) is the tightest.
-    expect(remainingForModel(reports, { proxyOwner: 'anthropic', proxyModelId: 'claude-haiku-4-5' })).toBe(50)
-  })
-
-  it('is undefined for an untracked antigravity model, owner, or errored report', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'unknown' })).toBeUndefined()
-    expect(remainingForModel(reports, { proxyOwner: 'gemini', proxyModelId: 'gemini-3-pro' })).toBeUndefined()
-    const errored: QuotaReport[] = [{ provider: 'codex', windows: [], error: 'HTTP 401' }]
-    expect(remainingForModel(errored, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBeUndefined()
+  it('maps a model to the provider whose credential serves it', () => {
+    expect(quotaProviderForModel([codex, antigravity], { proxyModelId: 'claude-sonnet-4-6' })).toBe('antigravity')
+    expect(quotaProviderForModel([codex], { proxyModelId: 'unknown' })).toBeUndefined()
   })
 })
 
