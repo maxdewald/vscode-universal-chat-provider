@@ -6,13 +6,13 @@ import { kyFetch } from '@src/shared/kyFetch'
 import { isHTTPError } from 'ky'
 
 export const LOGIN_PROVIDERS = [
-  { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', provider: 'codex' },
-  { label: 'Anthropic Claude', detail: 'Claude Code account', provider: 'claude' },
-  { label: 'Antigravity', detail: 'Antigravity account', provider: 'antigravity' },
-  { label: 'Kimi', detail: 'Moonshot Kimi account', provider: 'kimi' },
-  { label: 'xAI Grok', detail: 'Grok Build account', provider: 'xai' },
-  { label: 'Devin', detail: 'Devin / Cognition account', provider: 'devin' },
-  { label: 'Meta Muse', detail: 'Muse Code account', provider: 'meta' },
+  { label: 'OpenAI Codex', title: 'Codex', detail: 'ChatGPT / Codex account', provider: 'codex' },
+  { label: 'Anthropic Claude', title: 'Claude', detail: 'Claude Code account', provider: 'claude' },
+  { label: 'Antigravity', title: 'Antigravity', detail: 'Antigravity account', provider: 'antigravity' },
+  { label: 'Kimi', title: 'Kimi', detail: 'Moonshot Kimi account', provider: 'kimi' },
+  { label: 'xAI Grok', title: 'Grok', detail: 'Grok Build account', provider: 'xai' },
+  { label: 'Devin', title: 'Devin', detail: 'Devin / Cognition account', provider: 'devin' },
+  { label: 'Meta Muse', title: 'Meta', detail: 'Muse Code account', provider: 'meta' },
 ]
 
 const OPENAI_COMPATIBILITY_PATH = '/config/api-keys/openai-compatibility'
@@ -67,6 +67,8 @@ export const AuthFileRawSchema = Type.Object({
   chatgpt_account_id: Type.Optional(Type.String()),
   account_id: Type.Optional(Type.String()),
   id_token: Type.Optional(IdTokenSchema),
+  disabled: Type.Optional(Type.Boolean()),
+  supports_quota: Type.Optional(Type.Boolean()),
 })
 
 export type AuthFileRaw = Static<typeof AuthFileRawSchema>
@@ -93,6 +95,7 @@ const AuthStatusPayloadSchema = Type.Object({
 const AuthFileModelsPayloadSchema = Type.Object({
   models: Type.Optional(Type.Array(Type.Object({
     id: Type.String(),
+    display_name: Type.Optional(Type.String()),
   }, { additionalProperties: true }))),
 })
 
@@ -102,6 +105,22 @@ const ApiCallResponseSchema = Type.Object({
   header: Type.Optional(Type.Record(Type.String(), Type.Array(Type.String()))),
   body: Type.Optional(Type.Unknown()),
 })
+
+// Normalized quota as returned by CLIProxyAPI's quota providers (sdk/pluginapi QuotaFetchResponse).
+const CredentialQuotaSchema = Type.Object({
+  serverTimeOffsetMs: Type.Optional(Type.Number()),
+  groups: Type.Optional(Type.Array(Type.Object({
+    displayName: Type.Optional(Type.String()),
+    buckets: Type.Optional(Type.Array(Type.Object({
+      window: Type.Optional(Type.String()),
+      remainingFraction: Type.Number(),
+      resetTime: Type.Optional(Type.String()),
+      description: Type.Optional(Type.String()),
+    }, { additionalProperties: true }))),
+  }, { additionalProperties: true }))),
+}, { additionalProperties: true })
+
+export type CredentialQuota = Static<typeof CredentialQuotaSchema>
 
 const OpenAICompatibilityProviderSchema = Type.Object({
   'name': Type.String(),
@@ -120,6 +139,8 @@ const toManagementError: BeforeErrorHook = ({ error }) => {
 
 export class ManagementClient {
   private readonly fetcher: KyInstance
+  // The provider-resolved quota route exists only on the v0 management contract.
+  private readonly quotaFetcher: KyInstance
 
   constructor(baseUrl: string, key: string) {
     // ponytail: retry:0/timeout:false preserve the old raw-fetch behavior; ky just folds
@@ -131,6 +152,7 @@ export class ManagementClient {
       timeout: false,
       hooks: { beforeError: [toManagementError] },
     })
+    this.quotaFetcher = this.fetcher.extend({ prefix: `${baseUrl}/v0/management` })
   }
 
   async requestAuthUrl(provider: string, signal?: AbortSignal): Promise<AuthSession> {
@@ -174,6 +196,16 @@ export class ManagementClient {
     return (payload?.models ?? []).map(model => model.id)
   }
 
+  async listAuthFileModelInfo(name: string, signal?: AbortSignal): Promise<Array<{ id: string, name?: string }>> {
+    const payload = asValue(
+      AuthFileModelsPayloadSchema,
+      await this.fetcher.get(`/credentials/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
+    )
+    return (payload?.models ?? []).map(model => model.display_name === undefined || model.display_name.trim() === ''
+      ? { id: model.id }
+      : { id: model.id, name: model.display_name })
+  }
+
   async listAuthFiles(signal?: AbortSignal): Promise<AuthFile[]> {
     return (await this.listAuthFilesRaw(signal))
       .filter((file): file is AuthFileRaw & { name: string } => file.name !== undefined)
@@ -214,6 +246,17 @@ export class ManagementClient {
       retry: { limit: 2, methods: ['post'], statusCodes: [500, 502, 503, 504] },
     }).json())
     return { statusCode: json?.status_code ?? json?.statusCode ?? 0, header: json?.header ?? {}, body: json?.body }
+  }
+
+  // Asks CLIProxyAPI for one credential's quota, resolved by the server's quota provider for it.
+  async fetchCredentialQuota(authIndex: string, signal?: AbortSignal): Promise<CredentialQuota> {
+    const payload = asValue(
+      CredentialQuotaSchema,
+      await this.quotaFetcher.post('quota/fetch', { json: { auth_index: authIndex }, signal: signal ?? null }).json(),
+    )
+    if (payload === undefined)
+      throw new Error('CLIProxyAPI returned an invalid quota response.')
+    return payload
   }
 
   async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {

@@ -52,8 +52,8 @@ export class ServerController implements ProxyConnection {
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private quotaReports: QuotaReport[] = []
-  private activeQuotaProvider: QuotaReport['provider'] | undefined
-  private lastQuotaRefresh = new Map<QuotaReport['provider'], number>()
+  private activeQuotaProvider: string | undefined
+  private lastQuotaRefresh = new Map<string, number>()
   private quotaBackoff = new Map<string, number>()
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
@@ -160,8 +160,8 @@ export class ServerController implements ProxyConnection {
     this.quotaListener = listener
   }
 
-  scheduleQuotaRefresh(model: { proxyOwner: string }): void {
-    this.activeQuotaProvider = quotaProviderForModel(model)
+  scheduleQuotaRefresh(model: { proxyModelId: string }): void {
+    this.activeQuotaProvider = quotaProviderForModel(this.quotaReports, model)
     void this.refreshQuotas()
   }
 
@@ -463,7 +463,7 @@ export class ServerController implements ProxyConnection {
     return this.performQuotaRefresh(provider)
   }
 
-  private async performQuotaRefresh(provider: QuotaReport['provider'] | undefined): Promise<void> {
+  private async performQuotaRefresh(provider: string | undefined): Promise<void> {
     const management = await this.managementForStatus()
     if (management === undefined) {
       if (provider !== undefined)

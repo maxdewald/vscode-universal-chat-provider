@@ -137,6 +137,39 @@ describe('management client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
+  it('asks the server for one credential\'s normalized quota', async () => {
+    const bodies: unknown[] = []
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async (request) => {
+      bodies.push(await request.clone().json())
+      return Response.json({ groups: [{ displayName: 'Usage', buckets: [{ window: '5h', remainingFraction: 0.4 }] }] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().fetchCredentialQuota('a1')).resolves.toEqual({
+      groups: [{ displayName: 'Usage', buckets: [{ window: '5h', remainingFraction: 0.4 }] }],
+    })
+    const request = fetchMock.mock.calls[0]![0]
+    expect(request.method).toBe('POST')
+    expect(request.url).toBe('http://127.0.0.1:8317/v0/management/quota/fetch')
+    expect(request.headers.get('authorization')).toMatch(/^Bearer /)
+    expect(bodies).toEqual([{ auth_index: 'a1' }])
+  })
+
+  it('surfaces a server without a quota provider for the credential as an error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'no quota provider available for credential' }, { status: 501 })))
+
+    await expect(createClient().fetchCredentialQuota('m1')).rejects.toThrow('no quota provider available for credential')
+  })
+
+  it('lists credential models with their display names', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ models: [{ id: 'gemini-pro-agent', display_name: 'Gemini 3.1 Pro (High)' }, { id: 'plain', display_name: '' }] })))
+
+    await expect(createClient().listAuthFileModelInfo('ag.json')).resolves.toEqual([
+      { id: 'gemini-pro-agent', name: 'Gemini 3.1 Pro (High)' },
+      { id: 'plain' },
+    ])
+  })
+
   it('exposes the supported login providers in picker order', () => {
     expect(LOGIN_PROVIDERS.map(provider => provider.provider)).toEqual([
       'codex',

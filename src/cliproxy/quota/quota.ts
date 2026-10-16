@@ -1,43 +1,92 @@
-import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
-import type { QuotaProvider, QuotaReport } from '@src/cliproxy/quota/providers/types'
-import { Type } from '@sinclair/typebox'
-import { isQuotaProvider, QUOTA_PROVIDERS } from '@src/cliproxy/quota/providers'
-import { parseReset } from '@src/cliproxy/quota/providers/types'
+import type { AuthFileRaw, CredentialQuota, ManagementClient } from '@src/cliproxy/api/management-client'
+import { LOGIN_PROVIDERS } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
-import { asJsonValue } from '@src/shared/json'
 
-export type { QuotaReport, QuotaWindow } from '@src/cliproxy/quota/providers/types'
-
-const ObjectSchema = Type.Object({}, { additionalProperties: true })
-
-export function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
-  const owner = model.proxyOwner.toLowerCase()
-  return (Object.keys(QUOTA_PROVIDERS) as Array<QuotaReport['provider']>)
-    .find(name => QUOTA_PROVIDERS[name].owners.includes(owner))
+export interface QuotaWindow {
+  label: string
+  remainingPercent: number
+  resetsAt?: number // epoch ms when the window refreshes; omitted when unknown or already past
+  group?: string // the server's group name; a group named after a served model gates only that model
 }
 
-// backoff maps authIndex -> deadline and is owned here: fetchProviderQuota writes it from the
-// response headers, and an account still inside its window reports no windows instead of being
-// fetched, so setQuotas keeps its last-good value without touching the upstream.
+export interface QuotaReport {
+  provider: string // CLIProxyAPI credential provider key, as listed by the server
+  title: string
+  windows: QuotaWindow[]
+  models?: Array<{ id: string, name?: string }> // models this credential serves, as listed by the server
+  account?: { authIndex: string, label: string }
+  error?: string
+}
+
+// How long to sit out an account whose quota fetch was rate limited, so we never hot-loop the upstream.
+const RATE_LIMIT_FLOOR_MS = 5 * 60_000
+
+export function quotaProviderForModel(reports: readonly QuotaReport[], model: { proxyModelId: string }): string | undefined {
+  return reports.find(report => servesModel(report, model.proxyModelId))?.provider
+}
+
+// Quota is computed by CLIProxyAPI's quota providers; this only lists the credentials the server
+// says it can report on and asks the server for each one. No upstream endpoint is known here.
 export async function fetchQuotas(
   client: ManagementClient,
   signal?: AbortSignal,
   backoff: Map<string, number> = new Map(),
-  providerFilter?: QuotaReport['provider'],
+  providerFilter?: string,
 ): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
   const tasks = files.flatMap((entry) => {
-    const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
-    const provider = raw === 'xai' ? 'grok' : raw
-    if (!isQuotaProvider(provider) || (providerFilter !== undefined && provider !== providerFilter))
+    const provider = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
+    const authIndex = entry.auth_index?.trim() ?? ''
+    if (entry.supports_quota !== true || entry.disabled === true || provider === '' || authIndex === '')
       return []
-    if ((backoff.get(entry.auth_index?.trim() ?? '') ?? 0) > Date.now()) {
-      const account = accountOf(entry)
-      return [Promise.resolve<QuotaReport>({ provider, windows: [], ...(account === undefined ? {} : { account }) })]
-    }
-    return [fetchProviderQuota(provider, QUOTA_PROVIDERS[provider], client, entry, signal, backoff)]
+    if (providerFilter !== undefined && provider !== providerFilter)
+      return []
+    const report: QuotaReport = { provider, title: providerTitle(provider), windows: [], account: { authIndex, label: accountLabel(entry, authIndex) } }
+    if ((backoff.get(authIndex) ?? 0) > Date.now())
+      return [Promise.resolve(report)]
+    return [fetchCredentialQuota(client, entry, report, signal, backoff)]
   })
   return Promise.all(tasks)
+}
+
+async function fetchCredentialQuota(
+  client: ManagementClient,
+  entry: AuthFileRaw,
+  report: QuotaReport,
+  signal: AbortSignal | undefined,
+  backoff: Map<string, number>,
+): Promise<QuotaReport> {
+  const authIndex = report.account!.authIndex
+  const [quota, models] = await Promise.allSettled([
+    client.fetchCredentialQuota(authIndex, signal),
+    entry.name === undefined ? Promise.resolve([]) : client.listAuthFileModelInfo(entry.name, signal),
+  ])
+  const withModels = models.status === 'fulfilled' ? { ...report, models: models.value } : report
+  if (quota.status === 'rejected') {
+    const error = errorMessage(quota.reason)
+    if (/\b429\b/.test(error))
+      backoff.set(authIndex, Date.now() + RATE_LIMIT_FLOOR_MS)
+    return { ...withModels, error }
+  }
+  backoff.delete(authIndex)
+  return { ...withModels, windows: quotaWindows(quota.value) }
+}
+
+export function quotaWindows(quota: CredentialQuota): QuotaWindow[] {
+  const offset = quota.serverTimeOffsetMs ?? 0
+  return (quota.groups ?? []).flatMap((group) => {
+    const groupName = group.displayName?.trim() ?? ''
+    return (group.buckets ?? []).map((bucket) => {
+      const window = (bucket.window ?? bucket.description ?? '').trim()
+      const resetsAt = parseReset(bucket.resetTime, offset)
+      return {
+        label: [groupName, window].filter(part => part !== '').join(' · ') || 'Quota',
+        remainingPercent: Math.min(Math.max(bucket.remainingFraction * 100, 0), 100),
+        ...(resetsAt === undefined ? {} : { resetsAt }),
+        ...(groupName === '' ? {} : { group: groupName }),
+      }
+    })
+  })
 }
 
 export function formatPercent(value?: number): string {
@@ -62,97 +111,52 @@ export function formatResetCountdown(resetsAt: number | undefined): string | und
   return `${mins}m`
 }
 
-// Maps a model to its remaining-quota percent by handing the report to the provider that
-// bills its owner. Antigravity is keyed per model; the rest report account-level windows.
-export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: string, proxyModelId: string }): number | undefined {
-  const name = quotaProviderForModel(model)
-  if (name === undefined)
-    return undefined
-  const provider = QUOTA_PROVIDERS[name]
+// A model's remaining quota is the tightest window that gates it, on the best account serving it.
+// A window grouped under one of the credential's served models gates only that model; every other
+// window gates the whole account.
+export function remainingForModel(reports: readonly QuotaReport[], model: { proxyModelId: string }): number | undefined {
   const remaining = reports
-    .filter(report => report.provider === name && report.error === undefined)
-    .map(report => provider.remaining(report, model.proxyModelId))
+    .filter(report => report.error === undefined && servesModel(report, model.proxyModelId))
+    .map(report => tightestWindow(report, model.proxyModelId))
     .filter((percent): percent is number => percent !== undefined)
   return remaining.length > 0 ? Math.max(...remaining) : undefined
 }
 
-async function fetchProviderQuota(
-  provider: QuotaReport['provider'],
-  source: QuotaProvider,
-  client: ManagementClient,
-  entry: AuthFileRaw,
-  signal: AbortSignal | undefined,
-  backoff: Map<string, number>,
-): Promise<QuotaReport> {
-  const account = accountOf(entry)
-  const report: QuotaReport = { provider, windows: [], ...(account === undefined ? {} : { account }) }
-  const authIndex = entry.auth_index?.trim() ?? ''
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
-  const requestBody = source.body?.(entry)
-  if (requestBody !== undefined && 'error' in requestBody)
-    return { ...report, error: requestBody.error }
-  try {
-    const { statusCode, header, body } = await client.apiCall({
-      auth_index: authIndex,
-      method: source.method,
-      url: source.url,
-      header: source.header,
-      ...requestBody,
-    }, signal)
-    const retryAfter = parseRetryAfter(header, statusCode)
-    if (retryAfter === undefined)
-      backoff.delete(authIndex)
-    else
-      backoff.set(authIndex, retryAfter)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode} from ${source.url} — ${describeBody(body)}` }
-    const data = asJsonValue(ObjectSchema, body)
-    if (data === undefined)
-      return { ...report, error: `invalid quota payload from ${source.url} — ${describeBody(body)}` }
-    source.apply(report, data)
-    return report
-  }
-  catch (error) {
-    return { ...report, error: errorMessage(error) }
-  }
+function tightestWindow(report: QuotaReport, proxyModelId: string): number | undefined {
+  const served = report.models ?? []
+  const modelScoped = new Set(served.flatMap(model => [model.id, model.name ?? '']).map(normalize).filter(key => key !== ''))
+  const own = new Set(served.filter(model => model.id === proxyModelId).flatMap(model => [model.id, model.name ?? '']).map(normalize))
+  const percents = report.windows
+    .filter(window => window.group === undefined || !modelScoped.has(normalize(window.group)) || own.has(normalize(window.group)))
+    .map(window => window.remainingPercent)
+  return percents.length > 0 ? Math.min(...percents) : undefined
 }
 
-// Upstream error bodies carry the useful detail (rate_limit_error, invalid_token, …).
-function describeBody(body: unknown): string {
-  const text = typeof body === 'string' ? body : JSON.stringify(body)
-  return text === undefined || text.trim() === '' ? 'empty body' : text
+function servesModel(report: QuotaReport, proxyModelId: string): boolean {
+  return (report.models ?? []).some(model => model.id === proxyModelId)
 }
 
-// How long to sit out a 429 that carried no usable deadline, so we never hot-loop the upstream.
-const RATE_LIMIT_FLOOR_MS = 5 * 60_000
-
-// Deadline to wait until before hitting this account again, in order of trust: Retry-After
-// (RFC 7231 delta-seconds or HTTP date), then Anthropic's -unified-reset once its -remaining
-// hits 0, then a floor for bare 429s.
-function parseRetryAfter(header: Record<string, string[]> | undefined, statusCode: number): number | undefined {
-  const retryAfter = headerValue(header, 'retry-after')
-  const seconds = Number(retryAfter)
-  return parseReset(Number.isNaN(seconds) ? retryAfter : Date.now() / 1000 + seconds)
-    ?? (headerValue(header, 'anthropic-ratelimit-unified-remaining') === '0'
-      ? parseReset(headerValue(header, 'anthropic-ratelimit-unified-reset'))
-      : undefined)
-    ?? (statusCode === 429 ? Date.now() + RATE_LIMIT_FLOOR_MS : undefined)
+function normalize(value: string): string {
+  return value.toLowerCase().replaceAll(/[^a-z0-9]/g, '')
 }
 
-// CLIProxyAPI forwards Go's canonicalized http.Header, so values arrive as string arrays.
-function headerValue(header: Record<string, string[]> | undefined, name: string): string | undefined {
-  return Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === name)?.[1]?.[0]?.trim()
+function providerTitle(provider: string): string {
+  return LOGIN_PROVIDERS.find(entry => entry.provider === provider)?.title
+    ?? `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
 }
 
-function accountOf(entry: AuthFileRaw): QuotaReport['account'] | undefined {
-  const authIndex = entry.auth_index?.trim() ?? ''
-  if (authIndex === '')
+// Accepts an ISO-8601 server time and returns local epoch ms, dropping values already in the past.
+function parseReset(value: string | undefined, serverOffsetMs: number): number | undefined {
+  if (value === undefined || value.trim() === '')
     return undefined
-  const label = entry.email?.trim()
+  const ms = Date.parse(value) - serverOffsetMs
+  return Number.isNaN(ms) || ms <= Date.now() ? undefined : ms
+}
+
+function accountLabel(entry: AuthFileRaw, authIndex: string): string {
+  return entry.email?.trim()
     ?? entry.id_token?.email?.trim()
     ?? entry.label?.trim()
     ?? entry.name?.trim()
     ?? `Account ${authIndex}`
-  return { authIndex, label }
 }

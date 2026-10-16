@@ -389,66 +389,45 @@ describe('language model provider', () => {
     expect(clientMocks.streamResponse).not.toHaveBeenCalled()
   })
 
-  it('keeps the last successful Claude quota until newer values arrive', () => {
+  it('keeps the last successful quota per account until newer values arrive', () => {
     const provider = createProvider()
-    provider.setQuotas([{
-      provider: 'claude',
-      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }],
-    }])
+    provider.setQuotas([{ provider: 'claude', title: 'Claude', windows: [{ label: '5h', remainingPercent: 80 }] }])
 
-    provider.setQuotas([{ provider: 'claude', windows: [], error: 'HTTP 401' }])
+    provider.setQuotas([{ provider: 'claude', title: 'Claude', windows: [], error: 'HTTP 401' }])
     expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 80 }] },
+      { title: 'Claude', entries: [{ name: '5h', remainingPercent: 80 }] },
     ])
-    provider.setQuotas([{
-      provider: 'claude',
-      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 65 }],
-    }])
+    provider.setQuotas([{ provider: 'claude', title: 'Claude', windows: [{ label: '5h', remainingPercent: 65 }] }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 65 }] },
+      { title: 'Claude', entries: [{ name: '5h', remainingPercent: 65 }] },
     ])
   })
 
   it('keeps a pending row for an account whose quota has not loaded yet', () => {
     const provider = createProvider()
-    provider.setQuotas([{ provider: 'claude', windows: [] }])
+    provider.setQuotas([{ provider: 'devin', title: 'Devin', windows: [] }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: 'Quota', remainingPercent: undefined }] },
+      { title: 'Devin', entries: [{ name: 'Quota', remainingPercent: undefined }] },
     ])
   })
 
-  it('threads resetsAt through quotaSections for account-window providers', () => {
+  it('lists every provider the server reports, with reset times, in server order', () => {
     const provider = createProvider()
-    provider.setQuotas([{ provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] }])
-    expect(provider.quotaSections()).toEqual([
-      { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 75 }] },
-    ])
-
     provider.setQuotas([{
-      provider: 'grok',
+      provider: 'xai',
+      title: 'Grok',
       windows: [{ label: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }],
     }, {
       provider: 'claude',
-      windows: [{ key: 'five_hour', label: '5h Quota', remainingPercent: 80 }],
+      title: 'Claude',
+      windows: [{ label: '5h', remainingPercent: 80 }],
     }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: '5h Quota', remainingPercent: 80 }] },
       { title: 'Grok', entries: [{ name: 'Credits', remainingPercent: 60, resetsAt: 1_800_000_000_000 }] },
-    ])
-  })
-
-  it('threads the remaining Claude extra-usage balance through quotaSections', () => {
-    const provider = createProvider()
-    provider.setQuotas([{
-      provider: 'claude',
-      windows: [{ key: 'extra_usage', label: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } }],
-    }])
-
-    expect(provider.quotaSections()).toEqual([
-      { title: 'Claude', entries: [{ name: 'Extra Usage', remainingPercent: 75, balance: { amount: 15, currency: 'EUR', suffix: 'left' } }] },
+      { title: 'Claude', entries: [{ name: '5h', remainingPercent: 80 }] },
     ])
   })
 
@@ -456,22 +435,24 @@ describe('language model provider', () => {
     const provider = createProvider()
     provider.setQuotas([{
       provider: 'codex',
+      title: 'Codex',
       account: { authIndex: '0', label: 'a@example.com' },
-      windows: [{ label: '5h Quota', remainingPercent: 90 }, { label: '7d Quota', remainingPercent: 50 }],
+      windows: [{ label: '5h', remainingPercent: 90 }, { label: '7d', remainingPercent: 50 }],
     }, {
       provider: 'codex',
+      title: 'Codex',
       account: { authIndex: '1', label: 'b@example.com' },
-      windows: [{ label: '5h Quota', remainingPercent: 30 }, { label: '7d Quota', remainingPercent: 10 }],
+      windows: [{ label: '5h', remainingPercent: 30 }, { label: '7d', remainingPercent: 10 }],
     }])
 
     expect(provider.quotaSections()).toEqual([
       { title: 'Codex (a@example.com)', entries: [
-        { name: '5h Quota', remainingPercent: 90 },
-        { name: '7d Quota', remainingPercent: 50 },
+        { name: '5h', remainingPercent: 90 },
+        { name: '7d', remainingPercent: 50 },
       ] },
       { title: 'Codex (b@example.com)', entries: [
-        { name: '5h Quota', remainingPercent: 30 },
-        { name: '7d Quota', remainingPercent: 10 },
+        { name: '5h', remainingPercent: 30 },
+        { name: '7d', remainingPercent: 10 },
       ] },
     ])
   })
@@ -480,12 +461,13 @@ describe('language model provider', () => {
     const provider = createProvider()
     provider.setQuotas([{
       provider: 'codex',
+      title: 'Codex',
       account: { authIndex: '0', label: 'a@example.com' },
-      windows: [{ label: '5h Quota', remainingPercent: 90 }],
+      windows: [{ label: '5h', remainingPercent: 90 }],
     }])
 
     expect(provider.quotaSections()).toEqual([
-      { title: 'Codex', entries: [{ name: '5h Quota', remainingPercent: 90 }] },
+      { title: 'Codex', entries: [{ name: '5h', remainingPercent: 90 }] },
     ])
   })
 })
