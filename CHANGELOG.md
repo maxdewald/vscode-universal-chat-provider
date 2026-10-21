@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.2.0...v1.3.0) (2026-10-21)
+
+
+### Features
+
+* **ui:** refresh logo and add custom provider icons ([c4c4023](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c4c4023062182f23b7f6ae31ff0e67ffaf98838c))
+
 ## [1.2.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.2...v1.2.0) (2026-10-21)
 
 
