@@ -32,7 +32,9 @@
   "files": [
     "LICENSE.md",
     "dist/*",
-    "images/logo.png"
+    "images/icons.woff",
+    "images/logo.png",
+    "images/provider-icon-*.svg"
   ],
   "engines": {
     "node": ">=22.18.0",
@@ -42,10 +44,23 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "icons": {
+      "universal-chat-provider-logo": {
+        "description": "Universal Chat Provider logo",
+        "default": {
+          "fontPath": "images/icons.woff",
+          "fontCharacter": "\\E000"
+        }
+      }
+    },
     "languageModelChatProviders": [
       {
         "vendor": "universal-chat-provider",
         "displayName": "Universal Chat Provider",
+        "icon": {
+          "light": "images/provider-icon-light.svg",
+          "dark": "images/provider-icon-dark.svg"
+        },
         "managementCommand": "universalChatProvider.login"
       }
     ],

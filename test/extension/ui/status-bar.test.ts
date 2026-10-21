@@ -21,7 +21,7 @@ describe('status bar', () => {
   })
 
   it.each([
-    ['external', '$(server) Universal Chat Provider', 'using an external server', undefined],
+    ['external', '$(universal-chat-provider-logo) Universal Chat Provider', 'using an external server', undefined],
     ['starting', '$(loading~spin) Universal Chat Provider', 'starting the managed server', undefined],
     ['error', '$(warning) Universal Chat Provider', 'managed server is not running', 'statusBarItem.warningBackground'],
   ] as const)('shows %s status', (status, text, tooltip, background) => {
@@ -35,7 +35,7 @@ describe('status bar', () => {
   it('omits the healthy managed server state from the tooltip', () => {
     updateStatusBar(statusBarItem as never, 'running')
 
-    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(statusBarItem.text).toBe('$(universal-chat-provider-logo) Universal Chat Provider')
     expect(tooltipValue()).not.toContain('managed server running')
   })
 
@@ -49,7 +49,7 @@ describe('status bar', () => {
   it('stays normal when the active model is above the low threshold', () => {
     updateStatusBar(statusBarItem as never, 'running', [], { name: 'Gemini 3 Pro', remainingPercent: 12 })
 
-    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(statusBarItem.text).toBe('$(universal-chat-provider-logo) Universal Chat Provider')
     expect(statusBarItem.backgroundColor).toBeUndefined()
   })
 
@@ -59,7 +59,7 @@ describe('status bar', () => {
       { title: 'Codex', entries: [{ name: '7d Quota', remainingPercent: 2 }] },
     ], { name: 'Gemini 3 Pro', remainingPercent: 2 })
 
-    expect(statusBarItem.text).toBe('$(server-process) Universal Chat Provider')
+    expect(statusBarItem.text).toBe('$(universal-chat-provider-logo) Universal Chat Provider')
     expect(statusBarItem.backgroundColor).toBeUndefined()
     expect(tooltipValue()).not.toContain('$(warning)')
   })

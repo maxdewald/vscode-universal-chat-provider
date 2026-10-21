@@ -16,10 +16,12 @@ function warnBelow(): number | undefined {
     : undefined
 }
 
+const LOGO = '$(universal-chat-provider-logo)'
+
 const PRESENTATION: Record<ServerStatus, { icon: string, tooltip?: string }> = {
-  external: { icon: '$(server)', tooltip: 'using an external server' },
+  external: { icon: LOGO, tooltip: 'using an external server' },
   starting: { icon: '$(loading~spin)', tooltip: 'starting the managed server…' },
-  running: { icon: '$(server-process)' },
+  running: { icon: LOGO },
   error: { icon: '$(warning)', tooltip: 'managed server is not running' },
 }
 
