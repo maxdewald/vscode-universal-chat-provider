@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.1...v1.1.2) (2026-10-21)
+
+
+### Bug Fixes
+
+* **chat:** forward Retry-After on rate limits ([49be83e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/49be83e94bb13910f412686ac908acb60b0e8933))
+
 ## [1.1.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.0...v1.1.1) (2026-10-21)
 
 
