@@ -75,6 +75,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (UTILITY_SETTINGS.some(setting => event.affectsConfiguration(`chat.${setting}`)))
           this.modelsChanged.fire()
+        if (event.affectsConfiguration('universalChatProvider.models.showLatestOnly'))
+          void this.registry.forceRefresh(false)
       }),
     )
   }

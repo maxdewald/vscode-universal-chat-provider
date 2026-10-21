@@ -133,17 +133,15 @@ describe('model registry', () => {
     expect(outputMessages(message)).toHaveLength(3)
   })
 
-  it('logs each skipped model only once', async () => {
+  it('logs skipped models as one line per reason, only once', async () => {
     const registry = createRegistry('secret')
-    const message = 'Skipped model codex-auto-review: model is hidden upstream.'
+    const message = 'Skipped 2 models (model is hidden upstream): codex-auto-review, codex-internal.'
 
     clientMocks.discover.mockResolvedValue({
-      available: [
-        { id: 'codex-auto-review', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 },
-      ],
-      metadata: [
-        { slug: 'codex-auto-review', visibility: 'hide', supported_in_api: true },
-      ],
+      available: ['codex-internal', 'codex-auto-review']
+        .map(id => ({ id, owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 })),
+      metadata: ['codex-internal', 'codex-auto-review']
+        .map(slug => ({ slug, visibility: 'hide', supported_in_api: true })),
     })
     await registry.forceRefresh(false)
     await registry.forceRefresh(false)
@@ -151,6 +149,26 @@ describe('model registry', () => {
     await registry.forceRefresh(false)
 
     expect(outputMessages(message)).toHaveLength(1)
+  })
+
+  it('hides superseded releases when models.showLatestOnly is enabled', async () => {
+    vscodeMock.settings.set('universalChatProvider.models.showLatestOnly', true)
+    catalogMocks.fetchCatalog.mockResolvedValue({
+      router: new Map(),
+      modelsDev: new Map([
+        ['gpt-5.6-sol', { id: 'gpt-5.6-sol', release_date: '2026-07-09' }],
+        ['gpt-6.1-sol', { id: 'gpt-6.1-sol', release_date: '2026-10-01' }],
+      ]),
+    })
+    clientMocks.discover.mockResolvedValueOnce({
+      available: ['gpt-5.6-sol', 'gpt-6.1-sol']
+        .map(id => ({ id, owned_by: 'openai', context_length: 128_000, max_completion_tokens: 20 })),
+      metadata: [],
+    })
+
+    const models = await createRegistry('secret').forceRefresh(false)
+
+    expect(models.map(model => model.id)).toEqual(['gpt-6.1-sol'])
   })
 
   it('retains cached models on discovery failure and reports interactive errors', async () => {

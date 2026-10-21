@@ -262,6 +262,24 @@ describe('model mapping', () => {
     ])
   })
 
+  it('keeps only the newest release of each model line when latestOnly is set', () => {
+    const skipped: string[] = []
+    const models = mapProxyModels(
+      ['gpt-5.6-sol', 'gpt-6.1-sol', 'gpt-5.6-terra', 'gpt-6-luna']
+        .map(id => ({ id, owned_by: 'openai', context_length: 272_000, max_completion_tokens: 128_000 })),
+      [],
+      new Map([
+        ['gpt-5.6-sol', { id: 'gpt-5.6-sol', release_date: '2026-07-09' }],
+        ['gpt-6.1-sol', { id: 'gpt-6.1-sol', release_date: '2026-10-01' }],
+        ['gpt-5.6-terra', { id: 'gpt-5.6-terra', release_date: '2026-07-09' }],
+      ]),
+      { latestOnly: true, onSkipped: id => skipped.push(id) },
+    )
+
+    expect(models.map(model => model.id).sort()).toEqual(['gpt-5.6-terra', 'gpt-6-luna', 'gpt-6.1-sol'])
+    expect(skipped).toEqual(['gpt-5.6-sol'])
+  })
+
   it('does not add a Fast variant when no fast mode is advertised', () => {
     const models = mapProxyModels(
       [{ id: 'gpt-5.4-mini', owned_by: 'openai', context_length: 272_000, max_completion_tokens: 128_000 }],

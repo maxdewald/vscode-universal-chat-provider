@@ -8,7 +8,7 @@ import { isProxyCredentialRejection } from '@src/cliproxy/api/errors'
 import { CLIProxyClient } from '@src/cliproxy/api/proxy-client'
 import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
-import { EventEmitter, window } from 'vscode'
+import { EventEmitter, window, workspace } from 'vscode'
 
 export interface ModelRegistryHooks {
   acquireApiKey: () => Promise<string | undefined>
@@ -105,16 +105,19 @@ export class ModelRegistry {
       const catalogs = await fetchCatalog(controller.signal)
       const discovery = await client.discover(controller.signal)
       const collisions = new Set<string>()
+      const skipped = new Map<string, string[]>()
       const models = mapProxyModels(discovery.available, discovery.metadata, catalogs, {
-        onSkipped: (id, reason) => {
-          const message = `Skipped model ${id}: ${reason}.`
-          if (this.loggedSkips.has(message))
-            return
-          this.loggedSkips.add(message)
-          this.output.appendLine(message)
-        },
+        latestOnly: workspace.getConfiguration('universalChatProvider').get<boolean>('models.showLatestOnly', false),
+        onSkipped: (id, reason) => skipped.set(reason, [...skipped.get(reason) ?? [], id]),
         onCollision: message => collisions.add(message),
       })
+      for (const [reason, ids] of skipped) {
+        const message = `Skipped ${ids.length === 1 ? 'model' : `${ids.length} models`} (${reason}): ${ids.sort().join(', ')}.`
+        if (!this.loggedSkips.has(message)) {
+          this.loggedSkips.add(message)
+          this.output.appendLine(message)
+        }
+      }
       for (const collision of collisions) {
         if (!this.previousCollisions.has(collision))
           this.output.appendLine(collision)

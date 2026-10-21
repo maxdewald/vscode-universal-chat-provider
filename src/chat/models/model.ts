@@ -71,6 +71,7 @@ interface ModelConfigurationSchema {
 }
 
 export interface ModelMappingOptions {
+  latestOnly?: boolean
   onSkipped?: (id: string, reason: string) => void
   onCollision?: (message: string) => void
 }
@@ -95,7 +96,7 @@ interface ModelCandidate {
   levels: string[]
   totalContext: number
   outputTokens: number
-  fastCostMultiplier: number | undefined
+  modelsDev: CatalogModel | undefined
 }
 
 export function mapProxyModels(
@@ -156,14 +157,15 @@ export function mapProxyModels(
       levels,
       totalContext,
       outputTokens,
-      fastCostMultiplier: modelsDevModel?.fastCostMultiplier,
+      modelsDev: modelsDevModel,
     })
   }
 
-  const ambiguousNames = ambiguousDisplayNames(candidates, options)
-  const models = candidates.map(candidate => ({
+  const visible = options.latestOnly ? latestReleases(candidates, options) : candidates
+  const ambiguousNames = ambiguousDisplayNames(visible, options)
+  const models = visible.map(candidate => ({
     model: toProviderModel(candidate, ambiguousNames.has(displayBaseKey(candidate))),
-    fastCostMultiplier: candidate.fastCostMultiplier,
+    fastCostMultiplier: candidate.modelsDev?.fastCostMultiplier,
   }))
   models.sort((a, b) => {
     const nameOrder = a.model.name.replace(REASONING_NAME_SUFFIX, '')
@@ -185,6 +187,24 @@ function toFastModel(model: ProviderModel, costMultiplier: number): ProviderMode
     detail: `${costMultiplier}x usage · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
     serviceTier: 'priority',
   }
+}
+
+function latestReleases(candidates: readonly ModelCandidate[], options: ModelMappingOptions): ModelCandidate[] {
+  // models.dev families are inconsistent across vendors, so the version-stripped id groups releases instead.
+  const lineKey = (candidate: ModelCandidate): string => `${candidate.providerName}\0${candidate.entry.id.toLowerCase().replace(/[\d.-]+/g, '')}`
+  const newest = new Map<string, string>()
+  for (const candidate of candidates) {
+    const date = candidate.modelsDev?.release_date ?? ''
+    if (date > (newest.get(lineKey(candidate)) ?? ''))
+      newest.set(lineKey(candidate), date)
+  }
+  return candidates.filter((candidate) => {
+    const date = candidate.modelsDev?.release_date
+    if (date === undefined || date >= (newest.get(lineKey(candidate)) ?? ''))
+      return true
+    options.onSkipped?.(candidate.entry.id, 'superseded by a newer release')
+    return false
+  })
 }
 
 function ambiguousDisplayNames(candidates: readonly ModelCandidate[], options: ModelMappingOptions): Set<string> {

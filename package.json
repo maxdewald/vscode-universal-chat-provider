@@ -125,25 +125,25 @@
             ],
             "enumDescriptions": [
               "Download and run CLIProxyAPI automatically.",
-              "Connect to a CLIProxyAPI server you manage."
+              "Connect to a CLIProxyAPI server you run yourself."
             ],
             "default": "managed",
             "order": 1,
-            "description": "How CLIProxyAPI is provided."
+            "description": "How to run CLIProxyAPI."
           },
           "universalChatProvider.baseUrl": {
             "type": "string",
             "default": "http://127.0.0.1:8317",
             "order": 2,
-            "description": "CLIProxyAPI server URL. Used only in external mode.",
-            "markdownDescription": "CLIProxyAPI server URL. Used only when `#universalChatProvider.server.mode#` is `external`."
+            "description": "URL of your CLIProxyAPI server. External mode only.",
+            "markdownDescription": "URL of your CLIProxyAPI server. Only used when `#universalChatProvider.server.mode#` is External."
           },
           "universalChatProvider.server.managementKey": {
             "type": "string",
             "default": "",
             "scope": "machine",
             "order": 5,
-            "description": "External mode only. Enter your server's existing management key, not its bcrypt hash. Managed mode generates and stores its own key automatically and ignores this setting."
+            "description": "Management key of your CLIProxyAPI server (the plain key, not its hash). External mode only."
           }
         }
       },
@@ -165,23 +165,22 @@
               "Manual"
             ],
             "markdownEnumDescriptions": [
-              "Download the latest CLIProxyAPI release when VS Code starts and restart automatically when no requests are active.",
-              "Check for updates when VS Code starts and ask before downloading them for an idle restart.",
-              "Use only the configured version and do not check for updates."
+              "Update on startup and restart once no requests are running.",
+              "Ask before installing updates.",
+              "Stay on `#universalChatProvider.server.version#` and never check for updates."
             ],
             "default": "automatic",
             "scope": "machine",
             "order": 1,
-            "description": "How managed CLIProxyAPI updates are handled.",
-            "markdownDescription": "How managed CLIProxyAPI updates are handled."
+            "description": "How the managed server is updated."
           },
           "universalChatProvider.server.version": {
             "type": "string",
             "default": "latest",
             "scope": "machine",
             "order": 2,
-            "description": "CLIProxyAPI release used when update policy is Manual. Use latest or an exact version (8.0.3 or newer).",
-            "markdownDescription": "CLIProxyAPI release used when `#universalChatProvider.server.updatePolicy#` is `manual`. Use `latest` or an exact version (8.0.3 or newer) to pin it."
+            "description": "CLIProxyAPI version for Manual updates: latest or an exact version (8.0.3 or newer).",
+            "markdownDescription": "CLIProxyAPI version used when `#universalChatProvider.server.updatePolicy#` is Manual: `latest` or an exact version (8.0.3 or newer)."
           },
           "universalChatProvider.server.extraConfig": {
             "type": "string",
@@ -189,8 +188,8 @@
             "scope": "machine",
             "editPresentation": "multilineText",
             "order": 3,
-            "description": "Custom YAML overrides for the managed server, such as proxy, retries, and account selection. Overriding connection settings, credentials, or providers can break the extension.",
-            "markdownDescription": "Customize the managed server with CLIProxyAPI v8 YAML. [Configuration reference](https://github.com/router-for-me/CLIProxyAPI/blob/main/config.example.yaml).\n\n**Examples**\n- `requests.proxy-url`: upstream proxy\n- `routing.retry.request-retry`: retry count\n- `routing.strategy`: account selection (`round-robin` or `fill-first`)\n\nNested settings merge; lists and other values replace defaults.\n\nOverriding connection settings, credentials, or providers can break the extension."
+            "description": "Extra YAML config for the managed server, such as proxy, retries, and account selection. Changing connection, credential, or provider settings can break the extension.",
+            "markdownDescription": "Extra YAML config for the managed server. See the [configuration reference](https://github.com/router-for-me/CLIProxyAPI/blob/main/config.example.yaml).\n\n**Examples**\n- `requests.proxy-url`: upstream proxy\n- `routing.retry.request-retry`: retry count\n- `routing.strategy`: account selection (`round-robin` or `fill-first`)\n\nChanging connection, credential, or provider settings can break the extension."
           }
         }
       },
@@ -203,7 +202,7 @@
             "type": "boolean",
             "default": true,
             "order": 1,
-            "description": "Warn in the status bar when the model in use is low on quota."
+            "description": "Warn in the status bar when the current model is low on quota."
           },
           "universalChatProvider.quotaWarningThreshold": {
             "type": "number",
@@ -211,31 +210,44 @@
             "minimum": 0,
             "maximum": 100,
             "order": 2,
-            "description": "Remaining-quota percent below which the status bar warning appears."
+            "description": "Warn when remaining quota drops below this percentage."
+          }
+        }
+      },
+      {
+        "type": "object",
+        "title": "Models",
+        "order": 4,
+        "properties": {
+          "universalChatProvider.models.showLatestOnly": {
+            "type": "boolean",
+            "default": false,
+            "order": 1,
+            "description": "Hide older versions of a model when a newer one is available, e.g. Claude Opus 4.8 once Opus 5.5 is out."
           }
         }
       },
       {
         "type": "object",
         "title": "Provider Specific",
-        "order": 4,
+        "order": 5,
         "properties": {
           "universalChatProvider.codex.webSearch": {
             "type": "boolean",
             "default": false,
-            "description": "Let Codex look things up online and open web pages while it answers."
+            "description": "Let Codex search and browse the web."
           },
           "universalChatProvider.claude.webSearch": {
             "type": "boolean",
             "default": false,
-            "description": "Let Claude look things up online while it answers."
+            "description": "Let Claude search the web."
           }
         }
       },
       {
         "type": "object",
         "title": "Advanced",
-        "order": 5,
+        "order": 6,
         "properties": {
           "universalChatProvider.debugLevel": {
             "type": "string",
@@ -250,13 +262,13 @@
               "Request Logging"
             ],
             "enumDescriptions": [
-              "Disable diagnostic collection.",
-              "Show prompt-cache metrics and write redacted per-request diagnostics to extension storage.",
-              "Include diagnostics and make the managed CLIProxyAPI log complete request and response payloads. Logs may contain prompts, conversations, tools, files, and credentials."
+              "Collect nothing.",
+              "Show prompt cache stats and save redacted request details.",
+              "Also save full requests and responses. These may contain prompts, files, and credentials. Restarts the managed server."
             ],
             "default": "off",
             "order": 1,
-            "description": "Diagnostic detail to collect. Request Logging prompts before restarting the managed server and writes sensitive payloads to disk."
+            "description": "How much diagnostic data to collect."
           }
         }
       }

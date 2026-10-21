@@ -32,6 +32,7 @@ const CatalogModelSchema = Type.Object({
   supportedOutputModalities: Type.Optional(Type.Array(Type.String())),
   thinking: Type.Optional(CatalogThinkingSchema),
   fastCostMultiplier: Type.Optional(Type.Number()),
+  release_date: Type.Optional(Type.String()),
 })
 
 const ModelsDevCostSchema = Type.Object({
@@ -42,6 +43,7 @@ const ModelsDevModelSchema = Type.Object({
   id: Type.String(),
   name: Type.Optional(Type.String()),
   description: Type.Optional(Type.String()),
+  release_date: Type.Optional(Type.String()),
   reasoning_options: Type.Optional(Type.Array(Type.Object({
     values: Type.Optional(Type.Array(Type.Unknown())),
   }, { additionalProperties: true }))),
@@ -180,6 +182,7 @@ function toCatalogModel(model: ModelsDevModel): CatalogModel {
     ...(model.modalities?.output === undefined ? {} : { supportedOutputModalities: model.modalities.output }),
     ...(levels.length === 0 ? {} : { thinking: { levels } }),
     ...(fastMultiplier === undefined ? {} : { fastCostMultiplier: fastMultiplier }),
+    ...(model.release_date === undefined ? {} : { release_date: model.release_date }),
   }
 }
 
