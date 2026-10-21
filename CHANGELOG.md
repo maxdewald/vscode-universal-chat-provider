@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.2...v1.2.0) (2026-10-21)
+
+
+### Features
+
+* **models:** add option to show only latest model releases ([817d9e6](https://github.com/maxdewald/vscode-universal-chat-provider/commit/817d9e600585c0cbb4ac502571c25a065a320e4d))
+
 ## [1.1.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.1...v1.1.2) (2026-10-21)
 
 
