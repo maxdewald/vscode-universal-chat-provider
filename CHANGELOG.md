@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.1.0...v1.1.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **chat:** improve Copilot error messages for filtered responses ([c73b994](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c73b994c9043bf14ceff9fe9f0f9d37c8ed0be39))
+
 ## [1.1.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.0.1...v1.1.0) (2026-10-07)
 
 
