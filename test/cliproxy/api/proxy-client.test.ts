@@ -52,6 +52,19 @@ describe('cLIProxyClient', () => {
       .toEqual(new ProxyHttpError('proxy unavailable', 503))
   })
 
+  it.each([
+    ['seconds', '30', 30_000],
+    ['garbage', 'soon', undefined],
+  ])('reads Retry-After given as %s', async (_name, header, retryAfterMs) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('slow down', { status: 429, headers: { 'retry-after': header } })))
+    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+
+    await expect(new CLIProxyClient('http://proxy', 'key')
+      .streamResponse(emptyBody, callbacks(), new AbortController().signal))
+      .rejects
+      .toMatchObject({ status: 429, retryAfterMs })
+  })
+
   it('reports a top-level JSON HTTP error message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({
       type: 'error',

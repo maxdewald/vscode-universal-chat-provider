@@ -62,7 +62,14 @@ const toProxyHttpError: BeforeErrorHook = ({ error }) => {
   return new ProxyHttpError(
     message || `CLIProxyAPI request failed with HTTP ${error.response.status}.`,
     error.response.status,
+    retryAfterMs(error.response.headers.get('retry-after')),
   )
+}
+
+// ponytail: seconds only (what Anthropic/OpenAI send); parse HTTP dates if a provider uses them.
+function retryAfterMs(header: string | null): number | undefined {
+  const seconds = header === null || header.trim() === '' ? Number.NaN : Number(header)
+  return Number.isFinite(seconds) ? Math.max(0, seconds * 1000) : undefined
 }
 
 export class CLIProxyClient {

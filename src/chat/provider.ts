@@ -38,9 +38,6 @@ interface HostChatResponseOptions {
   requestInitiator?: string
 }
 
-// Chat UIs that render `message: stack`; other extensions keep the LanguageModelError and its code.
-const CHAT_UI_INITIATORS = new Set(['core', 'github.copilot-chat'])
-
 export function utilityModelId(modelId: string, effort: string): string {
   return `${modelId}${UTILITY_SUFFIX}${effort}`
 }
@@ -243,9 +240,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       )
       if (utilityRequest || compaction !== undefined)
         void vscode.window.showErrorMessage(`Utility model request failed: ${errorMessage(error)}`)
-      if (!CHAT_UI_INITIATORS.has(requestOptions.requestInitiator ?? ''))
+      // Copilot Chat renders `message: stack` and a LanguageModelError gets a fresh stack after IPC; others keep its code.
+      if (requestOptions.requestInitiator !== 'github.copilot-chat')
         throw error
-      // LanguageModelError gets a fresh stack after IPC, so only a stackless plain Error stays readable.
       const plain = new Error(errorMessage(error))
       plain.stack = ''
       throw plain

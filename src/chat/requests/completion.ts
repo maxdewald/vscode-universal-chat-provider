@@ -51,8 +51,10 @@ function mapProviderError(error: unknown): Error {
       return LanguageModelError.NoPermissions(error.message)
     if (error.status === 404)
       return LanguageModelError.NotFound(error.message)
+    // Proposed `languageModelRateLimit`, exposed without a proposal check; older VS Code lacks it.
+    const proposed = LanguageModelError as { RateLimited?: (message: string, retryAfter?: number) => Error }
     if (error.status === 429)
-      return LanguageModelError.Blocked(error.message)
+      return proposed.RateLimited?.(error.message, error.retryAfterMs) ?? LanguageModelError.Blocked(error.message)
   }
   return error instanceof Error ? error : new Error(String(error))
 }

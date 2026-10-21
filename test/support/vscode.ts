@@ -105,7 +105,11 @@ export class LanguageModelError extends Error {
     return new LanguageModelError(message, 'NotFound')
   }
 
-  private constructor(message: string, readonly code: string) {
+  static RateLimited(message = 'Rate limited', retryAfter?: number): LanguageModelError {
+    return new LanguageModelError(message, 'RateLimited', retryAfter)
+  }
+
+  private constructor(message: string, readonly code: string, readonly retryAfter?: number) {
     super(message)
   }
 }

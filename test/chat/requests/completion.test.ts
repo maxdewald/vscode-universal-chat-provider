@@ -72,7 +72,7 @@ describe('streamCompletion', () => {
     [401, 'bad key', 'NoPermissions', true],
     [403, 'The model grok-4.5 is not available in your region.', 'NoPermissions', false],
     [404, 'failed', 'NotFound', false],
-    [429, 'failed', 'Blocked', false],
+    [429, 'failed', 'RateLimited', false],
   ])('maps HTTP %s errors', async (status, message, code, recovers) => {
     const rejected = vi.fn()
     clientMocks.streamResponse.mockRejectedValueOnce(new ProxyHttpError(message, status))
@@ -81,6 +81,14 @@ describe('streamCompletion', () => {
       streamCompletion(deps('key', rejected), emptyBody, callbacks()),
     ).rejects.toMatchObject({ code, message })
     expect(rejected).toHaveBeenCalledTimes(recovers ? 1 : 0)
+  })
+
+  it('forwards Retry-After on rate limits', async () => {
+    clientMocks.streamResponse.mockRejectedValueOnce(new ProxyHttpError('slow down', 429, 30_000))
+
+    await expect(streamCompletion(deps('key'), emptyBody, callbacks()))
+      .rejects
+      .toMatchObject({ code: 'RateLimited', retryAfter: 30_000 })
   })
 
   it('passes HTTP 400 errors through unchanged', async () => {
