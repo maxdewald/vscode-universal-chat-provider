@@ -166,7 +166,7 @@ export class CLIProxyClient {
           if (reason === 'max_output_tokens')
             return
           if (reason === 'content_filter')
-            throw new Error('CLIProxyAPI blocked the response with its content filter.')
+            throw new Error('The model provider\'s safety filter refused this response; rephrase it, start a new chat, or switch models.')
           throw new Error(reason !== undefined && reason.length > 0
             ? `CLIProxyAPI returned an incomplete response: ${reason}.`
             : 'CLIProxyAPI returned an incomplete response without a reason.')

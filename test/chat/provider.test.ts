@@ -50,6 +50,14 @@ describe('language model provider', () => {
       token.token,
     )).rejects.toMatchObject({ code: 'NoPermissions' })
 
+    await expect(provider.provideLanguageModelChatResponse(
+      model(),
+      [],
+      { ...options(), requestInitiator: 'github.copilot-chat' } as ReturnType<typeof options>,
+      { report: vi.fn() },
+      token.token,
+    )).rejects.toMatchObject({ message: 'Configure a CLIProxyAPI API key first.', stack: '' })
+
     token.cancel()
     await expect(provider.provideTokenCount(model(), 'hello', token.token)).resolves.toBe(0)
     await expect(provider.provideLanguageModelChatInformation({ silent: true }, token.token)).resolves.toEqual([])

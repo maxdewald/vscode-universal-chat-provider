@@ -574,7 +574,7 @@ describe('cLIProxyClient', () => {
 
     await expect(stream(body, handlers))
       .rejects
-      .toThrow('blocked the response with its content filter')
+      .toThrow('The model provider\'s safety filter refused this response')
 
     expect(handlers.onText).toHaveBeenCalledWith('visible prefix')
     expect(handlers.onUsage).toHaveBeenCalledWith(usage)
