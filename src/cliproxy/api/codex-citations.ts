@@ -16,6 +16,8 @@ const SearchResultCitationSchema = Type.Object({
   title: Type.String(),
 })
 
+const AnnotationSchema = Type.Union([CitationSchema, SearchResultCitationSchema])
+
 // ChatGPT-backend models wrap citations in private-use glyphs: U+E200 cite U+E202 id U+E201.
 export const codexCitations: TextRenderer = {
   marker: '\uE200',
@@ -27,13 +29,17 @@ function renderCitations(text: string, emittedUtf16Length: number, annotations: 
   const replacements = new Map<number, { end: number, links: Set<string> }>()
   const sources = new Set<string>()
   for (const value of annotations) {
+    const citation = asValue(AnnotationSchema, value)
+    if (citation === undefined)
+      continue
     // Claude citations carry no text offsets, so their sources are listed after the text.
-    const source = asValue(SearchResultCitationSchema, value)
-    const sourceLink = source && markdownLink(source.url, source.title)
-    if (sourceLink !== undefined)
-      sources.add(sourceLink)
-    const citation = asValue(CitationSchema, value)
-    if (citation === undefined || citation.end_index > characters.length || citation.end_index <= citation.start_index)
+    if (citation.type === 'web_search_result_location') {
+      const sourceLink = markdownLink(citation.url, citation.title)
+      if (sourceLink !== undefined)
+        sources.add(sourceLink)
+      continue
+    }
+    if (citation.end_index > characters.length || citation.end_index <= citation.start_index)
       continue
     const marker = characters.slice(citation.start_index, citation.end_index).join('')
     if (!/^\uE200cite\uE202[^\uE201]*\uE201$/.test(marker))

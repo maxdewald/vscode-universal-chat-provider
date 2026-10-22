@@ -150,6 +150,9 @@ describe('cLIProxyClient', () => {
     { completion: 'both events', partDone: true, itemDone: true, itemId: 'message-1' },
     { completion: 'output index fallback', partDone: false, itemDone: true, itemId: undefined },
   ])('renders citation markers once on $completion completion', async ({ partDone, itemDone, itemId }) => {
+    const { setJsonValidationErrorReporter } = await import('@src/shared/json')
+    const reportValidationError = vi.fn()
+    setJsonValidationErrorReporter(reportValidationError)
     const prefix = 'Release notes. '
     const marker = '\uE200cite\uE202turn2view2\uE201'
     const part = {
@@ -187,6 +190,7 @@ describe('cLIProxyClient', () => {
       prefix,
       '[Release notes](<https://example.com/release>) More details.',
     ])
+    expect(reportValidationError).not.toHaveBeenCalled()
   })
 
   it('keeps citation metadata scoped to its content part', async () => {
@@ -227,6 +231,9 @@ describe('cLIProxyClient', () => {
   })
 
   it('appends deduplicated Claude search sources after the text', async () => {
+    const { setJsonValidationErrorReporter } = await import('@src/shared/json')
+    const reportValidationError = vi.fn()
+    setJsonValidationErrorReporter(reportValidationError)
     const location = { item_id: 'message-1', output_index: 0, content_index: 0 }
     const source = (url: string, title: string) => ({ type: 'web_search_result_location', url, title, cited_text: 'x' })
     const body = [
@@ -253,6 +260,7 @@ describe('cLIProxyClient', () => {
       'Node 26 is out.',
       '\n\n[Node \\[Blog\\]](<https://nodejs.org/blog>)',
     ])
+    expect(reportValidationError).not.toHaveBeenCalled()
   })
 
   it.each([
