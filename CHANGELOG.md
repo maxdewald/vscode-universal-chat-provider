@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.4.0...v1.4.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **cliproxy:** validate citation annotations without false errors ([81f72c1](https://github.com/maxdewald/vscode-universal-chat-provider/commit/81f72c1f651bd0abdb015f01a2650ccaa61b12b4))
+
 ## [1.4.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.3.0...v1.4.0) (2026-10-22)
 
 
