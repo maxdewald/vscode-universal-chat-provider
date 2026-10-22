@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.3.0...v1.4.0) (2026-10-22)
+
+
+### Features
+
+* **provider:** add light and dark provider icons ([053a8e9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/053a8e98916ea1ffcb1c45b851938d2b80622ec3))
+
 ## [1.3.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.2.0...v1.3.0) (2026-10-21)
 
 
