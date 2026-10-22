@@ -1,7 +1,7 @@
 import type { OutputChannel } from 'vscode'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { acquireBinary, extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset } from '@src/cliproxy/managed/binary'
+import { acquireBinary, extractArchive, normalizeVersion, parseChecksums, readInstalledVersion, resolveAsset, resolveVersion } from '@src/cliproxy/managed/binary'
 import { zipSync } from 'fflate'
 import { createTarGzip } from 'nanotar'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -87,6 +87,23 @@ describe('readInstalledVersion', () => {
     await mkdir(join(binDir, '7.10.0'))
     await mkdir(join(binDir, 'tmp'))
     expect(await readInstalledVersion(binDir)).toBe('7.10.0')
+  })
+})
+
+describe('resolveVersion', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('skips the newest release until its assets are uploaded', async () => {
+    const assetName = resolveAsset(process.platform, process.arch, '8.0.38').assetName
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(Response.json([
+      { tag_name: 'v8.0.39', assets: [] },
+      { tag_name: 'v8.0.39-rc1', prerelease: true, assets: [] },
+      { tag_name: 'v8.0.38', assets: [{ name: 'checksums.txt' }, { name: assetName }] },
+    ])))
+
+    expect(await resolveVersion('latest')).toBe('8.0.38')
   })
 })
 

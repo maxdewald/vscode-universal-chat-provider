@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { ServerController } from '@src/cliproxy/controller'
+import { resolveAsset } from '@src/cliproxy/managed/binary'
 import { managedPaths } from '@src/cliproxy/managed/config'
 import { claimLease } from '@src/cliproxy/managed/leases'
 import { OPENAI_COMPATIBILITY_SECRET } from '@src/cliproxy/managed/openai-compatibility-store'
@@ -16,6 +17,13 @@ import { createExtensionContext, resetVSCodeMock, vscodeMock, window, workspace 
 
 const makeTempDirectory = useTempDirectories()
 const { spawnPersistentNodeProcess } = useChildProcesses()
+
+function publishedRelease(version: string): object {
+  return {
+    tag_name: `v${version}`,
+    assets: [{ name: 'checksums.txt' }, { name: resolveAsset(process.platform, process.arch, version).assetName }],
+  }
+}
 
 describe('server controller lifecycle', () => {
   let root: string
@@ -61,7 +69,7 @@ describe('server controller lifecycle', () => {
   it('prompts before a startup update when suggestUpdates is selected', async () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'suggestUpdates')
     vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('8.0.3')
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.0.9' })))
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json([publishedRelease('8.0.9')])))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()
@@ -82,7 +90,7 @@ describe('server controller lifecycle', () => {
     vscodeMock.settings.set('universalChatProvider.server.updatePolicy', 'automatic')
     vi.spyOn(ManagedServer.prototype, 'installedVersion').mockReturnValue('8.0.3')
     const downloadBinary = vi.spyOn(ManagedServer.prototype, 'downloadBinary').mockResolvedValue('8.1.0')
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ tag_name: 'v8.1.0' })))
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json([publishedRelease('8.1.0')])))
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
 
     await controller.ensureReady()

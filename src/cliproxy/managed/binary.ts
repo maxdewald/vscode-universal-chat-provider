@@ -57,12 +57,17 @@ const fetcher = kyFetch.extend({
 export async function resolveVersion(requested: string, signal?: AbortSignal): Promise<string> {
   if (requested.toLowerCase() !== 'latest')
     return normalizeVersion(requested)
-  const payload = await fetcher
-    .get(`https://api.github.com/repos/${REPO}/releases/latest`, { signal: signal ?? null })
-    .json<{ tag_name?: string }>()
-  if (typeof payload.tag_name !== 'string' || payload.tag_name.length === 0)
-    throw new Error('Could not determine the latest CLIProxyAPI release.')
-  return normalizeVersion(payload.tag_name)
+  const releases = await fetcher
+    .get(`https://api.github.com/repos/${REPO}/releases?per_page=10`, { signal: signal ?? null })
+    .json<{ tag_name: string, prerelease: boolean, assets: { name: string }[] }[]>()
+  // Upstream publishes the release before CI uploads its assets, so skip releases that aren't downloadable yet.
+  for (const release of releases) {
+    const version = normalizeVersion(release.tag_name)
+    const names = release.assets.map(asset => asset.name)
+    if (!release.prerelease && names.includes('checksums.txt') && names.includes(resolveAsset(osPlatform(), osArch(), version).assetName))
+      return version
+  }
+  throw new Error('Could not determine the latest CLIProxyAPI release.')
 }
 
 interface AcquireOptions {
