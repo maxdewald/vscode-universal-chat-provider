@@ -431,11 +431,13 @@ describe('openai-compatible endpoint', () => {
       { 'name': 'opencode.ai', 'base-url': 'https://opencode.ai/v1' },
     ])
     const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
-    window.showQuickPick.mockResolvedValue({
-      label: 'opencode.ai',
-      description: 'openai-compatibility',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({
+        label: 'opencode.ai',
+        description: 'openai-compatibility',
+        account: 'openai-compatibility',
+      })
+      .mockResolvedValueOnce({ label: '$(trash) Remove', action: 'remove' })
     window.showWarningMessage.mockResolvedValue('Remove')
     const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
     const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
@@ -445,6 +447,94 @@ describe('openai-compatible endpoint', () => {
     expect(put).toHaveBeenCalledWith([])
     expect(persistOpenAICompatibility).toHaveBeenCalledWith([])
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('edits models on an openai-compatibility provider', async () => {
+    vi.spyOn(ManagementClient.prototype, 'listAuthFiles').mockResolvedValue([])
+    const existing = {
+      'name': 'openrouter.ai',
+      'base-url': 'https://openrouter.ai/api/v1',
+      'keys': [{ 'api-key': 'sk-or' }],
+      'models': [
+        { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
+        { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
+      ],
+    }
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([existing])
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    window.showQuickPick
+      .mockResolvedValueOnce({
+        label: 'openrouter.ai',
+        description: 'openai-compatibility',
+        account: 'openai-compatibility',
+      })
+      .mockResolvedValueOnce({ label: 'Edit models', action: 'edit-models' })
+      .mockImplementationOnce(async (items) => {
+        // select only gpt-5.5
+        const list = items as Array<{ label: string }>
+        return list.filter(item => item.label === 'gpt-5.5')
+      })
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{ id: 'gpt-5.5' }, { id: 'claude-opus-4-8' }, { id: 'other' }],
+    })))
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
+
+    await service.manageAccounts()
+
+    expect(put).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: 'openrouter.ai',
+        models: [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' }],
+      }),
+    ])
+    expect(persistOpenAICompatibility).toHaveBeenCalled()
+    expect(onAccountsChanged).toHaveBeenCalledWith(['openrouter.ai/gpt-5.5'])
+    expect(window.showQuickPick.mock.calls[2]?.[0]).toEqual([
+      { label: 'gpt-5.5', picked: true },
+      { label: 'claude-opus-4-8', picked: true },
+      { label: 'other', picked: false },
+    ])
+  })
+
+  it('falls back to InputBox when edit discovery fails', async () => {
+    vi.spyOn(ManagementClient.prototype, 'listAuthFiles').mockResolvedValue([])
+    const existing = {
+      'name': 'openrouter.ai',
+      'base-url': 'https://openrouter.ai/api/v1',
+      'keys': [{ 'api-key': 'sk-or' }],
+      'models': [
+        { name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' },
+        { name: 'claude-opus-4-8', alias: 'openrouter.ai/claude-opus-4-8' },
+      ],
+    }
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([existing])
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    window.showQuickPick
+      .mockResolvedValueOnce({
+        label: 'openrouter.ai',
+        description: 'openai-compatibility',
+        account: 'openai-compatibility',
+      })
+      .mockResolvedValueOnce({ label: 'Edit models', action: 'edit-models' })
+    window.showInputBox.mockResolvedValueOnce('gpt-5.5')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })))
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
+
+    await service.manageAccounts()
+
+    expect(window.showInputBox).toHaveBeenCalledWith(expect.objectContaining({
+      value: 'gpt-5.5, claude-opus-4-8',
+    }))
+    expect(put).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: 'openrouter.ai',
+        models: [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' }],
+      }),
+    ])
+    expect(persistOpenAICompatibility).toHaveBeenCalled()
+    expect(onAccountsChanged).toHaveBeenCalledWith(['openrouter.ai/gpt-5.5'])
   })
 })
 

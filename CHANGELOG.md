@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Multi-select which models to register when adding an OpenAI-compatible endpoint
+- Edit models on an existing OpenAI-compatible endpoint from Manage Accounts
+
 ## [1.4.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.4.0...v1.4.1) (2026-10-22)
 
 
