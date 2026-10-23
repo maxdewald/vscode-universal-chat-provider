@@ -209,10 +209,12 @@ describe('openai-compatible endpoint', () => {
   })
 
   it('exposes every model discovered from /v1/models', async () => {
-    window.showQuickPick.mockResolvedValue({
-      label: 'OpenAI-compatible endpoint',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        // multi-select: return all items as if user selected all
+        return items as Array<{ label: string }>
+      })
     window.showInputBox
       .mockResolvedValueOnce('https://openrouter.ai/api/v1')
       .mockResolvedValueOnce('sk-or')
@@ -240,17 +242,78 @@ describe('openai-compatible endpoint', () => {
       },
     ])
     expect(window.showInputBox).toHaveBeenCalledTimes(2)
+    expect(window.showQuickPick).toHaveBeenCalledTimes(2)
+    expect(window.showQuickPick.mock.calls[1]?.[0]).toEqual([
+      { label: 'gpt-5.5', picked: false },
+      { label: 'claude-opus-4-8', picked: false },
+    ])
+    expect(window.showQuickPick.mock.calls[1]?.[1]).toMatchObject({
+      canPickMany: true,
+      title: 'Select models to register',
+    })
     expect(onAccountsChanged).toHaveBeenCalledWith([
       'openrouter.ai/gpt-5.5',
       'openrouter.ai/claude-opus-4-8',
     ])
   })
 
+  it('registers only the models selected from the discovered list', async () => {
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        const list = items as Array<{ label: string }>
+        return list.filter(item => item.label === 'gpt-5.5')
+      })
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{ id: 'gpt-5.5' }, { id: 'claude-opus-4-8' }],
+    })))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    const { service, onAccountsChanged } = serviceWith()
+
+    await service.login()
+
+    expect(put).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: 'openrouter.ai',
+        models: [{ name: 'gpt-5.5', alias: 'openrouter.ai/gpt-5.5' }],
+      }),
+    ])
+    expect(onAccountsChanged).toHaveBeenCalledWith(['openrouter.ai/gpt-5.5'])
+  })
+
+  it('aborts add when the model multi-select is cancelled or empty', async () => {
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockResolvedValueOnce([])
+    window.showInputBox
+      .mockResolvedValueOnce('https://openrouter.ai/api/v1')
+      .mockResolvedValueOnce('sk-or')
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ id: 'gpt-5.5' }] })))
+
+    const put = vi.spyOn(ManagementClient.prototype, 'putOpenAICompatibility').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listOpenAICompatibility').mockResolvedValue([])
+    const persistOpenAICompatibility = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const { service, onAccountsChanged } = serviceWith({ persistOpenAICompatibility })
+
+    await service.login()
+
+    expect(put).not.toHaveBeenCalled()
+    expect(persistOpenAICompatibility).not.toHaveBeenCalled()
+    expect(onAccountsChanged).not.toHaveBeenCalled()
+  })
+
   it('normalizes discovered model ids while preserving their order', async () => {
-    window.showQuickPick.mockResolvedValue({
-      label: 'OpenAI-compatible endpoint',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        // multi-select: return all items as if user selected all
+        return items as Array<{ label: string }>
+      })
     window.showInputBox
       .mockResolvedValueOnce('https://openrouter.ai/api/v1')
       .mockResolvedValueOnce('sk-or')
@@ -275,10 +338,12 @@ describe('openai-compatible endpoint', () => {
   })
 
   it('refreshes models when persistence fails after the live endpoint update', async () => {
-    window.showQuickPick.mockResolvedValue({
-      label: 'OpenAI-compatible endpoint',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        // multi-select: return all items as if user selected all
+        return items as Array<{ label: string }>
+      })
     window.showInputBox
       .mockResolvedValueOnce('https://openrouter.ai/api/v1')
       .mockResolvedValueOnce('sk-or')
@@ -295,10 +360,12 @@ describe('openai-compatible endpoint', () => {
   })
 
   it('does not persist or refresh when the live endpoint update fails', async () => {
-    window.showQuickPick.mockResolvedValue({
-      label: 'OpenAI-compatible endpoint',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        // multi-select: return all items as if user selected all
+        return items as Array<{ label: string }>
+      })
     window.showInputBox
       .mockResolvedValueOnce('https://openrouter.ai/api/v1')
       .mockResolvedValueOnce('sk-or')
@@ -316,10 +383,12 @@ describe('openai-compatible endpoint', () => {
   })
 
   it('keeps same-url endpoints with different tokens under unique names', async () => {
-    window.showQuickPick.mockResolvedValue({
-      label: 'OpenAI-compatible endpoint',
-      account: 'openai-compatibility',
-    })
+    window.showQuickPick
+      .mockResolvedValueOnce({ label: 'OpenAI-compatible endpoint', account: 'openai-compatibility' })
+      .mockImplementationOnce(async (items) => {
+        // multi-select: return all items as if user selected all
+        return items as Array<{ label: string }>
+      })
     window.showInputBox
       .mockResolvedValueOnce('https://codegate.dev/v1')
       .mockResolvedValueOnce('sk-second')
