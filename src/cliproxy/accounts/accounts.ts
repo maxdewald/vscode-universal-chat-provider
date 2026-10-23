@@ -1,6 +1,6 @@
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
-import { buildOpenAICompatibilityProvider, discoverUpstreamModels, pickUpstreamModelIds, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
+import { buildOpenAICompatibilityProvider, discoverUpstreamModels, parseModelIds, pickUpstreamModelIds, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
@@ -284,13 +284,13 @@ export class AccountsService {
         value: current,
         placeHolder: 'claude-opus-4-8, gpt-5.5',
         ignoreFocusOut: true,
-        validateInput: value => parseEditModelIds(value).length === 0
+        validateInput: value => parseModelIds(value).length === 0
           ? 'Enter at least one model ID.'
           : undefined,
       })
       if (modelsRaw === undefined)
         return
-      modelIds = parseEditModelIds(modelsRaw)
+      modelIds = parseModelIds(modelsRaw)
       if (modelIds.length === 0)
         return
     }
@@ -345,6 +345,3 @@ export class AccountsService {
   }
 }
 
-function parseEditModelIds(value: string): string[] {
-  return [...new Set(value.split(/[\n,]/).map(part => part.trim()).filter(part => part.length > 0))]
-}

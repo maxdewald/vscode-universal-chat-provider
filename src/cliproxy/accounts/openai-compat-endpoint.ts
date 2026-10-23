@@ -152,7 +152,7 @@ export async function discoverUpstreamModels(baseUrl: string, apiKey: string): P
   }
 }
 
-function parseModelIds(value: string): string[] {
+export function parseModelIds(value: string): string[] {
   return uniqueModelIds(value.split(/[\n,]/))
 }
 
