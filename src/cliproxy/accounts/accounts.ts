@@ -1,6 +1,6 @@
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
-import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
+import { buildOpenAICompatibilityProvider, discoverUpstreamModels, parseModelIds, pickUpstreamModelIds, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
@@ -206,27 +206,115 @@ export class AccountsService {
           account: 'openai-compatibility' as const,
         })),
       ],
-      { title: 'Connected Accounts', placeHolder: 'Select an account to remove' },
+      { title: 'Connected Accounts', placeHolder: 'Select an account to manage' },
     )
     if (picked === undefined)
       return
+
+    if (picked.account === 'openai-compatibility') {
+      const endpoint = endpoints.find(e => e.name === picked.label)
+      if (endpoint === undefined)
+        return
+      const action = await window.showQuickPick(
+        [
+          { label: '$(edit) Edit models', action: 'edit-models' as const },
+          { label: '$(trash) Remove', action: 'remove' as const },
+        ],
+        { title: endpoint.name, placeHolder: 'Choose an action' },
+      )
+      if (action === undefined)
+        return
+      if (action.action === 'edit-models') {
+        await this.editOpenAIEndpointModels(client, endpoints, endpoint)
+        return
+      }
+      const confirm = await window.showWarningMessage(`Remove the account ${picked.label}?`, { modal: true }, 'Remove')
+      if (confirm !== 'Remove')
+        return
+      try {
+        const remaining = endpoints.filter(e => e.name !== picked.label)
+        await client.putOpenAICompatibility(remaining)
+        await this.deps.persistOpenAICompatibility?.(remaining)
+        void window.showInformationMessage(`Removed ${picked.label}.`)
+        await this.deps.onAccountsChanged()
+      }
+      catch (error) {
+        void window.showErrorMessage(`Could not remove ${picked.label}: ${errorMessage(error)}`)
+      }
+      return
+    }
+
     const confirm = await window.showWarningMessage(`Remove the account ${picked.label}?`, { modal: true }, 'Remove')
     if (confirm !== 'Remove')
       return
     try {
-      if (picked.account === 'openai-compatibility') {
-        const remaining = endpoints.filter(endpoint => endpoint.name !== picked.label)
-        await client.putOpenAICompatibility(remaining)
-        await this.deps.persistOpenAICompatibility?.(remaining)
-      }
-      else {
-        await client.deleteAuthFile(picked.label)
-      }
+      await client.deleteAuthFile(picked.label)
       void window.showInformationMessage(`Removed ${picked.label}.`)
       await this.deps.onAccountsChanged()
     }
     catch (error) {
       void window.showErrorMessage(`Could not remove ${picked.label}: ${errorMessage(error)}`)
+    }
+  }
+
+  private async editOpenAIEndpointModels(
+    client: ManagementClient,
+    endpoints: OpenAICompatibilityProvider[],
+    endpoint: OpenAICompatibilityProvider,
+  ): Promise<void> {
+    const apiKey = endpoint.keys?.[0]?.['api-key'] ?? ''
+    const discovered = await window.withProgress(
+      { location: ProgressLocation.Notification, title: 'Fetching models from endpoint…' },
+      async () => discoverUpstreamModels(endpoint['base-url'], apiKey),
+    )
+
+    let modelIds: string[] | undefined
+    if (discovered.length > 0) {
+      modelIds = await pickUpstreamModelIds({
+        modelIds: discovered,
+        title: `Models for ${endpoint.name}`,
+        preselected: new Set((endpoint.models ?? []).map(m => m.name)),
+      })
+    }
+    else {
+      const current = (endpoint.models ?? []).map(m => m.name).join(', ')
+      const modelsRaw = await window.showInputBox({
+        title: `Models for ${endpoint.name}`,
+        prompt: 'Endpoint did not list models. Enter comma-separated model IDs.',
+        value: current,
+        placeHolder: 'claude-opus-4-8, gpt-5.5',
+        ignoreFocusOut: true,
+        validateInput: value => parseModelIds(value).length === 0
+          ? 'Enter at least one model ID.'
+          : undefined,
+      })
+      if (modelsRaw === undefined)
+        return
+      modelIds = parseModelIds(modelsRaw)
+      if (modelIds.length === 0)
+        return
+    }
+    if (modelIds === undefined)
+      return
+
+    const rebuilt: OpenAICompatibilityProvider = {
+      ...endpoint,
+      models: modelIds.map(name => ({ name, alias: `${endpoint.name}/${name}` })),
+    }
+    const updated = endpoints.map(e => e.name === endpoint.name ? rebuilt : e)
+    const expectedModelIds = modelIds.map(name => `${endpoint.name}/${name}`)
+    try {
+      await client.putOpenAICompatibility(updated)
+      try {
+        await this.deps.persistOpenAICompatibility?.(updated)
+      }
+      finally {
+        await this.deps.onAccountsChanged(expectedModelIds)
+      }
+      void window.showInformationMessage(`Updated models for “${endpoint.name}” (${modelIds.length}).`)
+    }
+    catch (error) {
+      void window.showErrorMessage(`Could not update models for ${endpoint.name}: ${errorMessage(error)}`)
     }
   }
 
@@ -256,3 +344,4 @@ export class AccountsService {
     catch {}
   }
 }
+

@@ -66,6 +66,15 @@ export async function promptOpenAICompatibilityEndpoint(
     if (modelIds.length === 0)
       return undefined
   }
+  else {
+    const picked = await pickUpstreamModelIds({
+      modelIds,
+      title: 'Select models to register',
+    })
+    if (picked === undefined)
+      return undefined
+    modelIds = picked
+  }
 
   return { baseUrl: normalizedBaseUrl, apiKey: normalizedApiKey, modelIds }
 }
@@ -104,7 +113,32 @@ const UpstreamModelsSchema = Type.Object({
   }, { additionalProperties: true }))),
 }, { additionalProperties: true })
 
-async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<string[]> {
+export async function pickUpstreamModelIds(options: {
+  modelIds: readonly string[]
+  title: string
+  preselected?: ReadonlySet<string>
+}): Promise<string[] | undefined> {
+  if (options.modelIds.length === 0)
+    return undefined
+  const selected = await window.showQuickPick(
+    options.modelIds.map(id => ({
+      label: id,
+      picked: options.preselected?.has(id) ?? false,
+    })),
+    {
+      title: options.title,
+      placeHolder: 'Select models to register',
+      canPickMany: true,
+      ignoreFocusOut: true,
+    },
+  )
+  if (selected === undefined || selected.length === 0)
+    return undefined
+  const chosen = new Set(selected.map(item => item.label))
+  return options.modelIds.filter(id => chosen.has(id))
+}
+
+export async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<string[]> {
   try {
     const payload = asValue(UpstreamModelsSchema, await kyFetch.get(`${baseUrl}/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -118,7 +152,7 @@ async function discoverUpstreamModels(baseUrl: string, apiKey: string): Promise<
   }
 }
 
-function parseModelIds(value: string): string[] {
+export function parseModelIds(value: string): string[] {
   return uniqueModelIds(value.split(/[\n,]/))
 }
 
