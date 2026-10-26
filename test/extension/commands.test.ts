@@ -189,6 +189,7 @@ function createCommandHarness() {
     controller as unknown as ServerController,
     output as never,
     serverOutput as never,
+    {} as never,
   )
   return { provider, controller, output, serverOutput }
 }
