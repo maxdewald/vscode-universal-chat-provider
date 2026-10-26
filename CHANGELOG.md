@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.4.1...v1.5.0) (2026-10-26)
+
+
+### Features
+
+* **dictation:** dictate into Copilot Chat via Codex or Gemini ([c6a9802](https://github.com/maxdewald/vscode-universal-chat-provider/commit/c6a980214b41024b22b418214137aad95656c523))
+
+
+### Build System
+
+* type-check with tsrs instead of tsc ([12813ce](https://github.com/maxdewald/vscode-universal-chat-provider/commit/12813ce46d2ec3f851f7d46caeadd91ea0d8c278))
+
 ## [1.4.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.4.0...v1.4.1) (2026-10-22)
 
 

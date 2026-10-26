@@ -191,6 +191,9 @@ importers:
 
   .:
     dependencies:
+      '@picovoice/pvrecorder-node':
+        specifier: ^1.2.9
+        version: 1.2.9
       '@sinclair/typebox':
         specifier: ^0.34.52
         version: 0.34.52
@@ -741,6 +744,10 @@ packages:
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
+
+  '@picovoice/pvrecorder-node@1.2.9':
+    resolution: {integrity: sha512-e398ue4G8YihrnnyTpnVePvOiBEM5+R4D+ChoyyeC8J8KFBMuhGrZwrdmpIPqDqCjCA+YqO2mFaicHstVhEpcg==}
+    engines: {node: '>=18.0.0'}
 
   '@pkgr/core@0.3.6':
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
@@ -3809,6 +3816,8 @@ snapshots:
   '@oxc-project/types@0.139.0': {}
 
   '@oxc-project/types@0.154.0': {}
+
+  '@picovoice/pvrecorder-node@1.2.9': {}
 
   '@pkgr/core@0.3.6': {}
 
