@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.5.0...v1.5.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **dictation:** wait for microphone warmup before recording ([1edbab4](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1edbab4a022d1458dcd93574afe434930fa305d1))
+
 ## [1.5.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.4.1...v1.5.0) (2026-10-26)
 
 
