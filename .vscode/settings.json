@@ -1,4 +1,8 @@
 {
+  // Use tsrs (TypeScript 7 in Rust) via the TypeScript 7 extension
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.tsdk.path": "./node_modules/tsrs/tsdk",
+
   // Disable the default formatter, use eslint instead
   "prettier.enable": false,
   "editor.formatOnSave": false,

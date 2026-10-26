@@ -299,7 +299,7 @@
     "test:compat": "UCP_COMPAT_TESTS=1 vitest run test/chat/requests/compaction.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsrs -p . --noEmit",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
     "vscode:prepublish": "pnpm build",
     "ext:package": "vsce package --no-dependencies",
@@ -330,6 +330,7 @@
     "eslint": "^10.12.0",
     "jest-mock-vscode": "^4.12.0",
     "tsdown": "^0.23.0",
+    "tsrs": "0.20.0-ts7.1.0-beta",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0",
     "vscode-ext-gen": "^1.6.0"
