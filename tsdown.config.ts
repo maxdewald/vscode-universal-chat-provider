@@ -8,6 +8,11 @@ export default defineConfig({
   ],
   format: ['cjs'],
   shims: false,
+  copy: {
+    from: 'node_modules/@picovoice/pvrecorder-node/lib/{mac,linux,windows}/**/*.node',
+    to: 'dist/native',
+    flatten: false,
+  },
   dts: false,
   deps: {
     neverBundle: ['vscode'],

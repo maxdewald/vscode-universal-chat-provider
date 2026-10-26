@@ -5,13 +5,15 @@ import { commands, QuickPickItemKind, window } from 'vscode'
 export interface ManageAction extends QuickPickItem {
   command: string
   group?: number
+  section?: string
   modes?: Array<'managed' | 'external'>
+  when?: () => boolean
 }
 
 type Choice = QuickPickItem & { command?: string }
 
-function divider(): Choice {
-  return { label: '', kind: QuickPickItemKind.Separator }
+function divider(label = ''): Choice {
+  return { label, kind: QuickPickItemKind.Separator }
 }
 
 export async function manageProvider(controller: ServerController | undefined, actions: ManageAction[]): Promise<void> {
@@ -19,11 +21,11 @@ export async function manageProvider(controller: ServerController | undefined, a
   const snapshot = await controller?.statusSnapshot()
   let previousGroup: number | undefined
   const body = actions
-    .filter(action => action.modes === undefined || action.modes.includes(mode))
+    .filter(action => (action.modes === undefined || action.modes.includes(mode)) && (action.when?.() ?? true))
     .flatMap((action) => {
       const separated = previousGroup !== undefined && action.group !== previousGroup
       previousGroup = action.group
-      return separated ? [divider(), action] : [action]
+      return separated ? [divider(action.section), action] : [action]
     })
   const choices: Choice[] = snapshot !== undefined
     ? [statusEntry(snapshot), divider(), ...body]

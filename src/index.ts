@@ -51,7 +51,7 @@ export function activate(context: ExtensionContext): void {
         renderStatusBar()
     }),
     lm.registerLanguageModelChatProvider('universal-chat-provider', provider),
-    ...registerCommands(provider, controller, output, serverOutput),
+    ...registerCommands(provider, controller, output, serverOutput, context),
   )
 
   statusBar.show()
