@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { clipPrompt, engineChoices, transcribeLive, upsample16kTo24k, wav } from '@src/dictation/dictation'
+import { clipPrompt, engineChoices, transcribeLive, untilLive, upsample16kTo24k, wav } from '@src/dictation/dictation'
 import { describe, expect, it, vi } from 'vitest'
 
 const codex = { proxyModelId: 'gpt-6-luna', proxyOwner: 'openai' }
@@ -39,6 +39,27 @@ describe('audio helpers', () => {
 
   it('upsamples 16 kHz to 24 kHz by interpolation', () => {
     expect([...upsample16kTo24k(Int16Array.from([0, 300, 600, 900]))]).toEqual([0, 200, 400, 600, 800, 900])
+  })
+})
+
+describe('untilLive', () => {
+  async function* frames(...values: number[]): AsyncGenerator<Int16Array> {
+    for (const value of values)
+      yield Int16Array.from([value, value])
+  }
+  async function collect(source: AsyncGenerator<Int16Array>): Promise<number[]> {
+    const values: number[] = []
+    for await (const frame of source)
+      values.push(frame[0]!)
+    return values
+  }
+
+  it('skips leading digital silence and keeps every frame from the first real one', async () => {
+    expect(await collect(await untilLive(frames(0, 0, 5, 0, 7)))).toEqual([5, 0, 7])
+  })
+
+  it('gives up waiting after the limit so a silent microphone still records', async () => {
+    expect(await collect(await untilLive(frames(0, 0, 0), 0))).toEqual([0, 0, 0])
   })
 })
 

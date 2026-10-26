@@ -21,6 +21,7 @@ const FINAL_TRANSCRIPT_TIMEOUT_MS = 15_000
 const SILENCE_PEAK = 50
 // Shorter takes are treated as accidental toggles and end quietly.
 const MIN_RECORDING_MS = 1500
+const MIC_WARMUP_MAX_MS = 3000
 const BLINK_MS = 500
 const BLINK_TICKS = 30
 const VOCABULARY_HINT = 'Software development dictation; keep code terms, file names, and identifiers as spoken.'
@@ -135,7 +136,8 @@ export function engineChoices(models: readonly ModelRef[]): Array<{ id: string, 
 
 export async function* record(extensionPath: string, signal: AbortSignal, deviceIndex = -1): AsyncGenerator<Int16Array> {
   const native = loadRecorder(extensionPath)
-  const { handle, status } = native.init(FRAME_LENGTH, deviceIndex, 50)
+  // 20 s of buffer, so a slow connection never drops the start of the recording.
+  const { handle, status } = native.init(FRAME_LENGTH, deviceIndex, 200)
   check(status, 'open the microphone')
   try {
     check(native.start(handle), 'start recording')
@@ -152,6 +154,21 @@ export async function* record(extensionPath: string, signal: AbortSignal, device
     native.stop(handle)
     native.delete(handle)
   }
+}
+
+// Bluetooth headsets deliver digital silence while switching to their microphone profile.
+export async function untilLive(frames: AsyncGenerator<Int16Array>, maxWaitMs = MIC_WARMUP_MAX_MS): Promise<AsyncGenerator<Int16Array>> {
+  const deadline = Date.now() + maxWaitMs
+  for (let next = await frames.next(); next.done !== true; next = await frames.next()) {
+    const first = next.value
+    if (first.some(Boolean) || Date.now() >= deadline) {
+      return (async function* () {
+        yield first
+        yield* frames
+      })()
+    }
+  }
+  return frames
 }
 
 export function listMicrophones(extensionPath: string): string[] {
@@ -393,9 +410,9 @@ export function createDictateCommand(
   // The chat input toolbar forwards its chat widget, which can't be serialized to the extension host, so its clicks never arrive.
   const button = window.createStatusBarItem(StatusBarAlignment.Right, 98)
   button.command = 'universalChatProvider.dictate'
-  const render = (state: 'idle' | 'recording' | 'transcribing'): void => {
-    button.text = { idle: '$(mic)', recording: '$(debug-stop) Dictating', transcribing: '$(loading~spin) Transcribing' }[state]
-    button.tooltip = { idle: 'Dictate to Chat', recording: 'Stop dictation', transcribing: 'Transcribing…' }[state]
+  const render = (state: 'idle' | 'starting' | 'recording' | 'transcribing'): void => {
+    button.text = { idle: '$(mic)', starting: '$(loading~spin) Mic starting', recording: '$(debug-stop) Dictating', transcribing: '$(loading~spin) Transcribing' }[state]
+    button.tooltip = { idle: 'Dictate to Chat', starting: 'Waiting for the microphone; speak after the sound', recording: 'Stop dictation', transcribing: 'Transcribing…' }[state]
     button.backgroundColor = state === 'recording' ? new ThemeColor('statusBarItem.errorBackground') : undefined
   }
   const syncVisibility = (): void => {
@@ -457,25 +474,37 @@ export function createDictateCommand(
     }
 
     const recording = active = new AbortController()
-    render('recording')
+    render('starting')
     const soundFailed = (message: string): void => output.warn(`Dictation sound couldn't play: ${message}`)
-    playRecordingSound(context.extensionPath, 'Started', soundFailed)
     recording.signal.addEventListener('abort', () => {
       render('transcribing')
       playRecordingSound(context.extensionPath, 'Stopped', soundFailed)
     })
-    const release = await connection.acquireRequest()
+    let release = (): void => {}
+    let microphoneFrames: AsyncGenerator<Int16Array> | undefined
     try {
       const microphone = dictationMicrophone()
       const deviceIndex = microphone ? listMicrophones(context.extensionPath).indexOf(microphone) : -1
       if (microphone && deviceIndex === -1)
         output.warn(`Microphone "${microphone}" isn't connected; using the system default.`)
       const language = dictationLanguage()
-      output.info(`Dictation started with ${engine} on ${microphone || 'the system default microphone'}, language ${language ?? 'auto'}.`)
+      // The mic warms up while the proxy and the realtime session get ready; the recorder buffers until the engine reads.
+      const warmupStartedAt = Date.now()
+      microphoneFrames = record(context.extensionPath, recording.signal, deviceIndex)
+      const live = untilLive(microphoneFrames).then((frames) => {
+        if (!recording.signal.aborted) {
+          render('recording')
+          playRecordingSound(context.extensionPath, 'Started', soundFailed)
+        }
+        output.info(`Dictation started with ${engine} on ${microphone || 'the system default microphone'} after ${Date.now() - warmupStartedAt} ms, language ${language ?? 'auto'}.`)
+        return frames
+      })
+      live.catch(() => {})
+      release = await connection.acquireRequest()
       const startedAt = Date.now()
       let peak = 0
       async function* metered(): AsyncGenerator<Int16Array> {
-        for await (const frame of record(context.extensionPath, recording.signal, deviceIndex)) {
+        for await (const frame of await live) {
           for (const sample of frame)
             peak = Math.max(peak, Math.abs(sample))
           yield frame
@@ -505,6 +534,7 @@ export function createDictateCommand(
     }
     finally {
       recording.abort()
+      await microphoneFrames?.return(undefined)
       release()
       active = undefined
       render('idle')
