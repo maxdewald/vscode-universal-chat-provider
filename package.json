@@ -31,10 +31,11 @@
   "icon": "images/logo.png",
   "files": [
     "LICENSE.md",
-    "dist/*",
+    "dist/**",
     "images/icons.woff",
     "images/logo.png",
-    "images/provider-icon-*.svg"
+    "images/provider-icon-*.svg",
+    "media/*.wav"
   ],
   "engines": {
     "node": ">=22.18.0",
@@ -120,6 +121,22 @@
       {
         "command": "universalChatProvider.openSettings",
         "title": "Universal Chat Provider: Open Settings"
+      },
+      {
+        "command": "universalChatProvider.dictate",
+        "title": "Universal Chat Provider: Dictate to Chat (Start/Stop)"
+      },
+      {
+        "command": "universalChatProvider.selectMicrophone",
+        "title": "Universal Chat Provider: Select Dictation Microphone"
+      },
+      {
+        "command": "universalChatProvider.selectDictationEngine",
+        "title": "Universal Chat Provider: Select Dictation Engine"
+      },
+      {
+        "command": "universalChatProvider.selectDictationLanguage",
+        "title": "Universal Chat Provider: Select Dictation Language"
       }
     ],
     "configuration": [
@@ -244,8 +261,34 @@
       },
       {
         "type": "object",
-        "title": "Provider Specific",
+        "title": "Dictation",
         "order": 5,
+        "properties": {
+          "universalChatProvider.dictation.engine": {
+            "type": "string",
+            "default": "",
+            "order": 1,
+            "markdownDescription": "Speech-to-text via unofficial endpoints; may break. Empty is off. Codex models (`gpt-transcribe`, `gpt-live-transcribe`) are the most accurate and fastest; Gemini models such as `gemini-3-flash` work too but are slower. [$(mic) Select Engine…](command:universalChatProvider.selectDictationEngine)"
+          },
+          "universalChatProvider.dictation.microphone": {
+            "type": "string",
+            "default": "",
+            "scope": "machine",
+            "order": 2,
+            "markdownDescription": "Input device used for dictation. Leave empty for the system default. [$(record) Select Microphone…](command:universalChatProvider.selectMicrophone)"
+          },
+          "universalChatProvider.dictation.language": {
+            "type": "string",
+            "default": "",
+            "order": 3,
+            "markdownDescription": "Language you dictate in, as an ISO code such as `en` or `de`. Empty takes your system language and saves it on first use; `auto` sends no hint and lets the engine guess. [$(globe) Select Language…](command:universalChatProvider.selectDictationLanguage)"
+          }
+        }
+      },
+      {
+        "type": "object",
+        "title": "Provider Specific",
+        "order": 6,
         "properties": {
           "universalChatProvider.codex.webSearch": {
             "type": "boolean",
@@ -262,7 +305,7 @@
       {
         "type": "object",
         "title": "Advanced",
-        "order": 6,
+        "order": 7,
         "properties": {
           "universalChatProvider.debugLevel": {
             "type": "string",
@@ -306,6 +349,7 @@
     "ext:publish": "vsce publish --no-dependencies"
   },
   "dependencies": {
+    "@picovoice/pvrecorder-node": "^1.2.9",
     "@sinclair/typebox": "^0.34.52",
     "eventsource-parser": "^4.0.0",
     "fflate": "^0.8.3",

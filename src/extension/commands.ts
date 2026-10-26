@@ -1,7 +1,8 @@
 import type { UniversalChatProvider } from '@src/chat/provider'
 import type { ServerController } from '@src/cliproxy/controller'
 import type { ManageAction } from '@src/extension/ui/manage-menu'
-import type { Disposable, OutputChannel } from 'vscode'
+import type { Disposable, ExtensionContext, LogOutputChannel, OutputChannel } from 'vscode'
+import { createDictateCommand, dictationEngine, dictationLanguageLabel, dictationMicrophone, selectEngine, selectLanguage, selectMicrophone } from '@src/dictation/dictation'
 import { manageProvider } from '@src/extension/ui/manage-menu'
 import { showQuotaMenu } from '@src/extension/ui/quota-menu'
 import { setUtilityModel } from '@src/extension/utility-model-nudge'
@@ -15,8 +16,9 @@ interface CommandDescriptor extends ManageAction {
 export function registerCommands(
   provider: UniversalChatProvider,
   controller: ServerController,
-  output: OutputChannel,
+  output: LogOutputChannel,
   serverOutput: OutputChannel,
+  context: ExtensionContext,
 ): Disposable[] {
   const actions: CommandDescriptor[] = [
     { command: 'universalChatProvider.login', run: async () => controller.login(), group: 0, label: '$(account) Add Account (Login)', description: 'Codex, Claude, Antigravity, and more' },
@@ -37,12 +39,42 @@ export function registerCommands(
       void window.showInformationMessage(`CLIProxyAPI exposed ${models.length} chat models.`)
     }, group: 1, label: '$(refresh) Refresh Models', description: 'Reload models and capabilities' },
     { command: 'universalChatProvider.setUtilityModel', run: async () => setUtilityModel(provider), group: 1, label: '$(sparkle) Set Utility Model', description: 'Run Copilot\'s commit messages, titles & summaries on your models' },
-    { command: 'universalChatProvider.restartServer', run: async () => controller.restartServer(), group: 2, modes: ['managed'], label: '$(debug-restart) Restart Server', description: 'Restart the managed server' },
-    { command: 'universalChatProvider.updateBinary', run: async () => controller.updateBinary(), group: 2, modes: ['managed'], label: '$(cloud-download) Update Proxy Binary', description: 'Check and apply the selected update policy' },
-    { command: 'universalChatProvider.resetServer', run: async () => controller.resetServer(), group: 2, modes: ['managed'], label: '$(discard) Reset Managed Server', description: 'Recreate the config and keys' },
-    { command: 'universalChatProvider.configure', run: async () => provider.configure(), group: 2, modes: ['external'], label: '$(settings-gear) Configure Connection', description: 'Set the proxy URL and API key' },
-    { command: 'universalChatProvider.openSettings', run: async () => commands.executeCommand('workbench.action.openSettings', `@ext:${extensionId}`), group: 3, label: '$(gear) Open Settings', description: 'Edit this extension\'s settings' },
-    { command: 'universalChatProvider.showLogs', run: () => output.show(true), group: 3, label: '$(output) Show Extension Logs', description: 'Diagnostics from the extension itself' },
+    {
+      command: 'universalChatProvider.selectDictationEngine',
+      run: async () => selectEngine(await provider.getModels(true), context.globalState),
+      group: 2,
+      section: 'Dictation',
+      get label() {
+        return dictationEngine() ? `$(mic-filled) Dictation: ${dictationEngine()}` : '$(mic) Dictation: Off'
+      },
+      get description() {
+        return dictationEngine() ? 'Change engine or turn off' : 'Unofficial speech-to-text'
+      },
+    },
+    {
+      command: 'universalChatProvider.selectMicrophone',
+      run: async () => selectMicrophone(context.extensionPath),
+      group: 2,
+      get label() {
+        return `$(record) Microphone: ${dictationMicrophone() || 'System Default'}`
+      },
+      when: () => Boolean(dictationEngine()),
+    },
+    {
+      command: 'universalChatProvider.selectDictationLanguage',
+      run: async () => selectLanguage(),
+      group: 2,
+      get label() {
+        return `$(globe) Language: ${dictationLanguageLabel()}`
+      },
+      when: () => Boolean(dictationEngine()),
+    },
+    { command: 'universalChatProvider.restartServer', run: async () => controller.restartServer(), group: 3, modes: ['managed'], label: '$(debug-restart) Restart Server', description: 'Restart the managed server' },
+    { command: 'universalChatProvider.updateBinary', run: async () => controller.updateBinary(), group: 3, modes: ['managed'], label: '$(cloud-download) Update Proxy Binary', description: 'Check and apply the selected update policy' },
+    { command: 'universalChatProvider.resetServer', run: async () => controller.resetServer(), group: 3, modes: ['managed'], label: '$(discard) Reset Managed Server', description: 'Recreate the config and keys' },
+    { command: 'universalChatProvider.configure', run: async () => provider.configure(), group: 3, modes: ['external'], label: '$(settings-gear) Configure Connection', description: 'Set the proxy URL and API key' },
+    { command: 'universalChatProvider.openSettings', run: async () => commands.executeCommand('workbench.action.openSettings', `@ext:${extensionId}`), group: 4, label: '$(gear) Open Settings', description: 'Edit this extension\'s settings' },
+    { command: 'universalChatProvider.showLogs', run: () => output.show(true), group: 4, label: '$(output) Show Extension Logs', description: 'Diagnostics from the extension itself' },
     { command: 'universalChatProvider.clearCredentials', run: async () => {
       const choice = await window.showWarningMessage(
         'Remove the stored CLIProxyAPI API key from VS Code SecretStorage?',
@@ -51,11 +83,14 @@ export function registerCommands(
       )
       if (choice === 'Remove')
         await provider.clearCredentials()
-    }, group: 3, label: '$(trash) Clear Stored API Key', description: 'Remove the key from SecretStorage' },
+    }, group: 4, label: '$(trash) Clear Stored API Key', description: 'Remove the key from SecretStorage' },
   ]
+  const dictate = createDictateCommand(context, async interactive => provider.getModels(interactive), controller, output)
   return [
     commands.registerCommand('universalChatProvider.manage', async () => manageProvider(controller, actions)),
     commands.registerCommand('universalChatProvider.showServerLogs', () => serverOutput.show(true)),
+    ...dictate.disposables,
+    commands.registerCommand('universalChatProvider.dictate', dictate.run),
     ...actions.map(action => commands.registerCommand(action.command, action.run)),
   ]
 }
