@@ -149,6 +149,16 @@ describe('management client', () => {
     ])
   })
 
+  it.each([200, 404])('refreshes the server model catalog (HTTP %i)', async (status) => {
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json({}, { status }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createClient().refreshModels()).resolves.toBeUndefined()
+    const request = fetchMock.mock.calls[0]![0]
+    expect(request.url).toBe('http://127.0.0.1:8317/v8/management/models/refresh')
+    expect(request.method).toBe('POST')
+  })
+
   it('treats a missing openai-compatibility section as empty', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'not_found' }, { status: 404 })))
 

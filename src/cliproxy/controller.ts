@@ -449,6 +449,18 @@ export class ServerController implements ProxyConnection {
     await this.refreshListener?.(expectedModelIds)
   }
 
+  async refreshModelCatalog(): Promise<void> {
+    const management = await this.managementForStatus()
+    if (management === undefined)
+      return
+    try {
+      await new ManagementClient(management.baseUrl, management.key).refreshModels()
+    }
+    catch (error) {
+      this.output.appendLine(`Model catalog refresh failed: ${errorMessage(error)}`)
+    }
+  }
+
   async refreshQuotas(): Promise<void> {
     const provider = this.activeQuotaProvider
     if (this.quotaListener === undefined)

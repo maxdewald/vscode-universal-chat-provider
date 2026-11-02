@@ -216,6 +216,11 @@ export class ManagementClient {
     return { statusCode: json?.status_code ?? json?.statusCode ?? 0, header: json?.header ?? {}, body: json?.body }
   }
 
+  // CPA 8.0.45+ re-fetches its upstream model catalogs; older servers 404 and keep what they have.
+  async refreshModels(signal?: AbortSignal): Promise<void> {
+    await this.fetcher.post('/models/refresh', { signal: signal ?? null, throwHttpErrors: status => status !== 404 })
+  }
+
   async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {
     const response = await this.fetcher.get(OPENAI_COMPATIBILITY_PATH, {
       signal: signal ?? null,
