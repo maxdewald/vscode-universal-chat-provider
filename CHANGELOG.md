@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.5.2...v1.6.0) (2026-11-05)
+
+
+### Features
+
+* **quota:** refresh Claude and Codex quota from CLIProxyAPI rate-limit signals ([9d86c60](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9d86c6024aca0548b9c9a6f706a6cfd7c6311cb3))
+
 ## [1.5.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.5.1...v1.5.2) (2026-11-05)
 
 
