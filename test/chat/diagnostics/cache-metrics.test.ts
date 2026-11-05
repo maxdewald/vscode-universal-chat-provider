@@ -368,6 +368,24 @@ describe('cacheMetricsTracker', () => {
     expect(logged[2]!.crossTurn).toMatchObject({ stablePrefixLen: 1, totalItems: 2 })
   })
 
+  it('tracks interleaved threads that share a prompt cache key separately', async () => {
+    const metrics = tracker()
+    const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }
+    const parent = { role: 'system', content: 'parent' }
+    const subagent = { role: 'system', content: 'subagent' }
+
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [parent] })
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [subagent] })
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [parent, { role: 'user', content: 'p' }] })
+    record(metrics, usage, { model: 'm', promptCacheKey: 'a', inputItems: [subagent, { role: 'user', content: 's' }] })
+    await metrics.flush()
+
+    const logged = await entries()
+    expect(logged[1]!.crossTurn).toMatchObject({ stablePrefixLen: 0 })
+    expect(logged[2]!.crossTurn).toMatchObject({ stablePrefixLen: 1, totalItems: 2, diverged: [] })
+    expect(logged[3]!.crossTurn).toMatchObject({ stablePrefixLen: 1, totalItems: 2, diverged: [] })
+  })
+
   it('keeps invocation order when same-key requests complete in reverse order', async () => {
     const metrics = tracker()
     const usage = { input_tokens: 1, prompt_tokens_details: { cached_tokens: 0 } }

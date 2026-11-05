@@ -10,6 +10,7 @@ import { LanguageModelDataPart, StatusBarAlignment, window, workspace } from 'vs
 const LOG_FILE = 'debug.jsonl'
 const DIVERGED_CONTENT_CAP = 6000
 const DIVERGED_CONTENT_LEAD = 200
+const MAX_THREADS_PER_CACHE_KEY = 8
 
 type UsageShape = 'anthropic' | 'openai' | 'unknown' | 'unavailable'
 
@@ -51,12 +52,7 @@ interface CrossTurnDiff {
   diverged: { index: number, before: string, after: string }[]
 }
 
-function crossTurnDiff(
-  prev: readonly unknown[] | undefined,
-  cur: readonly unknown[] | undefined,
-): CrossTurnDiff | undefined {
-  if (prev === undefined || cur === undefined)
-    return undefined
+function crossTurnDiff(prev: readonly unknown[], cur: readonly unknown[]): CrossTurnDiff {
   const json = (items: readonly unknown[], i: number): string => JSON.stringify(items[i]) ?? ''
   let stable = 0
   while (stable < prev.length && stable < cur.length && json(prev, stable) === json(cur, stable))
@@ -95,10 +91,6 @@ function formatPrefixLine(model: string, diff: CrossTurnDiff): string {
   return `${base}; broke@${first.index} Δ${sign}${delta} (${first.before.length}→${first.after.length} chars)`
 }
 
-function num(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
 const UsageDetailsSchema = Type.Object({
   cache_write_tokens: Type.Optional(Type.Number()),
   cached_tokens: Type.Optional(Type.Number()),
@@ -131,14 +123,14 @@ export function normalizeUsage(usage: unknown): UsageSummary {
     }
   }
   const record = asValue(UsageRecordSchema, usage) ?? {}
-  const output = num(record.output_tokens ?? record.completion_tokens)
+  const output = record.output_tokens ?? record.completion_tokens ?? 0
 
   const cacheRead = record.cache_read_input_tokens
   const cacheWrite = record.cache_creation_input_tokens
   if (cacheRead !== undefined || cacheWrite !== undefined) {
-    const read = num(cacheRead)
-    const write = num(cacheWrite)
-    const uncached = num(record.input_tokens)
+    const read = cacheRead ?? 0
+    const write = cacheWrite ?? 0
+    const uncached = record.input_tokens ?? 0
     const total = read + write + uncached
     return {
       shape: 'anthropic',
@@ -153,9 +145,9 @@ export function normalizeUsage(usage: unknown): UsageSummary {
 
   const details = record.input_tokens_details ?? record.prompt_tokens_details
   if (details?.cached_tokens !== undefined || details?.cache_write_tokens !== undefined) {
-    const total = num(record.input_tokens ?? record.prompt_tokens)
-    const read = num(details.cached_tokens)
-    const write = num(details.cache_write_tokens)
+    const total = record.input_tokens ?? record.prompt_tokens ?? 0
+    const read = details.cached_tokens ?? 0
+    const write = details.cache_write_tokens ?? 0
     return {
       shape: 'openai',
       inputTokens: total,
@@ -167,7 +159,7 @@ export function normalizeUsage(usage: unknown): UsageSummary {
     }
   }
 
-  const total = num(record.input_tokens ?? record.prompt_tokens)
+  const total = record.input_tokens ?? record.prompt_tokens ?? 0
   return {
     shape: 'unknown',
     inputTokens: total,
@@ -216,7 +208,8 @@ export function formatUsageLine(
 export class CacheMetricsTracker {
   private readonly statusBar: StatusBarItem
   private readonly recentHitRates: number[] = []
-  private readonly lastItemsByCacheKey = new Map<string, readonly unknown[]>()
+  // Subagents share their parent's cache key, so each key can carry several interleaved threads.
+  private readonly threadsByCacheKey = new Map<string, (readonly unknown[])[]>()
   private writes: Promise<void> = Promise.resolve()
 
   constructor(
@@ -233,11 +226,28 @@ export class CacheMetricsTracker {
 
   start(context: UsageContext): (usage: unknown) => void {
     let diff: CrossTurnDiff | undefined
-    if (this.enabled() && context.promptCacheKey !== undefined && context.inputItems !== undefined) {
-      diff = crossTurnDiff(this.lastItemsByCacheKey.get(context.promptCacheKey), context.inputItems)
-      this.lastItemsByCacheKey.set(context.promptCacheKey, context.inputItems)
-    }
+    if (this.enabled() && context.promptCacheKey !== undefined && context.inputItems !== undefined)
+      diff = this.diffAgainstThread(context.promptCacheKey, context.inputItems)
     return usage => this.record(usage, context, diff)
+  }
+
+  private diffAgainstThread(cacheKey: string, items: readonly unknown[]): CrossTurnDiff | undefined {
+    const threads = this.threadsByCacheKey.get(cacheKey) ?? this.threadsByCacheKey.set(cacheKey, []).get(cacheKey)!
+    let bestIndex = -1
+    let best: CrossTurnDiff | undefined
+    for (const [index, thread] of threads.entries()) {
+      const diff = crossTurnDiff(thread, items)
+      if (best === undefined || diff.stablePrefixLen > best.stablePrefixLen) {
+        best = diff
+        bestIndex = index
+      }
+    }
+    if (best !== undefined && best.stablePrefixLen > 0)
+      threads.splice(bestIndex, 1)
+    else if (threads.length >= MAX_THREADS_PER_CACHE_KEY)
+      threads.shift()
+    threads.push(items)
+    return best
   }
 
   private record(usage: unknown, context: UsageContext, diff: CrossTurnDiff | undefined): void {
