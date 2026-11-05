@@ -74,17 +74,14 @@ describe('fetchQuotas', () => {
     ])
   })
 
-  it('fetches only the provider used by the active model', async () => {
-    const { client, apiCall } = createManagementClientFake([
-      { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
-      { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
-    ], respondOk)
+  it('keeps the last report when a fetch fails', async () => {
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'a1' }], () => ({ statusCode: 401, body: '' }))
+    const previous: QuotaReport[] = [{ provider: 'claude', account: { authIndex: 'a1', label: 'claude.json' }, windows: [
+      { key: 'five_hour', label: '5h Quota', remainingPercent: 80 },
+    ] }]
 
-    const reports = await fetchQuotas(client, undefined, new Map(), 'claude')
-
-    expect(reports.map(report => report.provider)).toEqual(['claude'])
-    expect(apiCall).toHaveBeenCalledTimes(1)
-    expect(apiCall.mock.calls[0]?.[0].url).toContain('oauth/usage')
+    const [report] = await fetchQuotas(client, undefined, new Map(), previous)
+    expect(report).toMatchObject({ windows: previous[0]!.windows, error: expect.stringContaining('HTTP 401') as string })
   })
 
   it('parses codex reset_at as epoch seconds, falling back to reset_after_seconds', async () => {
@@ -409,12 +406,67 @@ describe('fetchQuotas', () => {
     expect(backoff.get('x1')).toBe(Date.parse(reset))
   })
 
-  it('clears the backoff once the upstream stops rate limiting', async () => {
-    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
-    const backoff = new Map([['x1', Date.now() - 1]])
+  it('polls signal providers every 15 minutes and the rest every 5', async () => {
+    const { client } = createManagementClientFake([
+      { name: 'claude.json', type: 'claude', auth_index: 'x1' },
+      { name: 'grok.json', type: 'xai', auth_index: 'g1' },
+    ], respondOk)
+    const nextFetch = new Map([['x1', Date.now() - 1]])
 
-    await fetchQuotas(client, undefined, backoff)
-    expect(backoff.has('x1')).toBe(false)
+    await fetchQuotas(client, undefined, nextFetch)
+    expect(nextFetch.get('x1')).toBe(Date.now() + 15 * 60_000)
+    expect(nextFetch.get('g1')).toBe(Date.now() + 5 * 60_000)
+  })
+
+  it('overlays newer proxy signals on the previous report instead of refetching', async () => {
+    const observedAt = new Date(Date.now() + 1000).toISOString()
+    const reset = Math.floor(Date.now() / 1000) + 3600
+    const { client, apiCall } = createManagementClientFake([
+      { name: 'claude.json', type: 'claude', auth_index: 'a1', quota: { observed_at: observedAt, signals: {
+        'Anthropic-Ratelimit-Unified-5h-Utilization': '0.25',
+        'Anthropic-Ratelimit-Unified-5h-Reset': String(reset),
+        'Anthropic-Ratelimit-Unified-7d-Utilization': '0.69',
+      } } },
+      { name: 'codex.json', type: 'codex', auth_index: 'c1', quota: { observed_at: observedAt, signals: {
+        'X-Codex-Primary-Used-Percent': '40',
+        'X-Codex-Primary-Window-Minutes': '300',
+        'X-Codex-Secondary-Used-Percent': '10',
+        'X-Codex-Secondary-Window-Minutes': '10080',
+      } } },
+    ], respondOk)
+    const nextFetch = new Map([['a1', Date.now() + 60_000], ['c1', Date.now() + 60_000]])
+    const previous: QuotaReport[] = [
+      { provider: 'claude', account: { authIndex: 'a1', label: 'claude.json' }, updatedAt: Date.now(), windows: [
+        { key: 'five_hour', label: '5h Quota', remainingPercent: 90 },
+        { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 50 },
+      ] },
+    ]
+
+    const [claude, codex] = await fetchQuotas(client, undefined, nextFetch, previous)
+
+    expect(apiCall).not.toHaveBeenCalled()
+    expect(claude!.windows).toEqual([
+      { key: 'five_hour', label: '5h Quota', remainingPercent: 75, resetsAt: reset * 1000 },
+      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 50 },
+      { key: 'seven_day', label: '7d Quota', remainingPercent: 31 },
+    ])
+    expect(codex!.windows).toEqual([
+      { label: '5h Quota', remainingPercent: 60 },
+      { label: '7d Quota', remainingPercent: 90 },
+    ])
+  })
+
+  it('ignores signals older than the last endpoint fetch', async () => {
+    const { client } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'a1', quota: {
+      observed_at: new Date(Date.now() - 1000).toISOString(),
+      signals: { 'Anthropic-Ratelimit-Unified-5h-Utilization': '0.99' },
+    } }], respondOk)
+    const previous: QuotaReport[] = [{ provider: 'claude', account: { authIndex: 'a1', label: 'claude.json' }, updatedAt: Date.now(), windows: [
+      { key: 'five_hour', label: '5h Quota', remainingPercent: 90 },
+    ] }]
+
+    const [report] = await fetchQuotas(client, undefined, new Map([['a1', Date.now() + 60_000]]), previous)
+    expect(report).toBe(previous[0])
   })
 
   it('skips the upstream call while an account is inside its Retry-After window', async () => {
@@ -474,7 +526,7 @@ describe('remainingForModel', () => {
     const accounts: QuotaReport[] = [
       { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 0 }] },
       { provider: 'codex', windows: remainingPercent === undefined ? [] : [{ label: '5h Quota', remainingPercent }] },
-      { provider: 'codex', windows: [{ label: '5h Quota', remainingPercent: 100 }], error: 'HTTP 401' },
+      { provider: 'codex', windows: [], error: 'HTTP 401' },
       { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 100 }] },
     ]
     const model = { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' }

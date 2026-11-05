@@ -351,7 +351,7 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
-  it('refreshes only the active model provider at most once every three minutes', async () => {
+  it('l', async () => {
     vi.useFakeTimers({ now: new Date('2026-07-30T12:00:00Z') })
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
     controller.setQuotaListener(vi.fn())
@@ -367,21 +367,15 @@ describe('server controller lifecycle', () => {
       body: JSON.stringify({ rate_limit: {} }),
     })
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(1))
-    expect(apiCall.mock.calls[0]?.[0].url).toContain('wham/usage')
+    await controller.refreshQuotas()
+    expect(apiCall).toHaveBeenCalledTimes(2)
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
-    await Promise.resolve()
-    expect(apiCall).toHaveBeenCalledTimes(1)
+    await controller.refreshQuotas()
+    expect(apiCall).toHaveBeenCalledTimes(2)
 
-    controller.scheduleQuotaRefresh({ proxyOwner: 'anthropic' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(2))
-    expect(apiCall.mock.calls[1]?.[0].url).toContain('oauth/usage')
-
-    await vi.advanceTimersByTimeAsync(180_000)
-    controller.scheduleQuotaRefresh({ proxyOwner: 'openai' })
-    await vi.waitFor(() => expect(apiCall).toHaveBeenCalledTimes(3))
+    await vi.advanceTimersByTimeAsync(15 * 60_000)
+    await controller.refreshQuotas()
+    expect(apiCall).toHaveBeenCalledTimes(4)
     controller.dispose()
   })
 

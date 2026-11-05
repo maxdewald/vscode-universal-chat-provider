@@ -21,6 +21,7 @@ export interface QuotaReport {
   windows: QuotaWindow[] // codex/claude/grok/kimi: account-level windows (5h / 7d / …)
   models?: Record<string, { remainingPercent: number, resetsAt?: number }> // antigravity: keyed by proxy model id
   account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
+  updatedAt?: number // epoch ms of the data the windows reflect
   error?: string
 }
 
@@ -35,6 +36,14 @@ export interface QuotaProvider {
   apply: (report: QuotaReport, data: unknown) => void
   owners: string[] // proxy `owned_by` values this provider bills for
   remaining: (report: QuotaReport, proxyModelId: string) => number | undefined
+  // Windows rebuilt from the rate-limit headers CLIProxyAPI records after each upstream reply.
+  fromSignals?: (signals: Record<string, string>) => QuotaWindow[]
+}
+
+// CLIProxyAPI keys signals by Go's canonical header name and drops empty values.
+export function signalNumber(signals: Record<string, string>, name: string): number | undefined {
+  const value = Number(signals[name])
+  return Number.isFinite(value) ? value : undefined
 }
 
 export function clamp(value: number, low: number, high: number): number {

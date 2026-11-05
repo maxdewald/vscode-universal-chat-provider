@@ -22,9 +22,9 @@ export function activate(context: ExtensionContext): void {
   // Status and quota arrive on separate listeners; re-render the bar from both on either change.
   let lastStatus: ServerStatus = 'starting'
   const renderStatusBar = (): void => updateStatusBar(statusBar, lastStatus, provider?.quotaSections() ?? [], provider?.currentModelQuota())
-  provider.onActivity = (model) => {
+  provider.onActivity = () => {
     renderStatusBar()
-    controller!.scheduleQuotaRefresh(model)
+    void controller!.refreshQuotas()
   }
   controller.setRefreshListener(async (expectedModelIds) => {
     await provider?.forceRefresh(false, expectedModelIds)

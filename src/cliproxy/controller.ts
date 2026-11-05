@@ -23,7 +23,7 @@ import { maintainRequestLogs } from '@src/cliproxy/managed/request-log-maintenan
 import { pickUpdate } from '@src/cliproxy/managed/update-policy'
 import { claimClaudeReset, listClaudeResets } from '@src/cliproxy/quota/claude-resets'
 import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
-import { fetchQuotas, quotaProviderForModel } from '@src/cliproxy/quota/quota'
+import { fetchQuotas } from '@src/cliproxy/quota/quota'
 import { countAccounts } from '@src/cliproxy/status'
 import { errorMessage } from '@src/shared/errors'
 import { debounce } from 'moderndash'
@@ -35,8 +35,6 @@ import {
 } from 'vscode'
 
 export type { ServerMode, ServerStatus, ServerStatusSnapshot } from '@src/cliproxy/status'
-
-const QUOTA_REFRESH_INTERVAL_MS = 180_000
 
 export class ServerController implements ProxyConnection {
   private readonly disposables: Disposable[] = []
@@ -52,9 +50,7 @@ export class ServerController implements ProxyConnection {
   private statusListener: ((status: ServerStatus) => void) | undefined
   private quotaListener: ((reports: QuotaReport[]) => void) | undefined
   private quotaReports: QuotaReport[] = []
-  private activeQuotaProvider: QuotaReport['provider'] | undefined
-  private lastQuotaRefresh = new Map<QuotaReport['provider'], number>()
-  private quotaBackoff = new Map<string, number>()
+  private quotaNextFetch = new Map<string, number>()
   private lastStatus: ServerStatus = 'starting'
   private updateCheckStarted = false
 
@@ -160,11 +156,6 @@ export class ServerController implements ProxyConnection {
     this.quotaListener = listener
   }
 
-  scheduleQuotaRefresh(model: { proxyOwner: string }): void {
-    this.activeQuotaProvider = quotaProviderForModel(model)
-    void this.refreshQuotas()
-  }
-
   async login(): Promise<void> {
     return this.accounts.login()
   }
@@ -205,8 +196,10 @@ export class ServerController implements ProxyConnection {
     if (management === undefined)
       return 'failed'
     const outcome = await claim(new ManagementClient(management.baseUrl, management.key), option, requestId)
-    if (outcome !== 'failed')
+    if (outcome !== 'failed') {
+      this.quotaNextFetch.clear()
       await this.refreshQuotas()
+    }
     return outcome
   }
 
@@ -450,41 +443,24 @@ export class ServerController implements ProxyConnection {
   }
 
   async refreshQuotas(): Promise<void> {
-    const provider = this.activeQuotaProvider
     if (this.quotaListener === undefined)
       return
-    if (provider !== undefined) {
-      const lastRefresh = this.lastQuotaRefresh.get(provider)
-      if (lastRefresh !== undefined && Date.now() - lastRefresh < QUOTA_REFRESH_INTERVAL_MS)
-        return
-      // Claimed before awaiting so a concurrent call is gated by the same window.
-      this.lastQuotaRefresh.set(provider, Date.now())
-    }
-    return this.performQuotaRefresh(provider)
-  }
-
-  private async performQuotaRefresh(provider: QuotaReport['provider'] | undefined): Promise<void> {
     const management = await this.managementForStatus()
-    if (management === undefined) {
-      if (provider !== undefined)
-        this.lastQuotaRefresh.delete(provider)
+    if (management === undefined)
       return
-    }
     try {
       const reports = await fetchQuotas(
         new ManagementClient(management.baseUrl, management.key),
         undefined,
-        this.quotaBackoff,
-        provider,
+        this.quotaNextFetch,
+        this.quotaReports,
       )
       for (const report of reports) {
         if (report.error !== undefined)
           this.output.appendLine(`Quota fetch failed for ${report.provider}${report.account === undefined ? '' : ` (${report.account.label})`}: ${report.error}`)
       }
-      this.quotaReports = provider === undefined
-        ? reports
-        : [...this.quotaReports.filter(report => report.provider !== provider), ...reports]
-      this.quotaListener?.(this.quotaReports)
+      this.quotaReports = reports
+      this.quotaListener?.(reports)
     }
     catch (error) {
       this.output.appendLine(`Quota refresh failed: ${errorMessage(error)}`)

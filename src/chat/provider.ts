@@ -84,15 +84,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   readonly onDidChangeLanguageModelChatInformation = this.modelsChanged.event
 
   setQuotas(reports: QuotaReport[]): void {
-    // Claude's usage endpoint intermittently 401s; keep the last good value per account so a
-    // transient failure doesn't blank the menu. Other providers always take the fresh report.
-    const previousClaude = this.quotaReports.filter(report => report.provider === 'claude')
-    this.quotaReports = reports.map((report) => {
-      if (report.provider !== 'claude' || hasQuota(report))
-        return report
-      const previous = previousClaude.find(prev => prev.account?.authIndex === report.account?.authIndex && hasQuota(prev))
-      return previous ?? report
-    })
+    this.quotaReports = reports
   }
 
   currentModelQuota(): { name: string, remainingPercent: number } | undefined {
@@ -123,7 +115,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       }
     }
 
-    const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.error === undefined)
+    const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.models !== undefined)
     const models = antigravity?.models
     if (models !== undefined) {
       const entries = this.registry.snapshot()
@@ -329,8 +321,4 @@ function configuredUtilityAliases(): Set<string> {
     .map(setting => chat.get<string>(setting, '').trim())
     .filter(value => value.startsWith(UCP_PREFIX) && value.includes(UTILITY_SUFFIX))
     .map(value => value.slice(UCP_PREFIX.length)))
-}
-
-function hasQuota(report: QuotaReport): boolean {
-  return report.error === undefined && (report.windows.length > 0 || Object.keys(report.models ?? {}).length > 0)
 }

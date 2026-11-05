@@ -10,34 +10,49 @@ export type { QuotaReport, QuotaWindow } from '@src/cliproxy/quota/providers/typ
 
 const ObjectSchema = Type.Object({}, { additionalProperties: true })
 
-export function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
+function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
   const owner = model.proxyOwner.toLowerCase()
   return (Object.keys(QUOTA_PROVIDERS) as Array<QuotaReport['provider']>)
     .find(name => QUOTA_PROVIDERS[name].owners.includes(owner))
 }
 
-// backoff maps authIndex -> deadline and is owned here: fetchProviderQuota writes it from the
-// response headers, and an account still inside its window reports no windows instead of being
-// fetched, so setQuotas keeps its last-good value without touching the upstream.
+const FETCH_INTERVAL_MS = 5 * 60_000
+// Providers with header signals stay fresh between fetches, so their usage endpoint is polled rarely.
+const SIGNAL_FETCH_INTERVAL_MS = 15 * 60_000
+
+// nextFetch maps authIndex -> earliest time to hit that account's usage endpoint again. Until then,
+// or when a fetch fails, the account keeps its previous report, overlaid with newer proxy signals.
 export async function fetchQuotas(
   client: ManagementClient,
   signal?: AbortSignal,
-  backoff: Map<string, number> = new Map(),
-  providerFilter?: QuotaReport['provider'],
+  nextFetch: Map<string, number> = new Map(),
+  previous: readonly QuotaReport[] = [],
 ): Promise<QuotaReport[]> {
   const files = await client.listAuthFilesRaw(signal)
-  const tasks = files.flatMap((entry) => {
+  return Promise.all(files.flatMap((entry) => {
     const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
     const provider = raw === 'xai' ? 'grok' : raw
-    if (!isQuotaProvider(provider) || (providerFilter !== undefined && provider !== providerFilter))
+    if (!isQuotaProvider(provider))
       return []
-    if ((backoff.get(entry.auth_index?.trim() ?? '') ?? 0) > Date.now()) {
-      const account = accountOf(entry)
-      return [Promise.resolve<QuotaReport>({ provider, windows: [], ...(account === undefined ? {} : { account }) })]
-    }
-    return [fetchProviderQuota(provider, QUOTA_PROVIDERS[provider], client, entry, signal, backoff)]
-  })
-  return Promise.all(tasks)
+    const source = QUOTA_PROVIDERS[provider]
+    const account = accountOf(entry)
+    const last = previous.find(report => report.provider === provider && account !== undefined && report.account?.authIndex === account.authIndex)
+      ?? { provider, windows: [], ...(account === undefined ? {} : { account }) }
+    if ((nextFetch.get(account?.authIndex ?? '') ?? 0) > Date.now())
+      return [Promise.resolve(withSignals(last, source, entry))]
+    return [fetchProviderQuota(source, client, entry, signal, nextFetch, last)]
+  }))
+}
+
+function withSignals(report: QuotaReport, source: QuotaProvider, entry: AuthFileRaw): QuotaReport {
+  const observedAt = Date.parse(entry.quota?.observed_at ?? '')
+  const fresh = source.fromSignals?.(entry.quota?.signals ?? {}) ?? []
+  if (fresh.length === 0 || Number.isNaN(observedAt) || observedAt <= (report.updatedAt ?? 0))
+    return report
+  const windows = report.windows.map(window => fresh.find(update => update.label === window.label) ?? window)
+  windows.push(...fresh.filter(update => !windows.includes(update)))
+  const { error: _error, ...rest } = report
+  return { ...rest, windows, updatedAt: observedAt }
 }
 
 export function formatPercent(value?: number): string {
@@ -70,28 +85,28 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
     return undefined
   const provider = QUOTA_PROVIDERS[name]
   const remaining = reports
-    .filter(report => report.provider === name && report.error === undefined)
+    .filter(report => report.provider === name)
     .map(report => provider.remaining(report, model.proxyModelId))
     .filter((percent): percent is number => percent !== undefined)
   return remaining.length > 0 ? Math.max(...remaining) : undefined
 }
 
 async function fetchProviderQuota(
-  provider: QuotaReport['provider'],
   source: QuotaProvider,
   client: ManagementClient,
   entry: AuthFileRaw,
   signal: AbortSignal | undefined,
-  backoff: Map<string, number>,
+  nextFetch: Map<string, number>,
+  last: QuotaReport,
 ): Promise<QuotaReport> {
-  const account = accountOf(entry)
-  const report: QuotaReport = { provider, windows: [], ...(account === undefined ? {} : { account }) }
-  const authIndex = entry.auth_index?.trim() ?? ''
-  if (authIndex === '')
-    return { ...report, error: 'missing auth_index' }
+  const authIndex = last.account?.authIndex
+  if (authIndex === undefined)
+    return { ...last, error: 'missing auth_index' }
   const requestBody = source.body?.(entry)
   if (requestBody !== undefined && 'error' in requestBody)
-    return { ...report, error: requestBody.error }
+    return { ...last, error: requestBody.error }
+  // Claimed before awaiting so overlapping refreshes don't fetch the same account twice.
+  nextFetch.set(authIndex, Date.now() + FETCH_INTERVAL_MS)
   try {
     const { statusCode, header, body } = await client.apiCall({
       auth_index: authIndex,
@@ -100,21 +115,20 @@ async function fetchProviderQuota(
       header: source.header,
       ...requestBody,
     }, signal)
-    const retryAfter = parseRetryAfter(header, statusCode)
-    if (retryAfter === undefined)
-      backoff.delete(authIndex)
-    else
-      backoff.set(authIndex, retryAfter)
-    if (statusCode < 200 || statusCode >= 300)
-      return { ...report, error: `HTTP ${statusCode} from ${source.url} — ${describeBody(body)}` }
+    const ok = statusCode >= 200 && statusCode < 300
+    const interval = ok && source.fromSignals !== undefined ? SIGNAL_FETCH_INTERVAL_MS : FETCH_INTERVAL_MS
+    nextFetch.set(authIndex, parseRetryAfter(header, statusCode) ?? Date.now() + interval)
+    if (!ok)
+      return { ...last, error: `HTTP ${statusCode} from ${source.url} — ${describeBody(body)}` }
     const data = asJsonValue(ObjectSchema, body)
     if (data === undefined)
-      return { ...report, error: `invalid quota payload from ${source.url} — ${describeBody(body)}` }
+      return { ...last, error: `invalid quota payload from ${source.url} — ${describeBody(body)}` }
+    const report: QuotaReport = { provider: last.provider, windows: [], account: last.account!, updatedAt: Date.now() }
     source.apply(report, data)
     return report
   }
   catch (error) {
-    return { ...report, error: errorMessage(error) }
+    return { ...last, error: errorMessage(error) }
   }
 }
 

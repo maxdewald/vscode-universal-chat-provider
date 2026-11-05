@@ -1,7 +1,7 @@
 import type { Static } from '@sinclair/typebox'
 import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, minRemaining, Nullable, parseReset, percentOf } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, Nullable, parseReset, percentOf, signalNumber } from '@src/cliproxy/quota/providers/types'
 import { asValue } from '@src/shared/json'
 
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -50,6 +50,23 @@ export const codexProvider: QuotaProvider = {
   owners: ['openai'],
   // Spark and purchased credits are separate pools, so they never gate a regular model.
   remaining: report => minRemaining(report.windows.filter(window => window.key === undefined)),
+  fromSignals: signals => rateWindows({
+    primary_window: signalWindow(signals, 'Primary'),
+    secondary_window: signalWindow(signals, 'Secondary'),
+  }),
+}
+
+function signalWindow(signals: Record<string, string>, name: string): Static<typeof WindowSchema> | null {
+  const used = signalNumber(signals, `X-Codex-${name}-Used-Percent`)
+  if (used === undefined)
+    return null
+  const minutes = signalNumber(signals, `X-Codex-${name}-Window-Minutes`)
+  return {
+    used_percent: used,
+    limit_window_seconds: minutes === undefined ? null : minutes * 60,
+    reset_at: signalNumber(signals, `X-Codex-${name}-Reset-At`) ?? null,
+    reset_after_seconds: signalNumber(signals, `X-Codex-${name}-Reset-After-Seconds`) ?? null,
+  }
 }
 
 function parseWindows(data: unknown): QuotaWindow[] {

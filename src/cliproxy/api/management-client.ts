@@ -67,6 +67,10 @@ export const AuthFileRawSchema = Type.Object({
   chatgpt_account_id: Type.Optional(Type.String()),
   account_id: Type.Optional(Type.String()),
   id_token: Type.Optional(IdTokenSchema),
+  quota: Type.Optional(Type.Object({
+    observed_at: Type.Optional(Type.String()),
+    signals: Type.Optional(Type.Record(Type.String(), Type.String())),
+  })),
 })
 
 export type AuthFileRaw = Static<typeof AuthFileRawSchema>

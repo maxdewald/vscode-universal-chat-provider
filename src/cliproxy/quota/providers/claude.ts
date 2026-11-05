@@ -1,6 +1,6 @@
 import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, minRemaining, Nullable, parseReset } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, Nullable, parseReset, signalNumber } from '@src/cliproxy/quota/providers/types'
 import { asValue } from '@src/shared/json'
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
@@ -55,6 +55,13 @@ export const claudeProvider: QuotaProvider = {
       return family === undefined || id.includes(family)
     }))
   },
+  fromSignals: signals => ([['five_hour', '5h'], ['seven_day', '7d']] as const).flatMap(([key, claim]) => {
+    const used = signalNumber(signals, `Anthropic-Ratelimit-Unified-${claim}-Utilization`)
+    if (used === undefined)
+      return []
+    const resetsAt = parseReset(signalNumber(signals, `Anthropic-Ratelimit-Unified-${claim}-Reset`))
+    return [{ key, label: windowLabel(key)!, remainingPercent: clamp(100 - used * 100, 0, 100), ...(resetsAt === undefined ? {} : { resetsAt }) }]
+  }),
 }
 
 function sevenDayFamily(key: string | undefined): string | undefined {
