@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.6.0...v1.7.0) (2026-11-05)
+
+
+### Features
+
+* **models:** suggest fast mode before quota resets expire ([731105e](https://github.com/maxdewald/vscode-universal-chat-provider/commit/731105e4f628cb7f2b6ca90f4736d7e6e9bac8dd))
+
+
+### Bug Fixes
+
+* limit request log retention to seven days ([d08b7a3](https://github.com/maxdewald/vscode-universal-chat-provider/commit/d08b7a3989aa834e73587a3b8e013ae0ef704f29))
+
 ## [1.6.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.5.2...v1.6.0) (2026-11-05)
 
 
