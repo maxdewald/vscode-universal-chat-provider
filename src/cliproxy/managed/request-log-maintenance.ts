@@ -3,7 +3,7 @@ import { appendFile, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 
-const RETENTION_DAYS = 14
+const RETENTION_DAYS = 7
 const COOLING_MS = 2 * 60 * 1000
 const REQUEST_LOG = /^.+-(\d{4}-\d{2}-\d{2})T\d{6}-.+\.log$/
 const DAILY_LOG = /^requests-(\d{4}-\d{2}-\d{2})\.log$/
