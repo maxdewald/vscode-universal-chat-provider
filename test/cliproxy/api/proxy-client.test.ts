@@ -138,7 +138,7 @@ describe('cLIProxyClient', () => {
     expect(request.headers.get('content-type')).toBe('application/json')
     expect(request.headers.has('x-session-id')).toBe(false)
     expect(handlers.onText).toHaveBeenCalledWith('hello')
-    expect(handlers.onThinking).toHaveBeenCalledWith('think')
+    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith('think', 'output-unknown:0')
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
     expect(handlers.onToolCall).toHaveBeenCalledWith('call-1', 'lookup', { q: 'x' })
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
@@ -343,7 +343,7 @@ describe('cLIProxyClient', () => {
     await stream(body, handlers)
 
     expect(handlers.onText).toHaveBeenCalledExactlyOnceWith('Version 2 shipped.')
-    expect(handlers.onThinking.mock.calls.flat()).toEqual(['Search: current release', ''])
+    expect(handlers.onThinking.mock.calls).toEqual([['Search: current release', 'ws_1']])
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
@@ -368,7 +368,7 @@ describe('cLIProxyClient', () => {
       item: { type: 'web_search_call', status: 'completed', action },
     }), handlers)
 
-    expect(handlers.onThinking.mock.calls.flat()).toEqual([expected, ''])
+    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith(expected, 'output-unknown')
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
@@ -389,19 +389,16 @@ describe('cLIProxyClient', () => {
     {
       name: 'preserves a trailing HTML comment',
       deltas: ['**Checking settings**\n\n<!-- -->'],
-      expected: '**Checking settings**\n\n<!-- -->',
     },
     {
       name: 'preserves an HTML comment split across deltas',
       deltas: ['**Checking settings**\n\n<!-', '- -->'],
-      expected: '**Checking settings**\n\n<!-- -->',
     },
     {
       name: 'preserves a literal HTML comment in prose',
       deltas: ['**Plan**\n\nUse `<!-- -->` in JSX.'],
-      expected: '**Plan**\n\nUse `<!-- -->` in JSX.',
     },
-  ])('$name', async ({ deltas, expected }) => {
+  ])('$name', async ({ deltas }) => {
     const body = [
       ...deltas.map(delta => event({ type: 'response.reasoning_summary_text.delta', delta })),
       event({ type: 'response.reasoning_summary_part.done' }),
@@ -414,8 +411,7 @@ describe('cLIProxyClient', () => {
     await new CLIProxyClient('http://proxy', 'key')
       .streamResponse(emptyBody, handlers, new AbortController().signal)
 
-    expect(handlers.onThinking.mock.calls.flat().join('')).toBe(expected)
-    expect(handlers.onThinking.mock.calls.flat()).toEqual([...deltas, ''])
+    expect(handlers.onThinking.mock.calls).toEqual(deltas.map(delta => [delta, 'output-unknown:0']))
   })
 
   it('streams full reasoning_text deltas as thinking', async () => {
@@ -432,48 +428,26 @@ describe('cLIProxyClient', () => {
     await new CLIProxyClient('http://proxy', 'key')
       .streamResponse(emptyBody, handlers, new AbortController().signal)
 
-    expect(handlers.onThinking.mock.calls.flat().join('')).toBe('step one step two')
+    expect(handlers.onThinking.mock.calls).toEqual([['step one ', 'output-unknown:0'], ['step two', 'output-unknown:0']])
   })
 
-  it('emits only one boundary for repeated reasoning end events', async () => {
-    const body = [
-      event({ type: 'response.reasoning_summary_text.delta', delta: '**First**\n\n' }),
-      event({ type: 'response.reasoning_summary_text.done' }),
-      event({ type: 'response.reasoning_summary_part.done' }),
-      event({ type: 'response.reasoning_summary_text.delta', delta: '**Second**\n\n' }),
-      event({ type: 'response.reasoning_summary_part.done' }),
-      event({ type: 'response.completed' }),
-    ].join('')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
+  it('tags thinking deltas with the reasoning item and summary index', async () => {
+    const summary = (summary_index: number, delta: string) =>
+      event({ type: 'response.reasoning_summary_text.delta', item_id: 'rs_1', summary_index, delta })
     const handlers = callbacks()
 
-    await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse(emptyBody, handlers, new AbortController().signal)
-
-    expect(handlers.onThinking.mock.calls.flat()).toEqual(['**First**\n\n', '', '**Second**\n\n', ''])
-  })
-
-  it('separates reasoning sections with an empty thinking boundary', async () => {
-    const body = [
-      event({ type: 'response.reasoning_summary_text.delta', delta: 'Planning status line restructuring' }),
-      event({ type: 'response.reasoning_summary_part.done' }),
-      event({ type: 'response.reasoning_summary_text.delta', delta: 'Refining status header formatting' }),
-      event({ type: 'response.reasoning_summary_part.done' }),
+    await stream([
+      summary(0, 'Planning'),
+      summary(0, ' status line'),
+      event({ type: 'response.reasoning_summary_part.done', item_id: 'rs_1', summary_index: 0 }),
+      summary(1, 'Refining header'),
       event({ type: 'response.completed' }),
-    ].join('')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
-    const handlers = callbacks()
+    ].join(''), handlers)
 
-    await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse(emptyBody, handlers, new AbortController().signal)
-
-    expect(handlers.onThinking.mock.calls.flat()).toEqual([
-      'Planning status line restructuring',
-      '',
-      'Refining status header formatting',
-      '',
+    expect(handlers.onThinking.mock.calls).toEqual([
+      ['Planning', 'rs_1:0'],
+      [' status line', 'rs_1:0'],
+      ['Refining header', 'rs_1:1'],
     ])
   })
 
@@ -568,7 +542,7 @@ describe('cLIProxyClient', () => {
       .toBeUndefined()
 
     expect(handlers.onText).toHaveBeenCalledWith('partial answer')
-    expect(handlers.onThinking.mock.calls.flat()).toEqual(['final thought', ''])
+    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith('final thought', 'output-unknown:0')
     expect(handlers.onUsage).toHaveBeenCalledWith(usage)
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })

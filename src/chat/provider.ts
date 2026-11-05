@@ -43,7 +43,7 @@ export function utilityModelId(modelId: string, effort: string): string {
 }
 
 // Not yet in the published @types/vscode this project pins; present at runtime in Copilot Chat.
-const LanguageModelThinkingPart = (vscode as Record<string, unknown>)['LanguageModelThinkingPart'] as new (value: string) => LanguageModelResponsePart
+const LanguageModelThinkingPart = (vscode as Record<string, unknown>)['LanguageModelThinkingPart'] as new (value: string, id?: string) => LanguageModelResponsePart
 
 export class UniversalChatProvider implements LanguageModelChatProvider<ProviderModel> {
   private readonly credentials: CredentialStore
@@ -218,8 +218,8 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
           onText: (delta) => {
             progress.report(new LanguageModelTextPart(delta))
           },
-          onThinking: (delta) => {
-            progress.report(new LanguageModelThinkingPart(delta))
+          onThinking: (delta, id) => {
+            progress.report(new LanguageModelThinkingPart(delta, id))
           },
           onToolCall: (callId, name, input) =>
             progress.report(new LanguageModelToolCallPart(callId, name, input)),

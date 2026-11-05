@@ -9,15 +9,14 @@ import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/m
 import { codexCitations } from '@src/cliproxy/api/codex-citations'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import {
-  emitWebSearchStep,
   streamErrorMessage,
   StreamEventSchema,
   StreamItemSchema,
   streamKey,
   StreamResponseSchema,
   textPartBuffer,
-  thinkingSectionEmitter,
   toolCallAssembler,
+  webSearchStepLabel,
 } from '@src/cliproxy/api/responses-stream'
 import { asJsonValue, asValue } from '@src/shared/json'
 import { kyFetch } from '@src/shared/kyFetch'
@@ -31,7 +30,8 @@ export interface DiscoveryResult {
 
 export interface StreamCallbacks {
   onText: (delta: string) => void
-  onThinking?: (delta: string) => void
+  // VS Code merges thinking deltas that share an id into one block.
+  onThinking?: (delta: string, id: string) => void
   onToolCall: (callId: string, name: string, input: object) => void
   onUsage?: (usage: unknown) => void
 }
@@ -108,7 +108,6 @@ export class CLIProxyClient {
       throw new Error('CLIProxyAPI returned an empty streaming response.')
 
     const text = textPartBuffer(callbacks.onText, codexCitations)
-    const thinking = thinkingSectionEmitter(callbacks.onThinking)
     const tools = toolCallAssembler(callbacks.onToolCall)
 
     const events = response.body
@@ -130,14 +129,8 @@ export class CLIProxyClient {
           text.end(streamKey(payload, undefined, payload.content_index ?? 0), payload.part)
         }
         else if (type === 'response.reasoning_summary_text.delta' || type === 'response.reasoning_text.delta') {
-          thinking.push(payload.delta ?? '')
-        }
-        else if (
-          type === 'response.reasoning_summary_text.done'
-          || type === 'response.reasoning_summary_part.done'
-          || type === 'response.reasoning_text.done'
-        ) {
-          thinking.end()
+          if (payload.delta !== undefined && payload.delta.length > 0)
+            callbacks.onThinking?.(payload.delta, streamKey(payload, undefined, payload.summary_index ?? payload.content_index ?? 0))
         }
         else if (type === 'response.output_item.added') {
           const item = asValue(StreamItemSchema, payload.item)
@@ -153,7 +146,7 @@ export class CLIProxyClient {
             tools.end(streamKey(payload, item), item)
           }
           else if (item?.type === 'web_search_call') {
-            emitWebSearchStep(item.action, callbacks.onThinking)
+            callbacks.onThinking?.(webSearchStepLabel(item.action), streamKey(payload, item))
           }
           else if (item?.type === 'message') {
             item.content?.forEach((content, contentIndex) => {
@@ -184,7 +177,6 @@ export class CLIProxyClient {
       }
     }
     finally {
-      thinking.end()
       text.flush()
     }
   }

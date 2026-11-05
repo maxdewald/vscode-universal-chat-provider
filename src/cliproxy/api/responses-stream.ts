@@ -33,6 +33,7 @@ export const StreamEventSchema = Type.Object({
   item_id: Type.Optional(Type.String()),
   output_index: Type.Optional(Type.Unknown()),
   content_index: Type.Optional(Type.Unknown()),
+  summary_index: Type.Optional(Type.Unknown()),
   part: Type.Optional(Type.Unknown()),
   response: Type.Optional(Type.Unknown()),
   error: Type.Optional(Type.Union([Type.String(), ErrorObjectSchema])),
@@ -178,10 +179,7 @@ export function textPartBuffer(emit: (delta: string) => void, renderer: TextRend
   }
 }
 
-export function emitWebSearchStep(
-  rawAction: unknown,
-  emit?: (delta: string) => void,
-): void {
+export function webSearchStepLabel(rawAction: unknown): string {
   const action = asValue(WebActionSchema, rawAction)
   const actionType = typeof action?.['type'] === 'string' ? action['type'].trim().replace(/[_-]+/g, ' ') : ''
   const label = actionType.length > 0 ? actionType.charAt(0).toUpperCase() + actionType.slice(1) : 'Web Search'
@@ -196,27 +194,5 @@ export function emitWebSearchStep(
     })
     .filter(Boolean)
     .join(', ')
-  emit?.(detail.length > 0 ? `${label}: ${detail}` : label)
-  emit?.('')
-}
-
-export function thinkingSectionEmitter(emit?: (delta: string) => void): { push: (delta: string) => void, end: () => void } {
-  let hasEmittedThinking = false
-
-  return {
-    push(delta) {
-      if (delta.length > 0) {
-        emit?.(delta)
-        hasEmittedThinking = true
-      }
-    },
-    end() {
-      // An empty thinking part tells VS Code the section ended, so the next
-      // reasoning summary renders as its own block instead of being appended.
-      if (hasEmittedThinking) {
-        emit?.('')
-        hasEmittedThinking = false
-      }
-    },
-  }
+  return detail.length > 0 ? `${label}: ${detail}` : label
 }

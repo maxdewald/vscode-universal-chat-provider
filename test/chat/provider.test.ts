@@ -66,7 +66,7 @@ describe('language model provider', () => {
   it('translates streaming callbacks into VS Code response parts and usage logs', async () => {
     const provider = createProvider('secret')
     clientMocks.streamResponse.mockImplementation(async (_body: unknown, callbacks: StreamCallbacks) => {
-      callbacks.onThinking?.('thinking')
+      callbacks.onThinking?.('thinking', 'rs_1:0')
       callbacks.onText('text')
       callbacks.onToolCall('call', 'lookup', { q: 'x' })
       callbacks.onUsage?.({ output_tokens: 3 })
@@ -92,7 +92,7 @@ describe('language model provider', () => {
     const thinkingPart = report.mock.calls[0]?.[0] as LanguageModelThinkingPart
     expect(thinkingPart).toBeInstanceOf(LanguageModelThinkingPart)
     expect(thinkingPart.value).toBe('thinking')
-    expect(thinkingPart.id).toBeUndefined()
+    expect(thinkingPart.id).toBe('rs_1:0')
     expect(report.mock.calls[1]?.[0]).toEqual(new LanguageModelTextPart('text'))
     expect(report.mock.calls[2]?.[0]).toEqual(new LanguageModelToolCallPart('call', 'lookup', { q: 'x' }))
     const usagePart = report.mock.calls[3]?.[0] as LanguageModelDataPart
