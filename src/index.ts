@@ -1,8 +1,10 @@
+import type { ProviderModel } from '@src/chat/models/model'
 import type { ServerStatus } from '@src/cliproxy/controller'
 import type { ExtensionContext } from 'vscode'
 import { UniversalChatProvider } from '@src/chat/provider'
 import { ServerController } from '@src/cliproxy/controller'
 import { registerCommands } from '@src/extension/commands'
+import { createFastModeNudge } from '@src/extension/fast-mode-nudge'
 import { createStatusBar, updateStatusBar } from '@src/extension/ui/status-bar'
 import { maybeSuggestUtilityModel } from '@src/extension/utility-model-nudge'
 import { setJsonValidationErrorReporter } from '@src/shared/json'
@@ -17,12 +19,16 @@ export function activate(context: ExtensionContext): void {
   setJsonValidationErrorReporter(message => output.error(message))
   controller = new ServerController(context, output, serverOutput)
   provider = new UniversalChatProvider(context, output, controller, async () => controller!.login())
+  const suggestFastMode = createFastModeNudge(context, controller)
+  let foreground: { model: ProviderModel, at: number } | undefined
 
   const statusBar = createStatusBar()
   // Status and quota arrive on separate listeners; re-render the bar from both on either change.
   let lastStatus: ServerStatus = 'starting'
   const renderStatusBar = (): void => updateStatusBar(statusBar, lastStatus, provider?.quotaSections() ?? [], provider?.currentModelQuota())
-  provider.onActivity = () => {
+  provider.onActivity = (model, isForeground) => {
+    if (isForeground)
+      foreground = { model, at: Date.now() }
     renderStatusBar()
     void controller!.refreshQuotas()
   }
@@ -36,6 +42,10 @@ export function activate(context: ExtensionContext): void {
   controller.setQuotaListener((reports) => {
     provider?.setQuotas(reports)
     renderStatusBar()
+    if (foreground !== undefined && Date.now() - foreground.at < 15 * 60_000) {
+      void suggestFastMode(foreground.model, provider?.fastModel(foreground.model), reports)
+        .catch(error => output.error('Fast Mode suggestion failed', error))
+    }
   })
   renderStatusBar()
 

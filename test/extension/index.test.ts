@@ -1,7 +1,9 @@
 import { UniversalChatProvider } from '@src/chat/provider'
 import { ServerController } from '@src/cliproxy/controller'
+import { createFastModeNudge } from '@src/extension/fast-mode-nudge'
 import { activate, deactivate } from '@src/index'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createProviderModel } from '../support/chat'
 import {
   createExtensionContext,
   outputChannelByName,
@@ -9,6 +11,10 @@ import {
   statusBarItemByPriority,
   vscodeMock,
 } from '../support/vscode'
+
+const suggest = vi.hoisted(() => vi.fn(async () => {}))
+
+vi.mock('../../src/extension/fast-mode-nudge', () => ({ createFastModeNudge: vi.fn(() => suggest) }))
 
 beforeEach(() => {
   resetVSCodeMock()
@@ -42,5 +48,20 @@ describe('extension activation', () => {
     expect(statusBar?.command).toBe('universalChatProvider.manage')
     expect(statusBar?.show).toHaveBeenCalledTimes(1)
     expect(context.subscriptions).toEqual(expect.arrayContaining([output, serverOutput, statusBar]))
+
+    const provider = vscodeMock.registeredProviders[0]!.provider as UniversalChatProvider
+    const standard = createProviderModel()
+    const fast = createProviderModel({ id: `${standard.id}:fast`, serviceTier: 'priority' })
+    vi.spyOn(provider, 'fastModel').mockReturnValue(fast)
+    const quotaListener = setQuotaListener.mock.calls[0]![0]
+    expect(createFastModeNudge).toHaveBeenCalledWith(context, expect.any(ServerController))
+    quotaListener([])
+    expect(suggest).not.toHaveBeenCalled()
+    provider.onActivity?.(standard, false)
+    quotaListener([])
+    expect(suggest).not.toHaveBeenCalled()
+    provider.onActivity?.(standard, true)
+    quotaListener([])
+    expect(suggest).toHaveBeenCalledWith(standard, fast, [])
   })
 })

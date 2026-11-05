@@ -54,7 +54,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
   private readonly disposables: vscode.Disposable[] = []
   private quotaReports: QuotaReport[] = []
   private lastUsedModel: { proxyModelId: string, proxyOwner: string, name: string } | undefined
-  onActivity: ((model: { proxyOwner: string }) => void) | undefined
+  onActivity: ((model: ProviderModel, foreground: boolean) => void) | undefined
 
   constructor(
     context: ExtensionContext,
@@ -85,6 +85,10 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   setQuotas(reports: QuotaReport[]): void {
     this.quotaReports = reports
+  }
+
+  fastModel(model: ProviderModel): ProviderModel | undefined {
+    return this.registry.snapshot().find(candidate => candidate.id === `${model.id}:fast`)
   }
 
   currentModelQuota(): { name: string, remainingPercent: number } | undefined {
@@ -242,7 +246,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
       throw plain
     }
     finally {
-      this.onActivity?.(targetModel)
+      this.onActivity?.(targetModel, !utilityRequest && compaction === undefined)
     }
   }
 

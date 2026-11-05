@@ -256,6 +256,12 @@
             "default": false,
             "order": 1,
             "description": "Hide older versions of a model when a newer one is available, e.g. Claude Opus 4.8 once Opus 5.5 is out."
+          },
+          "universalChatProvider.models.suggestFastMode": {
+            "type": "boolean",
+            "default": true,
+            "order": 2,
+            "description": "Suggest Fast Mode when substantial quota remains shortly before a quota reset or an unused reset credit expires."
           }
         }
       },

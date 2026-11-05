@@ -38,6 +38,21 @@ beforeEach(() => {
 })
 
 describe('language model provider', () => {
+  it('distinguishes foreground activity from utility and compaction requests', async () => {
+    const provider = createProvider('secret')
+    const activity = vi.fn()
+    provider.onActivity = activity
+    clientMocks.streamResponse.mockResolvedValue(undefined)
+    for (const [selected, messages, foreground] of [
+      [model(), [userTextMessage('hello')], true],
+      [{ ...model(), id: utilityModelId(model().id, 'low') }, [userTextMessage('title')], false],
+      [model(), compactionMessages(), false],
+    ] as const) {
+      await provider.provideLanguageModelChatResponse(selected, messages, options(), { report: vi.fn() }, new CancellationTokenSource().token)
+      expect(activity).toHaveBeenLastCalledWith(expect.objectContaining({ proxyModelId: selected.proxyModelId }), foreground)
+    }
+  })
+
   it('requires credentials and returns zero for cancelled token counting', async () => {
     const provider = createProvider()
     const token = new CancellationTokenSource()

@@ -10,7 +10,7 @@ export type { QuotaReport, QuotaWindow } from '@src/cliproxy/quota/providers/typ
 
 const ObjectSchema = Type.Object({}, { additionalProperties: true })
 
-function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
+export function quotaProviderForModel(model: { proxyOwner: string }): QuotaReport['provider'] | undefined {
   const owner = model.proxyOwner.toLowerCase()
   return (Object.keys(QUOTA_PROVIDERS) as Array<QuotaReport['provider']>)
     .find(name => QUOTA_PROVIDERS[name].owners.includes(owner))
