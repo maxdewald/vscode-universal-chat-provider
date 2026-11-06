@@ -45,7 +45,7 @@ export function fastModeOpportunity(
     return {
       kind: 'quota',
       id: `${quota.key ?? quota.label}:${quota.resetsAt}`,
-      reason: `${formatPercent(quota.remainingPercent)} of its ${quota.label} remaining, resetting in ${formatResetCountdown(quota.resetsAt)}`,
+      reason: `${formatPercent(quota.remainingPercent)} of ${quota.label.toLowerCase()} unused, resets in ${formatResetCountdown(quota.resetsAt)}`,
     }
   }
   if ((source.remaining(report, model.proxyModelId) ?? 0) < 50)
@@ -58,7 +58,7 @@ export function fastModeOpportunity(
     : {
         kind: 'credit',
         id: reset.credit.id,
-        reason: `${formatPercent(source.remaining(report, model.proxyModelId))} quota remaining and an unused reset credit expiring in ${formatResetCountdown(reset.credit.expiresAt)}`,
+        reason: `unused reset credit expires in ${formatResetCountdown(reset.credit.expiresAt)}, ${formatPercent(source.remaining(report, model.proxyModelId))} quota left`,
       }
 }
 
@@ -101,7 +101,7 @@ export function createFastModeNudge(context: ExtensionContext, readers: Pick<Ser
       const view = 'View Quota & Resets'
       const disable = 'Don\'t Suggest Again'
       const choice = await window.showInformationMessage(
-        `${report.account!.label} has ${opportunity.reason}. Consider ${fastModel.name} (${fastModel.detail ?? 'higher quota usage'}). Fast mode uses quota faster; resets are never redeemed automatically.`,
+        `${report.account!.label}: ${opportunity.reason}. Consider ${fastModel.name}: faster, but uses more quota.`,
         view,
         disable,
       )

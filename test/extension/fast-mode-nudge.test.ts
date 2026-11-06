@@ -79,13 +79,13 @@ describe('fast-mode notification', () => {
     return { context, readers, nudge: createFastModeNudge(context, readers) }
   }
 
-  it('notifies once per opportunity across reloads and includes the Fast variant cost', async () => {
+  it('notifies once per opportunity across reloads and names the Fast variant', async () => {
     const { context, readers, nudge } = setup()
     await nudge(model, fast, [report()])
     await nudge(model, fast, [report()])
     await createFastModeNudge(context, readers)(model, fast, [report()])
     expect(window.showInformationMessage).toHaveBeenCalledTimes(1)
-    expect(window.showInformationMessage.mock.calls[0]?.[0]).toContain('GPT Test (Fast Mode) (2x usage)')
+    expect(window.showInformationMessage.mock.calls[0]?.[0]).toBe('Account One: 60% of 5h quota unused, resets in 45m. Consider GPT Test (Fast Mode): faster, but uses more quota.')
     expect(readers.listCodexResets).not.toHaveBeenCalled()
     await nudge(model, fast, [report('5h Quota', 44)])
     expect(window.showInformationMessage).toHaveBeenCalledTimes(2)
@@ -125,7 +125,7 @@ describe('fast-mode notification', () => {
     await nudge(model, fast, [report('7d Quota', 500)])
     await nudge(model, fast, [report('7d Quota', 500)])
     expect(window.showInformationMessage).toHaveBeenCalledTimes(1)
-    expect(window.showInformationMessage.mock.calls[0]?.[0]).toContain('unused reset credit expiring in 3h')
+    expect(window.showInformationMessage.mock.calls[0]?.[0]).toContain('unused reset credit expires in 3h')
     expect(readers.listCodexResets).toHaveBeenCalledTimes(1)
     vi.mocked(Date.now).mockReturnValue(now + 5 * MINUTE)
     await nudge(model, fast, [report('7d Quota', 500)])
