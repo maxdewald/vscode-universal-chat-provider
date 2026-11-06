@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.0...v1.7.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **models:** simplify fast mode suggestion message ([7eab8e6](https://github.com/maxdewald/vscode-universal-chat-provider/commit/7eab8e6a0f4c51388e2259fd35f58672f36d7ea2))
+
 ## [1.7.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.6.0...v1.7.0) (2026-11-05)
 
 
