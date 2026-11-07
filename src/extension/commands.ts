@@ -35,6 +35,7 @@ export function registerCommands(
       description: 'Remaining quota and limit resets for your accounts',
     },
     { command: 'universalChatProvider.refresh', run: async () => {
+      await controller.refreshModelCatalog()
       const models = await provider.forceRefresh(true)
       void window.showInformationMessage(`CLIProxyAPI exposed ${models.length} chat models.`)
     }, group: 1, label: '$(refresh) Refresh Models', description: 'Reload models and capabilities' },
