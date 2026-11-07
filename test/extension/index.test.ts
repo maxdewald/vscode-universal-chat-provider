@@ -6,10 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProviderModel } from '../support/chat'
 import {
   createExtensionContext,
+  extensions,
   outputChannelByName,
   resetVSCodeMock,
   statusBarItemByPriority,
   vscodeMock,
+  window,
+  workspace,
 } from '../support/vscode'
 
 const suggest = vi.hoisted(() => vi.fn(async () => {}))
@@ -22,6 +25,40 @@ beforeEach(() => {
 })
 
 describe('extension activation', () => {
+  it('waits for available chat models before suggesting a utility model', async () => {
+    vi.spyOn(UniversalChatProvider.prototype, 'initialize').mockResolvedValue()
+    vi.spyOn(ServerController.prototype, 'refreshQuotas').mockResolvedValue()
+    const getModels = vi.spyOn(UniversalChatProvider.prototype, 'getModels').mockResolvedValue([])
+    extensions.getExtension.mockReturnValue({})
+    const context = createExtensionContext({ globalStoragePath: '/tmp/ucp-index-test' })
+
+    activate(context)
+
+    expect(getModels).not.toHaveBeenCalled()
+    expect(window.showInformationMessage).not.toHaveBeenCalled()
+
+    const notifyModelInformationChange = () => {
+      for (const [listener] of workspace.onDidChangeConfiguration.mock.calls) {
+        listener({ affectsConfiguration: section => section === 'chat.utilityModel' })
+      }
+    }
+    notifyModelInformationChange()
+    await vi.waitFor(() => expect(getModels).toHaveBeenCalledTimes(1))
+    expect(getModels).toHaveBeenCalledWith(false)
+    expect(window.showInformationMessage).not.toHaveBeenCalled()
+    expect(context.globalState.get('universalChatProvider.utilityModelNudgeShown', false)).toBe(false)
+
+    getModels.mockResolvedValue([createProviderModel()])
+    notifyModelInformationChange()
+
+    await vi.waitFor(() => expect(window.showInformationMessage).toHaveBeenCalledTimes(1))
+    expect(context.globalState.get('universalChatProvider.utilityModelNudgeShown', false)).toBe(true)
+
+    notifyModelInformationChange()
+    await vi.waitFor(() => expect(getModels).toHaveBeenCalledTimes(3))
+    expect(window.showInformationMessage).toHaveBeenCalledTimes(1)
+  })
+
   it('wires the provider, controller, status bar, outputs, and commands', async () => {
     const initialize = vi.spyOn(UniversalChatProvider.prototype, 'initialize').mockResolvedValue()
     const refreshQuotas = vi.spyOn(ServerController.prototype, 'refreshQuotas').mockResolvedValue()

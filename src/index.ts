@@ -55,6 +55,10 @@ export function activate(context: ExtensionContext): void {
     controller,
     statusBar,
     provider,
+    provider.onDidChangeLanguageModelChatInformation(() => {
+      void maybeSuggestUtilityModel(context, provider!)
+        .catch(error => output.error('Utility model suggestion failed', error))
+    }),
     // Re-render when the quota-warning settings change so the bar reflects them without a restart.
     workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('universalChatProvider.showQuotaWarnings') || event.affectsConfiguration('universalChatProvider.quotaWarningThreshold'))
@@ -66,7 +70,6 @@ export function activate(context: ExtensionContext): void {
 
   statusBar.show()
   void provider.initialize().then(async () => controller?.refreshQuotas())
-  void maybeSuggestUtilityModel(context)
 }
 
 export function deactivate(): void {

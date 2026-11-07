@@ -11,17 +11,21 @@ export function shouldNudge(opts: {
   alreadyShown: boolean
   utilityModel: string
   copilotInstalled: boolean
+  hasModels: boolean
 }): boolean {
   return !opts.alreadyShown
     && opts.copilotInstalled
+    && opts.hasModels
     && !opts.utilityModel.trim().startsWith(UCP_PREFIX)
 }
 
-export async function maybeSuggestUtilityModel(context: ExtensionContext): Promise<void> {
+export async function maybeSuggestUtilityModel(context: ExtensionContext, provider: UniversalChatProvider): Promise<void> {
+  const models = await provider.getModels(false)
   const should = shouldNudge({
     alreadyShown: context.globalState.get<boolean>(SHOWN_KEY, false),
     utilityModel: workspace.getConfiguration('chat').get<string>('utilityModel', ''),
     copilotInstalled: extensions.getExtension('GitHub.copilot-chat') !== undefined,
+    hasModels: models.length > 0,
   })
   if (!should)
     return

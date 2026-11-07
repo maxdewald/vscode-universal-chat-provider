@@ -7,12 +7,13 @@ beforeEach(() => {
 })
 
 describe('shouldNudge', () => {
-  const base = { alreadyShown: false, utilityModel: '', copilotInstalled: true }
+  const base = { alreadyShown: false, utilityModel: '', copilotInstalled: true, hasModels: true }
 
   it.each([
     ['missing override', {}, true],
     ['already shown', { alreadyShown: true }, false],
     ['Copilot missing', { copilotInstalled: false }, false],
+    ['no chat models added', { hasModels: false }, false],
     ['provider already selected', { utilityModel: 'universal-chat-provider/foo' }, false],
     ['provider already selected with whitespace', { utilityModel: '  universal-chat-provider/foo  ' }, false],
     ['other provider selected', { utilityModel: 'some-other-vendor/model' }, true],
