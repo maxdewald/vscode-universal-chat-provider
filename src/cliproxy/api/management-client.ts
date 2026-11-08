@@ -166,10 +166,6 @@ export class ManagementClient {
     throw new Error('CLIProxyAPI returned an invalid auth status response.')
   }
 
-  async submitAuthCallback(redirectUrl: string): Promise<void> {
-    await this.fetcher.post('/oauth/callback', { json: { redirect_url: redirectUrl } })
-  }
-
   async cancelAuthSession(state: string, signal?: AbortSignal): Promise<void> {
     await this.fetcher.delete(`/oauth/session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
   }
