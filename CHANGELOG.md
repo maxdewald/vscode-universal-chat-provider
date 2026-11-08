@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.2...v1.7.3) (2026-11-08)
+
+
+### Bug Fixes
+
+* relay OAuth callback from the extension in remote (SSH) sessions ([941d38f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/941d38f49857d6116611eb62d3f722fe2133702d))
+
 ## [1.7.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.1...v1.7.2) (2026-11-08)
 
 
