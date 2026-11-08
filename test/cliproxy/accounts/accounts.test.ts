@@ -1,5 +1,6 @@
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
+import getPort from 'get-port'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { env, resetVSCodeMock, window } from '../../support/vscode'
 
@@ -73,7 +74,7 @@ describe('accounts login completion', () => {
     await done
 
     expect(list).toHaveBeenCalled()
-    expect(requestAuthUrl).toHaveBeenCalledWith(endpoint)
+    expect(requestAuthUrl).toHaveBeenCalledWith(endpoint, false)
     expect(env.openExternal.mock.calls[0]?.[0].toString()).toBe('https://example.com/auth')
     expect(window.showInformationMessage).toHaveBeenCalledWith(`${label} account connected.`)
     expect(onAccountsChanged).toHaveBeenCalledTimes(1)
@@ -95,21 +96,31 @@ describe('accounts login completion', () => {
     expect(report).toHaveBeenCalledWith({ message: 'Enter code ABCD-EFGH in your browser.' })
   })
 
-  it('forwards the OAuth callback port in remote sessions', async () => {
+  it('relays the OAuth callback through a forwarded port in remote sessions', async () => {
+    vi.useRealTimers()
     env.remoteName = 'ssh-remote'
-    vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue({
-      url: `https://example.com/auth?redirect_uri=${encodeURIComponent('http://localhost:1455/auth/callback')}`,
+    const port = await getPort()
+    const requestAuthUrl = vi.spyOn(ManagementClient.prototype, 'requestAuthUrl').mockResolvedValue({
+      url: `https://example.com/auth?redirect_uri=${encodeURIComponent(`http://localhost:${port}/callback`)}`,
       state: 'oauth-state',
+    })
+    const submit = vi.spyOn(ManagementClient.prototype, 'submitAuthCallback').mockResolvedValue()
+    let browser: Promise<string> | undefined
+    env.openExternal.mockImplementation(async () => {
+      browser = fetch(`http://127.0.0.1:${port}/callback?code=c&state=oauth-state`).then(async response => response.text())
+      return true
     })
     vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([])
     vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'error', error: 'expired' })
     const { service } = serviceWith()
 
-    const done = service.login()
-    await vi.advanceTimersByTimeAsync(1_500)
-    await done
+    await service.login()
 
-    expect(env.asExternalUri.mock.calls[0]?.[0].toString()).toBe('http://localhost:1455/')
+    expect(requestAuthUrl).toHaveBeenCalledWith('codex', true)
+    expect(env.asExternalUri.mock.calls[0]?.[0].toString()).toBe(`http://localhost:${port}/`)
+    expect(await browser).toContain('Sign-in received')
+    expect(submit).toHaveBeenCalledWith(`http://localhost:${port}/callback?code=c&state=oauth-state`)
+    await expect(fetch(`http://127.0.0.1:${port}/callback`)).rejects.toThrow()
   })
 
   it('reports server-declared login errors without refreshing models', async () => {

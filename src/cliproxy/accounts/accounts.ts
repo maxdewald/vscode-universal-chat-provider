@@ -1,5 +1,6 @@
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
+import { createServer } from 'node:http'
 import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
@@ -9,13 +10,34 @@ import { env, ProgressLocation, Uri, window } from 'vscode'
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
 
+// CLIProxyAPI's own forwarder re-redirects the browser to its unforwarded server port, so remote sessions relay the callback in one hop.
 // ponytail: if the local port is taken, VS Code forwards a different one and the redirect misses; add a paste-the-URL fallback if users hit it.
-async function forwardCallbackPort(authUrl: string): Promise<void> {
-  if (env.remoteName === undefined)
-    return
+async function relayCallback(client: ManagementClient, authUrl: string): Promise<(() => void) | undefined> {
   const redirect = URL.parse(URL.parse(authUrl)?.searchParams.get('redirect_uri') ?? '')
-  if (redirect !== null && ['localhost', '127.0.0.1'].includes(redirect.hostname) && redirect.port !== '')
-    await env.asExternalUri(Uri.parse(`http://localhost:${redirect.port}`))
+  if (redirect === null || !['localhost', '127.0.0.1'].includes(redirect.hostname) || redirect.port === '')
+    return undefined
+  const server = createServer((request, response) => {
+    const callback = new URL(request.url ?? '/', redirect)
+    if (callback.pathname !== redirect.pathname) {
+      response.writeHead(404).end()
+      return
+    }
+    client.submitAuthCallback(callback.href).then(
+      () => response.end('Sign-in received. You can close this tab.'),
+      (error: unknown) => response.writeHead(502).end(`Sign-in failed: ${errorMessage(error)}`),
+    )
+  })
+  const listening = await new Promise<boolean>((resolve, reject) => server
+    .once('error', (error: NodeJS.ErrnoException) => error.code === 'EADDRINUSE' ? resolve(false) : reject(error))
+    .listen(Number(redirect.port), '127.0.0.1', () => resolve(true)))
+  // Devin redirects straight to CLIProxyAPI's own port, which then only needs forwarding.
+  await env.asExternalUri(Uri.parse(`http://localhost:${redirect.port}`))
+  if (!listening)
+    return undefined
+  return () => {
+    server.close()
+    server.closeAllConnections()
+  }
 }
 
 export interface AccountsDeps {
@@ -67,42 +89,49 @@ export class AccountsService {
     }
 
     const client = new ManagementClient(management.baseUrl, management.key)
+    const remote = env.remoteName !== undefined
     let session: AuthSession
     let before: AuthFileRaw[]
+    let closeRelay: (() => void) | undefined
     try {
       before = await client.listAuthFilesRaw()
-      session = await client.requestAuthUrl(picked.provider.provider)
+      session = await client.requestAuthUrl(picked.provider.provider, remote)
+      closeRelay = remote ? await relayCallback(client, session.url) : undefined
     }
     catch (error) {
       void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}`)
       return
     }
 
-    await forwardCallbackPort(session.url)
-    const opened = await env.openExternal(Uri.parse(session.url))
-    if (!opened) {
-      void window.showWarningMessage(`Open this URL to finish signing in: ${session.url}`)
-      return
-    }
+    try {
+      const opened = await env.openExternal(Uri.parse(session.url))
+      if (!opened) {
+        void window.showWarningMessage(`Open this URL to finish signing in: ${session.url}`)
+        return
+      }
 
-    const result = await window.withProgress(
-      { location: ProgressLocation.Notification, cancellable: true, title: `Waiting for ${picked.provider.label} sign-in…` },
-      async (progress, token) => {
-        if (session.userCode !== undefined && session.userCode !== '')
-          progress.report({ message: `Enter code ${session.userCode} in your browser.` })
-        return this.waitForLogin(client, session, picked.provider.provider, before, token)
-      },
-    )
+      const result = await window.withProgress(
+        { location: ProgressLocation.Notification, cancellable: true, title: `Waiting for ${picked.provider.label} sign-in…` },
+        async (progress, token) => {
+          if (session.userCode !== undefined && session.userCode !== '')
+            progress.report({ message: `Enter code ${session.userCode} in your browser.` })
+          return this.waitForLogin(client, session, picked.provider.provider, before, token)
+        },
+      )
 
-    if (result.status === 'ok') {
-      await this.deps.onAccountsChanged()
-      void window.showInformationMessage(`${picked.provider.label} account connected.`)
+      if (result.status === 'ok') {
+        await this.deps.onAccountsChanged()
+        void window.showInformationMessage(`${picked.provider.label} account connected.`)
+      }
+      else if (result.status === 'error') {
+        void window.showErrorMessage(`${picked.provider.label} sign-in failed: ${result.error}`)
+      }
+      else {
+        void window.showWarningMessage(`${picked.provider.label} sign-in did not complete. Check Show Logs and try again.`)
+      }
     }
-    else if (result.status === 'error') {
-      void window.showErrorMessage(`${picked.provider.label} sign-in failed: ${result.error}`)
-    }
-    else {
-      void window.showWarningMessage(`${picked.provider.label} sign-in did not complete. Check Show Logs and try again.`)
+    finally {
+      closeRelay?.()
     }
   }
 

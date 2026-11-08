@@ -18,7 +18,7 @@ describe('management client', () => {
     vi.stubGlobal('fetch', fetchMock)
     const client = createClient()
 
-    await expect(client.requestAuthUrl(provider)).resolves.toEqual({ url: 'https://login', state: 'oauth-state' })
+    await expect(client.requestAuthUrl(provider, false)).resolves.toEqual({ url: 'https://login', state: 'oauth-state' })
     const request = fetchMock.mock.calls[0]![0]
     expect(request.url).toBe(`http://127.0.0.1:8317/v8/management/oauth/auth-url?provider=${provider}&is_webui=true`)
     expect(request.method).toBe('GET')
@@ -31,7 +31,7 @@ describe('management client', () => {
     [42, undefined],
   ])('handles optional device code %s', async (userCode, expected) => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ url: 'https://login', state: 'meta-state', user_code: userCode })))
-    const session = await createClient().requestAuthUrl('meta')
+    const session = await createClient().requestAuthUrl('meta', false)
     expect(session.userCode).toBe(expected)
   })
 
@@ -39,7 +39,7 @@ describe('management client', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ status: 'ok', url: 'https://login' })))
     const client = createClient()
 
-    await expect(client.requestAuthUrl('codex')).rejects.toThrow('CLIProxyAPI returned an invalid auth URL response.')
+    await expect(client.requestAuthUrl('codex', false)).rejects.toThrow('CLIProxyAPI returned an invalid auth URL response.')
   })
 
   it.each([

@@ -137,10 +137,10 @@ export class ManagementClient {
     })
   }
 
-  async requestAuthUrl(provider: string, signal?: AbortSignal): Promise<AuthSession> {
+  async requestAuthUrl(provider: string, relayCallback: boolean, signal?: AbortSignal): Promise<AuthSession> {
     const payload = asValue(
       AuthUrlPayloadSchema,
-      await this.fetcher.get(`/oauth/auth-url?provider=${encodeURIComponent(provider)}&is_webui=true`, { signal: signal ?? null }).json(),
+      await this.fetcher.get(`/oauth/auth-url?provider=${encodeURIComponent(provider)}${relayCallback ? '' : '&is_webui=true'}`, { signal: signal ?? null }).json(),
     )
     if (typeof payload?.url !== 'string' || typeof payload.state !== 'string' || payload.state.trim() === '')
       throw new Error('CLIProxyAPI returned an invalid auth URL response.')
@@ -164,6 +164,10 @@ export class ManagementClient {
       }
     }
     throw new Error('CLIProxyAPI returned an invalid auth status response.')
+  }
+
+  async submitAuthCallback(redirectUrl: string): Promise<void> {
+    await this.fetcher.post('/oauth/callback', { json: { redirect_url: redirectUrl } })
   }
 
   async cancelAuthSession(state: string, signal?: AbortSignal): Promise<void> {
