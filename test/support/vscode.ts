@@ -230,7 +230,9 @@ export const workspace = {
 
 export const env = {
   language: 'en',
+  remoteName: undefined as string | undefined,
   openExternal: vi.fn(async (_uri: vscode.Uri) => true),
+  asExternalUri: vi.fn(async (uri: vscode.Uri) => uri),
 }
 
 export const extensions = {
@@ -314,7 +316,10 @@ export function resetVSCodeMock(): void {
   workspace.fs.stat.mockResolvedValue({ size: 0 })
   workspace.fs.readFile.mockResolvedValue(new Uint8Array())
   env.language = 'en'
+  env.remoteName = undefined
   env.openExternal.mockReset()
   env.openExternal.mockResolvedValue(true)
+  env.asExternalUri.mockReset()
+  env.asExternalUri.mockImplementation(async uri => uri)
   extensions.getExtension.mockReset()
 }
