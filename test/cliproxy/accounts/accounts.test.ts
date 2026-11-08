@@ -123,6 +123,22 @@ describe('accounts login completion', () => {
     await expect(fetch(`http://127.0.0.1:${port}/callback`)).rejects.toThrow()
   })
 
+  it('submits a pasted redirect URL for the current login only', async () => {
+    window.showInputBox.mockResolvedValueOnce('http://localhost:1455/auth/callback?code=c&state=oauth-state')
+    const submit = vi.spyOn(ManagementClient.prototype, 'submitAuthCallback').mockResolvedValue()
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([])
+    vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'error', error: 'expired' })
+    const { service } = serviceWith()
+
+    const done = service.login()
+    await vi.advanceTimersByTimeAsync(1_500)
+    await done
+
+    const validate = window.showInputBox.mock.calls[0]?.[0]?.validateInput
+    expect(validate?.('http://localhost:1455/auth/callback?state=other')).toBeTypeOf('string')
+    expect(submit).toHaveBeenCalledWith('http://localhost:1455/auth/callback?code=c&state=oauth-state')
+  })
+
   it('reports server-declared login errors without refreshing models', async () => {
     vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([])
     vi.spyOn(ManagementClient.prototype, 'getAuthStatus').mockResolvedValue({ status: 'error', error: 'access denied' })

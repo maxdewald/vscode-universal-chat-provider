@@ -5,13 +5,12 @@ import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } f
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
 import { sleep } from 'moderndash'
-import { env, ProgressLocation, Uri, window } from 'vscode'
+import { CancellationTokenSource, env, ProgressLocation, Uri, window } from 'vscode'
 
 const LOGIN_TIMEOUT_MS = 180_000
 const LOGIN_POLL_MS = 1500
 
 // CLIProxyAPI's own forwarder re-redirects the browser to its unforwarded server port, so remote sessions relay the callback in one hop.
-// ponytail: if the local port is taken, VS Code forwards a different one and the redirect misses; add a paste-the-URL fallback if users hit it.
 async function relayCallback(client: ManagementClient, authUrl: string): Promise<(() => void) | undefined> {
   const redirect = URL.parse(URL.parse(authUrl)?.searchParams.get('redirect_uri') ?? '')
   if (redirect === null || !['localhost', '127.0.0.1'].includes(redirect.hostname) || redirect.port === '')
@@ -113,9 +112,17 @@ export class AccountsService {
       const result = await window.withProgress(
         { location: ProgressLocation.Notification, cancellable: true, title: `Waiting for ${picked.provider.label} sign-in…` },
         async (progress, token) => {
+          const redirectPrompt = new CancellationTokenSource()
           if (session.userCode !== undefined && session.userCode !== '')
             progress.report({ message: `Enter code ${session.userCode} in your browser.` })
-          return this.waitForLogin(client, session, picked.provider.provider, before, token)
+          else
+            void this.promptForRedirect(client, session, redirectPrompt.token)
+          try {
+            return await this.waitForLogin(client, session, picked.provider.provider, before, token)
+          }
+          finally {
+            redirectPrompt.cancel()
+          }
         },
       )
 
@@ -133,6 +140,21 @@ export class AccountsService {
     finally {
       closeRelay?.()
     }
+  }
+
+  private async promptForRedirect(client: ManagementClient, session: AuthSession, token: CancellationToken): Promise<void> {
+    const redirectUrl = await window.showInputBox({
+      title: 'Sign-in not finishing?',
+      prompt: 'If the browser ends on a page that fails to load, copy the full URL from its address bar and paste it here.',
+      placeHolder: 'http://localhost:…/callback?code=…&state=…',
+      ignoreFocusOut: true,
+      validateInput: value => URL.parse(value.trim())?.searchParams.get('state') === session.state ? undefined : 'Paste the full redirect URL from this sign-in attempt.',
+    }, token)
+    if (redirectUrl === undefined)
+      return
+    await client.submitAuthCallback(redirectUrl.trim()).catch((error: unknown) => {
+      void window.showErrorMessage(`Could not submit sign-in callback: ${errorMessage(error)}`)
+    })
   }
 
   private async waitForLogin(
