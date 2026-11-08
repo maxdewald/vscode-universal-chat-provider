@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.3...v1.8.0) (2026-11-08)
+
+
+### Features
+
+* offer a paste-the-redirect-URL fallback for every OAuth sign-in ([2b16174](https://github.com/maxdewald/vscode-universal-chat-provider/commit/2b1617487d1cf3477fab40b3ee84aaeb6df04a10))
+
 ## [1.7.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.2...v1.7.3) (2026-11-08)
 
 
