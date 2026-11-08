@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.1...v1.7.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* complete OAuth sign-in from remote (SSH) sessions ([2679030](https://github.com/maxdewald/vscode-universal-chat-provider/commit/26790307a84b53380e639dfcb0895d815acde266))
+* wait for chat models before suggesting utility model ([b1c553f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/b1c553f8c601e4096ab12b78f742b9c79c305572))
+
+
+### Refactoring
+
+* drop OAuth redirect paste fallback, rely on port forwarding ([67f27c0](https://github.com/maxdewald/vscode-universal-chat-provider/commit/67f27c06458d4e857fc6d892fefd2d4c734961d1))
+
 ## [1.7.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.0...v1.7.1) (2026-11-06)
 
 
