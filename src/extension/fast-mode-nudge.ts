@@ -32,7 +32,7 @@ export function fastModeOpportunity(
   model: ProviderModel,
   report: QuotaReport,
   resets: readonly CodexResetOption[] = [],
-): { kind: 'quota' | 'credit', id: string, reason: string } | undefined {
+): { scope: string, until: number, reason: string } | undefined {
   const now = Date.now()
   const source = QUOTA_PROVIDERS[report.provider]
   const quota = report.windows.find((quota) => {
@@ -43,8 +43,8 @@ export function fastModeOpportunity(
   })
   if (quota !== undefined) {
     return {
-      kind: 'quota',
-      id: `${quota.key ?? quota.label}:${quota.resetsAt}`,
+      scope: quota.key ?? quota.label,
+      until: quota.resetsAt!,
       reason: `${formatPercent(quota.remainingPercent)} of ${quota.label.toLowerCase()} unused, resets in ${formatResetCountdown(quota.resetsAt)}`,
     }
   }
@@ -56,8 +56,8 @@ export function fastModeOpportunity(
   return reset === undefined
     ? undefined
     : {
-        kind: 'credit',
-        id: reset.credit.id,
+        scope: 'credit',
+        until: reset.credit.expiresAt!,
         reason: `unused reset credit expires in ${formatResetCountdown(reset.credit.expiresAt)}, ${formatPercent(source.remaining(report, model.proxyModelId))} quota left`,
       }
 }
@@ -93,11 +93,13 @@ export function createFastModeNudge(context: ExtensionContext, readers: Pick<Ser
         || !workspace.getConfiguration('universalChatProvider').get<boolean>(SETTING, true)) {
         return
       }
-      const key = `${report.provider}:${report.account!.authIndex}:${opportunity.kind}`
-      const shown = context.globalState.get<Record<string, string>>(SHOWN_KEY, {})
-      if (shown[key] === opportunity.id)
+      const key = `${report.provider}:${report.account!.authIndex}:${opportunity.scope}`
+      const now = Date.now()
+      const shown = context.globalState.get<Record<string, unknown>>(SHOWN_KEY, {})
+      const suppressed = Object.fromEntries(Object.entries(shown).filter(([, until]) => typeof until === 'number' && until > now))
+      if (key in suppressed)
         return
-      await context.globalState.update(SHOWN_KEY, { ...shown, [key]: opportunity.id })
+      await context.globalState.update(SHOWN_KEY, { ...suppressed, [key]: opportunity.until })
       const view = 'View Quota & Resets'
       const disable = 'Don\'t Suggest Again'
       const choice = await window.showInformationMessage(
