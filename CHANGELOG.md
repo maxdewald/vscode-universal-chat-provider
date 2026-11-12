@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.0...v1.8.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* show the Fast Mode suggestion once per quota window ([#215](https://github.com/maxdewald/vscode-universal-chat-provider/issues/215)) ([1947e73](https://github.com/maxdewald/vscode-universal-chat-provider/commit/1947e7344282498360ba3e3bc620d071f9327673))
+
 ## [1.8.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.7.3...v1.8.0) (2026-11-08)
 
 
