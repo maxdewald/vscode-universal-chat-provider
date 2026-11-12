@@ -59,7 +59,7 @@ describe('fast-mode eligibility', () => {
   it('matches expiring credits to the account, expiry window, and remaining quota', () => {
     const quota = report('7d Quota', 500)
     const reset = { account: quota.account!, credit: { id: 'credit', expiresAt: now + 180 * MINUTE }, availableCount: 1 }
-    expect(fastModeOpportunity(model, quota, [reset])).toMatchObject({ kind: 'credit', id: 'credit' })
+    expect(fastModeOpportunity(model, quota, [reset])).toMatchObject({ scope: 'credit', until: now + 180 * MINUTE })
     for (const option of [
       { ...reset, account: { authIndex: 'other', label: 'Other' } },
       { ...reset, credit: { ...reset.credit, expiresAt: now + 181 * MINUTE } },
@@ -88,6 +88,9 @@ describe('fast-mode notification', () => {
     expect(window.showInformationMessage.mock.calls[0]?.[0]).toBe('Account One: 60% of 5h quota unused, resets in 45m. Consider GPT Test (Fast Mode): faster, but uses more quota.')
     expect(readers.listCodexResets).not.toHaveBeenCalled()
     await nudge(model, fast, [report('5h Quota', 44)])
+    expect(window.showInformationMessage).toHaveBeenCalledTimes(1)
+    vi.mocked(Date.now).mockReturnValue(now + 46 * MINUTE)
+    await nudge(model, fast, [{ ...report('5h Quota', 90), updatedAt: now + 46 * MINUTE }])
     expect(window.showInformationMessage).toHaveBeenCalledTimes(2)
   })
 
@@ -106,7 +109,7 @@ describe('fast-mode notification', () => {
     await nudge(model, fast, [report()])
     expect(commands.executeCommand).toHaveBeenCalledWith('universalChatProvider.showQuota')
     window.showInformationMessage.mockResolvedValueOnce('Don\'t Suggest Again')
-    await nudge(model, fast, [report('5h Quota', 44)])
+    await nudge(model, fast, [report('7d Quota', 100)])
     expect(vscodeMock.settings.get('universalChatProvider.models.suggestFastMode')).toBe(false)
   })
 
