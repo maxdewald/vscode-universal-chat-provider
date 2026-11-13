@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.1...v1.8.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **chat:** split consecutive reasoning summaries into separate thinking steps ([3618e04](https://github.com/maxdewald/vscode-universal-chat-provider/commit/3618e0430e58edd283ea719bc5089b6784aca815))
+
 ## [1.8.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.0...v1.8.1) (2026-11-12)
 
 
