@@ -44,13 +44,14 @@ describe('registerCommands', () => {
     expect(getMethod(harness)).toHaveBeenCalledTimes(1)
   })
 
-  it('refreshes models and reports the discovered count', async () => {
-    const { provider } = createCommandHarness()
+  it('refreshes the server catalog, then models, and reports the discovered count', async () => {
+    const { provider, controller } = createCommandHarness()
     provider.forceRefresh.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }])
 
     await commands.executeCommand('universalChatProvider.refresh')
 
     expect(provider.forceRefresh).toHaveBeenCalledWith(true)
+    expect(controller.refreshModelCatalog.mock.invocationCallOrder[0]).toBeLessThan(provider.forceRefresh.mock.invocationCallOrder[0]!)
     expect(window.showInformationMessage).toHaveBeenCalledWith('CLIProxyAPI exposed 2 chat models.')
   })
 
@@ -174,6 +175,7 @@ function createCommandHarness() {
     login: vi.fn(async () => {}),
     manageAccounts: vi.fn(async () => {}),
     refreshQuotas: vi.fn(async () => {}),
+    refreshModelCatalog: vi.fn(async () => {}),
     listCodexResets: vi.fn(async () => []),
     claimCodexReset: vi.fn(async () => 'failed' as const),
     listClaudeResets: vi.fn(async () => []),
