@@ -30,7 +30,7 @@ export interface DiscoveryResult {
 
 export interface StreamCallbacks {
   onText: (delta: string) => void
-  // VS Code merges thinking deltas that share an id into one block.
+  // VS Code merges adjacent untimed thinking parts even across ids; an empty delta ends a block.
   onThinking?: (delta: string, id: string) => void
   onToolCall: (callId: string, name: string, input: object) => void
   onUsage?: (usage: unknown) => void
@@ -109,6 +109,13 @@ export class CLIProxyClient {
 
     const text = textPartBuffer(callbacks.onText, codexCitations)
     const tools = toolCallAssembler(callbacks.onToolCall)
+    let lastThinkingKey: string | undefined
+    const thinking = (delta: string, key: string): void => {
+      if (lastThinkingKey !== undefined && lastThinkingKey !== key)
+        callbacks.onThinking?.('', lastThinkingKey)
+      lastThinkingKey = key
+      callbacks.onThinking?.(delta, key)
+    }
 
     const events = response.body
       .pipeThrough(new TextDecoderStream())
@@ -130,7 +137,7 @@ export class CLIProxyClient {
         }
         else if (type === 'response.reasoning_summary_text.delta' || type === 'response.reasoning_text.delta') {
           if (payload.delta !== undefined && payload.delta.length > 0)
-            callbacks.onThinking?.(payload.delta, streamKey(payload, undefined, payload.summary_index ?? payload.content_index ?? 0))
+            thinking(payload.delta, streamKey(payload, undefined, payload.summary_index ?? payload.content_index ?? 0))
         }
         else if (type === 'response.output_item.added') {
           const item = asValue(StreamItemSchema, payload.item)
@@ -146,7 +153,7 @@ export class CLIProxyClient {
             tools.end(streamKey(payload, item), item)
           }
           else if (item?.type === 'web_search_call') {
-            callbacks.onThinking?.(webSearchStepLabel(item.action), streamKey(payload, item))
+            thinking(webSearchStepLabel(item.action), streamKey(payload, item))
           }
           else if (item?.type === 'message') {
             item.content?.forEach((content, contentIndex) => {

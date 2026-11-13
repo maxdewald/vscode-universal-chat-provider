@@ -447,6 +447,7 @@ describe('cLIProxyClient', () => {
     expect(handlers.onThinking.mock.calls).toEqual([
       ['Planning', 'rs_1:0'],
       [' status line', 'rs_1:0'],
+      ['', 'rs_1:0'],
       ['Refining header', 'rs_1:1'],
     ])
   })
