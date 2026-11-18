@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.2...v1.8.3) (2026-11-18)
+
+
+### Bug Fixes
+
+* **models:** scope Codex catalog exclusions to Codex models ([f307f59](https://github.com/maxdewald/vscode-universal-chat-provider/commit/f307f59360d49ca7693945570c5659875214ad59))
+
 ## [1.8.2](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.1...v1.8.2) (2026-11-13)
 
 
