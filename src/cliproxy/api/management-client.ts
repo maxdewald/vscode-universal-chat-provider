@@ -192,6 +192,10 @@ export class ManagementClient {
     await this.fetcher.delete(`/credentials?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
   }
 
+  async setAuthFilePrefix(name: string, prefix: string, signal?: AbortSignal): Promise<void> {
+    await this.fetcher.patch('/credentials/fields', { json: { name, prefix }, signal: signal ?? null })
+  }
+
   async listAuthFilesRaw(signal?: AbortSignal): Promise<AuthFileRaw[]> {
     const payload = asValue(AuthFilesPayloadSchema, await this.fetcher.get('/credentials', { signal: signal ?? null }).json())
     return (payload?.files ?? []).flatMap((file) => {

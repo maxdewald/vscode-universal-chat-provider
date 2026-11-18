@@ -36,6 +36,7 @@ describe('managed config', () => {
       'routing': {
         'strategy': 'round-robin',
         'session-affinity': true,
+        'force-model-prefix': true,
         'retry': { 'request-retry': 3, 'max-retry-interval': 30 },
         'cooldown': { 'transient-error-cooldown-seconds': -1 },
       },
@@ -97,7 +98,7 @@ describe('managed config', () => {
     })) as Record<string, unknown>
     expect(config).toMatchObject({
       server: { host: '127.0.0.1', port: 9000 },
-      routing: { 'strategy': 'fill-first', 'session-affinity': true, 'retry': { 'request-retry': 0, 'max-retry-interval': 30 } },
+      routing: { 'strategy': 'fill-first', 'session-affinity': true, 'force-model-prefix': true, 'retry': { 'request-retry': 0, 'max-retry-interval': 30 } },
       access: { 'api-keys': ['custom-key'] },
       management: { 'allow-remote': false, 'secret-key': 'custom-secret' },
       requests: { 'proxy-url': null },

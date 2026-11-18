@@ -338,7 +338,7 @@ describe('server controller lifecycle', () => {
 
     const expectedModelIds = ['codegate/gpt-5.6-sol']
     const changed = accounts.deps.onAccountsChanged(expectedModelIds)
-    expect(refresh).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
     expect(refresh).toHaveBeenCalledWith(expectedModelIds)
     let completed = false
     void changed.then(() => completed = true)

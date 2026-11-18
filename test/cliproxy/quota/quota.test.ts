@@ -516,6 +516,7 @@ describe('remainingForModel', () => {
 
   it('returns the antigravity per-model percent', () => {
     expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(35)
+    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'antigravity/gemini-pro-agent' })).toBe(35)
   })
 
   it('returns the tightest codex window for any openai model, ignoring spark and credits', () => {

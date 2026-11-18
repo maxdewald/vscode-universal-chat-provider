@@ -76,6 +76,11 @@ export interface ModelMappingOptions {
   onCollision?: (message: string) => void
 }
 
+// The managed server namespaces each account's models as `<provider>/<model>`.
+export function upstreamModelId(id: string): string {
+  return id.slice(id.indexOf('/') + 1)
+}
+
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
 const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity', 'cognition', 'meta'])
 const WEB_SEARCH_TOOL_TYPES = new Set(['text', 'text_and_image'])
@@ -146,7 +151,7 @@ export function mapProxyModels(
     const levels = resolveReasoning(detail, catalogModel)
     const advertisedName = detail?.display_name !== undefined && detail.display_name !== entry.id
       ? detail.display_name
-      : catalogModel?.display_name ?? humanizeModelId(entry.id)
+      : catalogModel?.display_name ?? humanizeModelId(upstreamModelId(entry.id))
     const baseName = normalizeReasoningModelName(advertisedName, levels)
     const providerName = entry.owned_by ?? catalogModel?.type ?? 'proxy'
     candidates.push({

@@ -15,6 +15,15 @@ describe('engineChoices', () => {
     expect(choices.at(-1)?.description).toBe('Gemini · transcribes after you stop')
   })
 
+  it('recognizes provider-prefixed model ids', () => {
+    const choices = engineChoices([
+      { proxyModelId: 'codex/gpt-6-luna', proxyOwner: 'openai' },
+      { proxyModelId: 'antigravity/gemini-3-flash', proxyOwner: 'antigravity' },
+    ])
+    expect(choices.map(choice => choice.id)).toEqual(['', 'gpt-transcribe', 'gpt-live-transcribe', 'antigravity/gemini-3-flash'])
+    expect(choices.at(-1)).toMatchObject({ label: 'gemini-3-flash', description: 'Gemini · good on plain speech, weaker on code terms · slower' })
+  })
+
   it('offers only None without an audio-capable account', () => {
     expect(engineChoices([claude]).map(choice => choice.id)).toEqual([''])
   })

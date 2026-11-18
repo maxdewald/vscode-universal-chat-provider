@@ -1,5 +1,6 @@
 import type { QuotaProvider, QuotaReport } from '@src/cliproxy/quota/providers/types'
 import { Type } from '@sinclair/typebox'
+import { upstreamModelId } from '@src/chat/models/model'
 import { clamp, parseReset } from '@src/cliproxy/quota/providers/types'
 import { asValue } from '@src/shared/json'
 
@@ -29,7 +30,7 @@ export const antigravityProvider: QuotaProvider = {
     report.models = parseModels(data)
   },
   owners: ['antigravity'],
-  remaining: (report, proxyModelId) => report.models?.[proxyModelId]?.remainingPercent,
+  remaining: (report, proxyModelId) => report.models?.[upstreamModelId(proxyModelId)]?.remainingPercent,
 }
 
 // Antigravity exposes per-model remaining keyed by the same model id the proxy serves,

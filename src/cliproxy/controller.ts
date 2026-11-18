@@ -11,6 +11,7 @@ import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
+import { pinAccountsToProviders } from '@src/cliproxy/accounts/provider-prefixes'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
 import { isSupportedVersion, MIN_CLIPROXY_VERSION, resolveVersion } from '@src/cliproxy/managed/binary'
@@ -134,6 +135,8 @@ export class ServerController implements ProxyConnection {
       await this.bootstrap()
       await this.server!.ensureRunning()
       this.setStatus('running')
+      if (!alreadyUp)
+        await this.pinAccounts()
       void this.accounts.maybePromptLogin()
       void this.applyPendingUpdateWhenIdle()
       void this.maybeUpdateOnStartup()
@@ -439,7 +442,16 @@ export class ServerController implements ProxyConnection {
   }
 
   private async notifyAccountsChanged(expectedModelIds?: readonly string[]): Promise<void> {
+    await this.pinAccounts()
     await this.refreshListener?.(expectedModelIds)
+  }
+
+  private async pinAccounts(): Promise<void> {
+    const management = this.mode() === 'managed' ? this.currentManagement() : undefined
+    if (management !== undefined) {
+      await pinAccountsToProviders(new ManagementClient(management.baseUrl, management.key), message => this.output.appendLine(message))
+        .catch(error => this.output.appendLine(`Could not pin accounts to their providers: ${errorMessage(error)}`))
+    }
   }
 
   async refreshQuotas(): Promise<void> {

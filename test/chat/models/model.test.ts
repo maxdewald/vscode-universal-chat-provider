@@ -510,6 +510,25 @@ describe('model mapping', () => {
     expect(model?.name).toBe('Mystery Model Low')
   })
 
+  it('keeps the provider prefix out of names while requests use the prefixed id', () => {
+    const models = mapProxyModels(
+      [
+        { id: 'claude/claude-sonnet-4-6', owned_by: 'anthropic', context_length: 200_000, max_completion_tokens: 64_000 },
+        { id: 'antigravity/claude-sonnet-4-6', owned_by: 'antigravity', context_length: 200_000, max_completion_tokens: 64_000 },
+        { id: 'codex/mystery-model', owned_by: 'openai', context_length: 128_000, max_completion_tokens: 8192 },
+      ],
+      [{ slug: 'claude/claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6' }],
+      new Map(),
+      {},
+    )
+
+    expect(models.map(model => [model.id, model.proxyModelId, model.name, model.detail])).toEqual([
+      ['antigravity/claude-sonnet-4-6', 'antigravity/claude-sonnet-4-6', 'Claude Sonnet 4 6', 'Antigravity'],
+      ['claude/claude-sonnet-4-6', 'claude/claude-sonnet-4-6', 'Claude Sonnet 4.6', 'Claude Code'],
+      ['codex/mystery-model', 'codex/mystery-model', 'Mystery Model', 'Codex'],
+    ])
+  })
+
   it('shows the CLI app in model details and tooltips', () => {
     const models = mapProxyModels(
       [

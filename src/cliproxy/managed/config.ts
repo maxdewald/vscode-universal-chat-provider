@@ -59,6 +59,7 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
     'routing': {
       'strategy': 'round-robin',
       'session-affinity': true,
+      'force-model-prefix': true,
       'retry': { 'request-retry': 3, 'max-retry-interval': 30 },
       'cooldown': { 'transient-error-cooldown-seconds': -1 },
     },

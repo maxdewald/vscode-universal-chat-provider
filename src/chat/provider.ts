@@ -15,6 +15,7 @@ import type {
 } from 'vscode'
 import { CredentialFlows } from '@src/chat/credentials/credential-flows'
 import { CacheMetricsTracker, createContextUsagePart } from '@src/chat/diagnostics/cache-metrics'
+import { upstreamModelId } from '@src/chat/models/model'
 import { ModelRegistry } from '@src/chat/models/model-registry'
 import { detectCompaction } from '@src/chat/requests/compaction'
 import { streamCompletion } from '@src/chat/requests/completion'
@@ -22,6 +23,7 @@ import { estimateTokens } from '@src/chat/requests/estimate'
 import { buildRequest } from '@src/chat/requests/request-builder'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { remainingForModel } from '@src/cliproxy/quota/quota'
+import { runMigrations } from '@src/migrations/index'
 import { errorMessage } from '@src/shared/errors'
 import * as vscode from 'vscode'
 import {
@@ -71,7 +73,11 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     this.credentialFlows = new CredentialFlows(this.credentials, this.registry)
     this.cacheMetrics = new CacheMetricsTracker(context, output)
     this.disposables.push(
-      this.registry.onDidChange(() => this.modelsChanged.fire()),
+      this.registry.onDidChange(() => {
+        void runMigrations(context.globalState, { proxyModelIds: this.registry.snapshot().map(model => model.proxyModelId) }, message => output.appendLine(message))
+          .catch(error => output.appendLine(`Migrations failed: ${errorMessage(error)}`))
+        this.modelsChanged.fire()
+      }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (UTILITY_SETTINGS.some(setting => event.affectsConfiguration(`chat.${setting}`)))
           this.modelsChanged.fire()
@@ -123,10 +129,10 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     const models = antigravity?.models
     if (models !== undefined) {
       const entries = this.registry.snapshot()
-        .filter(model => model.proxyOwner.toLowerCase() === 'antigravity' && models[model.proxyModelId] !== undefined)
-        .map((model) => {
-          const quota = models[model.proxyModelId]!
-          return { name: model.name, remainingPercent: quota.remainingPercent, ...(quota.resetsAt === undefined ? {} : { resetsAt: quota.resetsAt }) }
+        .filter(model => model.proxyOwner.toLowerCase() === 'antigravity')
+        .flatMap((model) => {
+          const quota = models[upstreamModelId(model.proxyModelId)]
+          return quota === undefined ? [] : [{ name: model.name, remainingPercent: quota.remainingPercent, ...(quota.resetsAt === undefined ? {} : { resetsAt: quota.resetsAt }) }]
         })
         .sort((a, b) => (a.remainingPercent ?? 101) - (b.remainingPercent ?? 101))
       if (entries.length > 0)

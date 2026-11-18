@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Type } from '@sinclair/typebox'
+import { upstreamModelId } from '@src/chat/models/model'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { errorMessage } from '@src/shared/errors'
 import { asValue } from '@src/shared/json'
@@ -124,13 +125,14 @@ const CLIP_HINTS: Record<string, string> = {
 export const isLiveEngine = (engine: string): boolean => /transcribe|whisper/.test(engine)
 
 export function engineChoices(models: readonly ModelRef[]): Array<{ id: string, label: string, description: string }> {
-  const codex = models.some(entry => entry.proxyOwner === 'openai' && entry.proxyModelId.startsWith('gpt-'))
+  const codex = models.some(entry => entry.proxyOwner === 'openai' && upstreamModelId(entry.proxyModelId).startsWith('gpt-'))
   return [
     { id: '', label: 'None', description: 'Dictation off' },
     ...Object.entries(LIVE_ENGINES).filter(() => codex).map(([id, description]) => ({ id, label: id, description })),
     ...models
-      .filter(entry => entry.proxyModelId.startsWith('gemini-') && !entry.proxyModelId.includes('image'))
-      .map(({ proxyModelId: id }) => ({ id, label: id, description: CLIP_HINTS[id] ?? 'Gemini · transcribes after you stop' })),
+      .map(({ proxyModelId: id }) => ({ id, label: upstreamModelId(id) }))
+      .filter(({ label }) => label.startsWith('gemini-') && !label.includes('image'))
+      .map(choice => ({ ...choice, description: CLIP_HINTS[choice.label] ?? 'Gemini · transcribes after you stop' })),
   ]
 }
 
