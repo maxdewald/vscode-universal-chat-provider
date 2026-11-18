@@ -717,24 +717,28 @@ describe('model mapping', () => {
     }])
   })
 
-  it('drops models the proxy hides or excludes from the api, reporting the skip', () => {
+  it('only uses Codex catalog visibility and API support to filter Codex models', () => {
     const skipped: { id: string, reason: string }[] = []
     const models = mapProxyModels(
       [
         { id: 'listed', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
         { id: 'codex-auto-review', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
         { id: 'spark', owned_by: 'openai', context_length: 256_000, max_completion_tokens: 32_000 },
+        { id: 'claude-sonnet', owned_by: 'anthropic', context_length: 200_000, max_completion_tokens: 32_000 },
+        { id: 'gemini-pro', owned_by: 'google', context_length: 200_000, max_completion_tokens: 32_000 },
       ],
       [
         { slug: 'listed', visibility: 'list', supported_in_api: true },
         { slug: 'codex-auto-review', visibility: 'hide', supported_in_api: true },
         { slug: 'spark', visibility: 'list', supported_in_api: false },
+        { slug: 'claude-sonnet', visibility: 'list', supported_in_api: false },
+        { slug: 'gemini-pro', visibility: 'hide', supported_in_api: true },
       ],
       new Map(),
       { onSkipped: (id, reason) => skipped.push({ id, reason }) },
     )
 
-    expect(models.map(model => model.id)).toEqual(['listed'])
+    expect(models.map(model => model.id)).toEqual(['claude-sonnet', 'gemini-pro', 'listed'])
     expect(skipped).toEqual([
       { id: 'codex-auto-review', reason: 'model is hidden upstream' },
       { id: 'spark', reason: 'model is hidden upstream' },

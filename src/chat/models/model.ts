@@ -114,9 +114,10 @@ export function mapProxyModels(
       continue
     seen.add(entry.id)
 
-    const oauth = entry.owned_by !== undefined && OAUTH_OWNERS.has(entry.owned_by.toLowerCase())
+    const owner = entry.owned_by?.toLowerCase()
+    const oauth = owner !== undefined && OAUTH_OWNERS.has(owner)
     const detail = oauth ? metadataById.get(entry.id) : undefined
-    if (isHiddenUpstream(detail)) {
+    if (owner === 'openai' && isHiddenInCodexCatalog(detail)) {
       options.onSkipped?.(entry.id, 'model is hidden upstream')
       continue
     }
@@ -338,7 +339,7 @@ function resolveReasoning(
   return levels
 }
 
-function isHiddenUpstream(metadata: ProxyModelMetadata | undefined): boolean {
+function isHiddenInCodexCatalog(metadata: ProxyModelMetadata | undefined): boolean {
   return metadata?.visibility?.toLowerCase() === 'hide' || metadata?.supported_in_api === false
 }
 
