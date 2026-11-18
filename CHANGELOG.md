@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.4](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.3...v1.8.4) (2026-11-18)
+
+
+### Bug Fixes
+
+* **routing:** keep retries within the selected provider ([f60356f](https://github.com/maxdewald/vscode-universal-chat-provider/commit/f60356f2955438303de481f7499bff5fbb69db8e)), closes [#220](https://github.com/maxdewald/vscode-universal-chat-provider/issues/220)
+
 ## [1.8.3](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.2...v1.8.3) (2026-11-18)
 
 
