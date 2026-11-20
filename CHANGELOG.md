@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.5](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.4...v1.8.5) (2026-11-20)
+
+
+### Bug Fixes
+
+* **dictation:** refresh Codex credentials and retry when the realtime token expires ([329dabe](https://github.com/maxdewald/vscode-universal-chat-provider/commit/329dabe642af9270c30eb242b074f4bd720e3dfe))
+
 ## [1.8.4](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.3...v1.8.4) (2026-11-18)
 
 
