@@ -118,4 +118,16 @@ describe('transcribeLive', () => {
     expect(FakeRealtimeSocket.instance.url).toBe('ws://127.0.0.1:1/v1/realtime?model=gpt-realtime')
     expect(FakeRealtimeSocket.instance.sent.map(message => message.type)).toEqual(['session.update', 'input_audio_buffer.append', 'input_audio_buffer.commit'])
   })
+
+  it('marks an expired-token error so dictation can refresh and retry', async () => {
+    class ExpiredSocket extends FakeRealtimeSocket {
+      override send(): void {
+        this.onmessage?.({ data: JSON.stringify({ type: 'error', error: { code: 'token_expired', message: 'Token expired.' } }) })
+      }
+    }
+    vi.stubGlobal('WebSocket', ExpiredSocket)
+
+    const transcribing = transcribeLive('http://127.0.0.1:1', 'key', 'gpt-transcribe', [new Int16Array(1600)])
+    await expect(transcribing).rejects.toMatchObject({ message: 'Token expired.', cause: 'token_expired' })
+  })
 })

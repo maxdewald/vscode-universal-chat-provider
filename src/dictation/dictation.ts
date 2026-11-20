@@ -228,7 +228,7 @@ const LiveEventSchema = Type.Object({
   error: Type.Optional(Type.Object({ code: Type.Optional(Type.String()), message: Type.Optional(Type.String()) })),
 })
 
-export async function transcribeLive(baseUrl: string, apiKey: string, model: string, audio: AsyncIterable<Int16Array>, language?: string): Promise<string> {
+export async function transcribeLive(baseUrl: string, apiKey: string, model: string, audio: AsyncIterable<Int16Array> | Iterable<Int16Array>, language?: string): Promise<string> {
   // Node's WebSocket (undici) accepts headers; the DOM typing does not know that.
   const socket = new WebSocket(`${baseUrl.replace(/^http/, 'ws')}/v1/realtime?model=gpt-realtime`, { headers: { Authorization: `Bearer ${apiKey}` } })
   const order: string[] = []
@@ -252,6 +252,10 @@ export async function transcribeLive(baseUrl: string, apiKey: string, model: str
       const message = asValue(LiveEventSchema, JSON.parse(String(event.data)))
       if (message === undefined)
         return
+      if (message.error?.code === 'token_expired') {
+        reject(new Error(message.error.message ?? 'The Codex token expired.', { cause: 'token_expired' }))
+        return
+      }
       const id = message.item_id
       switch (message.type) {
         case 'input_audio_buffer.committed':
@@ -405,7 +409,7 @@ export async function selectMicrophone(extensionPath: string): Promise<void> {
 export function createDictateCommand(
   context: ExtensionContext,
   models: (interactive: boolean) => Promise<readonly ModelRef[]>,
-  connection: ProxyConnection,
+  connection: ProxyConnection & { refreshCodexCredentials: () => Promise<boolean> },
   output: LogOutputChannel,
 ): { run: () => Promise<void>, disposables: Disposable[] } {
   let active: AbortController | undefined
@@ -458,7 +462,68 @@ export function createDictateCommand(
     wasOn = isOn
   })
 
-  const run = async (): Promise<void> => {
+  const soundFailed = (message: string): void => output.warn(`Dictation sound couldn't play: ${message}`)
+
+  function microphoneIndex(microphone: string): number {
+    if (!microphone)
+      return -1
+    const index = listMicrophones(context.extensionPath).indexOf(microphone)
+    if (index === -1)
+      output.warn(`Microphone "${microphone}" isn't connected; using the system default.`)
+    return index
+  }
+
+  // The mic warms up while the proxy and the realtime session get ready; the recorder buffers until the engine reads.
+  async function whenLive(frames: AsyncGenerator<Int16Array>, signal: AbortSignal, setup: string): Promise<AsyncGenerator<Int16Array>> {
+    const startedAt = Date.now()
+    const liveFrames = await untilLive(frames)
+    if (!signal.aborted) {
+      render('recording')
+      playRecordingSound(context.extensionPath, 'Started', soundFailed)
+    }
+    output.info(`Dictation started with ${setup} after ${Date.now() - startedAt} ms.`)
+    return liveFrames
+  }
+
+  async function transcribe(engine: string, apiKey: string, audio: AsyncIterable<Int16Array>, language: string | undefined): Promise<string> {
+    const baseUrl = connection.baseUrl()
+    if (!isLiveEngine(engine))
+      return transcribeClip(baseUrl, apiKey, engine, audio, language)
+    const recorded: Int16Array[] = []
+    async function* keepCopy(): AsyncGenerator<Int16Array> {
+      for await (const frame of audio) {
+        recorded.push(frame)
+        yield frame
+      }
+    }
+    try {
+      return await transcribeLive(baseUrl, apiKey, engine, keepCopy(), language)
+    }
+    catch (error) {
+      // CLIProxyAPI refreshes Codex tokens for chat requests but not for realtime sessions.
+      if (!(error instanceof Error && error.cause === 'token_expired') || !await connection.refreshCodexCredentials())
+        throw error
+      output.warn(`Dictation failed (${errorMessage(error)}); retrying after refreshing Codex credentials.`)
+      return transcribeLive(baseUrl, apiKey, engine, recorded, language)
+    }
+  }
+
+  async function showResult(text: string, peak: number, microphoneName: string, elapsedMs: number): Promise<void> {
+    if (text) {
+      await commands.executeCommand('workbench.action.chat.open')
+      await commands.executeCommand('workbench.action.chat.focusInput')
+      // `type` inserts at the cursor of the focused editor, keeping whatever the user already wrote.
+      await commands.executeCommand('type', { text: `${text} ` })
+    }
+    else if (peak < SILENCE_PEAK && elapsedMs >= MIN_RECORDING_MS) {
+      void window.showWarningMessage(`Dictation heard only silence from ${microphoneName}. Pick another microphone or check that VS Code may use it.`, 'Select Microphone').then(async choice => choice && selectMicrophone(context.extensionPath))
+    }
+    else if (peak >= SILENCE_PEAK) {
+      void window.showInformationMessage('Dictation didn\'t recognize any speech.')
+    }
+  }
+
+  async function run(): Promise<void> {
     if (active !== undefined) {
       output.info('Dictation stopping.')
       active.abort()
@@ -477,7 +542,6 @@ export function createDictateCommand(
 
     const recording = active = new AbortController()
     render('starting')
-    const soundFailed = (message: string): void => output.warn(`Dictation sound couldn't play: ${message}`)
     recording.signal.addEventListener('abort', () => {
       render('transcribing')
       playRecordingSound(context.extensionPath, 'Stopped', soundFailed)
@@ -486,21 +550,10 @@ export function createDictateCommand(
     let microphoneFrames: AsyncGenerator<Int16Array> | undefined
     try {
       const microphone = dictationMicrophone()
-      const deviceIndex = microphone ? listMicrophones(context.extensionPath).indexOf(microphone) : -1
-      if (microphone && deviceIndex === -1)
-        output.warn(`Microphone "${microphone}" isn't connected; using the system default.`)
+      const microphoneName = microphone || 'the system default microphone'
       const language = dictationLanguage()
-      // The mic warms up while the proxy and the realtime session get ready; the recorder buffers until the engine reads.
-      const warmupStartedAt = Date.now()
-      microphoneFrames = record(context.extensionPath, recording.signal, deviceIndex)
-      const live = untilLive(microphoneFrames).then((frames) => {
-        if (!recording.signal.aborted) {
-          render('recording')
-          playRecordingSound(context.extensionPath, 'Started', soundFailed)
-        }
-        output.info(`Dictation started with ${engine} on ${microphone || 'the system default microphone'} after ${Date.now() - warmupStartedAt} ms, language ${language ?? 'auto'}.`)
-        return frames
-      })
+      microphoneFrames = record(context.extensionPath, recording.signal, microphoneIndex(microphone))
+      const live = whenLive(microphoneFrames, recording.signal, `${engine} on ${microphoneName}, language ${language ?? 'auto'},`)
       live.catch(() => {})
       release = await connection.acquireRequest()
       const startedAt = Date.now()
@@ -512,22 +565,9 @@ export function createDictateCommand(
           yield frame
         }
       }
-      const text = isLiveEngine(engine)
-        ? await transcribeLive(connection.baseUrl(), apiKey, engine, metered(), language)
-        : await transcribeClip(connection.baseUrl(), apiKey, engine, metered(), language)
+      const text = await transcribe(engine, apiKey, metered(), language)
       output.info(`Dictation finished: peak level ${peak}, ${text.length} characters.`)
-      if (text) {
-        await commands.executeCommand('workbench.action.chat.open')
-        await commands.executeCommand('workbench.action.chat.focusInput')
-        // `type` inserts at the cursor of the focused editor, keeping whatever the user already wrote.
-        await commands.executeCommand('type', { text: `${text} ` })
-      }
-      else if (peak < SILENCE_PEAK && Date.now() - startedAt >= MIN_RECORDING_MS) {
-        void window.showWarningMessage(`Dictation heard only silence from ${microphone || 'the system default microphone'}. Pick another microphone or check that VS Code may use it.`, 'Select Microphone').then(async choice => choice && selectMicrophone(context.extensionPath))
-      }
-      else if (peak >= SILENCE_PEAK) {
-        void window.showInformationMessage('Dictation didn\'t recognize any speech.')
-      }
+      await showResult(text, peak, microphoneName, Date.now() - startedAt)
     }
     catch (error) {
       const message = `Dictation failed: ${errorMessage(error)}`
@@ -542,5 +582,6 @@ export function createDictateCommand(
       render('idle')
     }
   }
+
   return { run, disposables: [button, configListener, { dispose: stopBlinking }] }
 }

@@ -379,6 +379,21 @@ describe('server controller lifecycle', () => {
     controller.dispose()
   })
 
+  it('force-refreshes only Codex credentials', async () => {
+    const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)
+    vi.spyOn(controller as unknown as { managementForStatus: () => Promise<{ baseUrl: string, key: string }> }, 'managementForStatus')
+      .mockResolvedValue({ baseUrl: 'http://127.0.0.1:1', key: 'secret' })
+    vi.spyOn(ManagementClient.prototype, 'listAuthFilesRaw').mockResolvedValue([
+      { name: 'codex.json', provider: 'codex' },
+      { name: 'claude.json', provider: 'claude' },
+    ])
+    const refresh = vi.spyOn(ManagementClient.prototype, 'refreshAuthFile').mockResolvedValue()
+
+    await expect(controller.refreshCodexCredentials()).resolves.toBe(true)
+    expect(refresh).toHaveBeenCalledExactlyOnceWith('codex.json')
+    controller.dispose()
+  })
+
   it('refreshes all quota providers before a model becomes active', async () => {
     const listener = vi.fn()
     const controller = new ServerController(context(root), vscodeMock.output as never, vscodeMock.output as never)

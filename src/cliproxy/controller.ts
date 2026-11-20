@@ -454,6 +454,17 @@ export class ServerController implements ProxyConnection {
     }
   }
 
+  async refreshCodexCredentials(): Promise<boolean> {
+    const management = await this.managementForStatus()
+    if (management === undefined)
+      return false
+    const client = new ManagementClient(management.baseUrl, management.key)
+    const files = await client.listAuthFilesRaw().catch(() => [])
+    const results = await Promise.allSettled(files.flatMap(file =>
+      (file.provider ?? file.type)?.toLowerCase() === 'codex' && file.name !== undefined ? [client.refreshAuthFile(file.name)] : []))
+    return results.some(result => result.status === 'fulfilled')
+  }
+
   async refreshQuotas(): Promise<void> {
     if (this.quotaListener === undefined)
       return
