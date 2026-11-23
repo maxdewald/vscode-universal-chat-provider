@@ -258,7 +258,7 @@ describe('model mapping', () => {
 
     expect(models.map(model => ({ id: model.id, detail: model.detail, serviceTier: model.serviceTier }))).toEqual([
       { id: 'claude-opus-5', detail: 'Claude Code', serviceTier: undefined },
-      { id: 'claude-opus-5:fast', detail: '2x usage · Claude Code', serviceTier: 'priority' },
+      { id: 'claude-opus-5:fast', detail: 'Usage credits, 2x price · Claude Code', serviceTier: 'priority' },
     ])
   })
 

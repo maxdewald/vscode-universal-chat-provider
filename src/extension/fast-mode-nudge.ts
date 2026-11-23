@@ -15,7 +15,8 @@ export function fastModeQuota(model: ProviderModel, reports: readonly QuotaRepor
   if (model.serviceTier !== undefined)
     return undefined
   const provider = quotaProviderForModel(model)
-  if (provider === undefined)
+  // Claude subscriptions bill fast mode to usage credits only, so unused plan quota is irrelevant.
+  if (provider === undefined || provider === 'claude')
     return undefined
   const now = Date.now()
   const accounts = reports.filter(report => report.provider === provider)
@@ -62,11 +63,10 @@ export function fastModeOpportunity(
       }
 }
 
-export function createFastModeNudge(context: ExtensionContext, readers: Pick<ServerController, 'listCodexResets' | 'listClaudeResets'>) {
+export function createFastModeNudge(context: ExtensionContext, readers: Pick<ServerController, 'listCodexResets'>) {
   const cache = new Map<string, { until: number, resets: CodexResetOption[] }>()
   const listResets: Partial<Record<QuotaReport['provider'], () => Promise<CodexResetOption[]>>> = {
     codex: async () => readers.listCodexResets(),
-    claude: async () => readers.listClaudeResets(),
   }
   let busy = false
   let latestModel: ProviderModel | undefined

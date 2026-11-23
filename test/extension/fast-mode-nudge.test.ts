@@ -43,15 +43,9 @@ describe('fast-mode eligibility', () => {
     expect(fastModeOpportunity(model, { ...quota, windows: [{ ...quota.windows[0]!, remainingPercent: 49 }] })).toBeUndefined()
   })
 
-  it('ignores unrelated Claude caps and purchased credits', () => {
-    const quota: QuotaReport = { ...report(), provider: 'claude', windows: [
-      ...report().windows,
-      { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 0 },
-      { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 0 },
-    ] }
-    const claude = { ...model, proxyOwner: 'anthropic', proxyModelId: 'claude-sonnet' }
-    expect(fastModeQuota(claude, [quota])).toBe(quota)
-    expect(fastModeQuota({ ...claude, proxyModelId: 'claude-opus' }, [quota])).toBeUndefined()
+  it('skips Claude, whose fast mode bills usage credits, and ignores purchased credits', () => {
+    const quota: QuotaReport = { ...report(), provider: 'claude' }
+    expect(fastModeQuota({ ...model, proxyOwner: 'anthropic', proxyModelId: 'claude-opus' }, [quota])).toBeUndefined()
     const credits = { ...report('Other Quota'), windows: [{ key: 'credits', label: '7d Quota', remainingPercent: 100, resetsAt: now + MINUTE }] }
     expect(fastModeOpportunity(model, credits)).toBeUndefined()
   })
@@ -75,7 +69,7 @@ describe('fast-mode eligibility', () => {
 describe('fast-mode notification', () => {
   function setup() {
     const context = createExtensionContext()
-    const readers = { listCodexResets: vi.fn(async (): Promise<CodexResetOption[]> => []), listClaudeResets: vi.fn(async () => []) }
+    const readers = { listCodexResets: vi.fn(async (): Promise<CodexResetOption[]> => []) }
     return { context, readers, nudge: createFastModeNudge(context, readers) }
   }
 

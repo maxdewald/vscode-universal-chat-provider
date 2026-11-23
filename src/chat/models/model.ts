@@ -186,11 +186,13 @@ export function mapProxyModels(
 
 // CLIProxyAPI turns service_tier=priority into Anthropic's speed=fast, so one field drives both.
 function toFastModel(model: ProviderModel, costMultiplier: number): ProviderModel {
+  // Claude subscriptions bill fast mode to usage credits only, never to plan quota.
+  const cost = model.proxyOwner === 'anthropic' ? `Usage credits, ${costMultiplier}x price` : `${costMultiplier}x usage`
   return {
     ...model,
     id: `${model.id}:fast`,
     name: `${model.name} (Fast Mode)`,
-    detail: `${costMultiplier}x usage · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
+    detail: `${cost} · ${model.detail ?? formatProviderName(model.proxyOwner)}`,
     serviceTier: 'priority',
   }
 }
