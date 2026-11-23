@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.6](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.5...v1.8.6) (2026-11-23)
+
+
+### Bug Fixes
+
+* **fast-mode:** don't suggest Claude fast mode from unused quota, label it as usage credits ([337e6f2](https://github.com/maxdewald/vscode-universal-chat-provider/commit/337e6f2483538973d27e70802541be49f4d1979b))
+
 ## [1.8.5](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.4...v1.8.5) (2026-11-20)
 
 
