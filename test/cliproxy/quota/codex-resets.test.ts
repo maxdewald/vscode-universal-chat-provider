@@ -4,7 +4,7 @@ import { createManagementClientFake, queuedApiCallResponses } from '../support/m
 
 describe('codex reset credits', () => {
   it('lists the soonest available reset for each Codex account', async () => {
-    const { client, apiCall } = createManagementClientFake([
+    const { client, callAs } = createManagementClientFake([
       { provider: 'codex', auth_index: 'codex-1', email: 'one@example.com', id_token: { chatgpt_account_id: 'acct-1' } },
       { type: 'claude', auth_index: 'claude-1' },
     ], queuedApiCallResponses([{
@@ -34,10 +34,8 @@ describe('codex reset credits', () => {
       availableCount: 3,
       hasRemainingUsage: true,
     }])
-    expect(apiCall).toHaveBeenCalledTimes(2)
-    expect(apiCall.mock.calls[0]![0]).toEqual({
-      auth_index: 'codex-1',
-      method: 'GET',
+    expect(callAs).toHaveBeenCalledTimes(2)
+    expect(callAs.mock.calls[0]!.slice(0, 2)).toEqual(['codex-1', {
       url: 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits',
       header: {
         'Authorization': 'Bearer $TOKEN$',
@@ -46,12 +44,10 @@ describe('codex reset credits', () => {
         'OpenAI-Beta': 'codex-1',
         'originator': 'Codex Desktop',
       },
-    })
-    expect(apiCall.mock.calls[1]![0]).toMatchObject({
-      auth_index: 'codex-1',
-      method: 'GET',
+    }])
+    expect(callAs.mock.calls[1]!.slice(0, 2)).toMatchObject(['codex-1', {
       url: 'https://chatgpt.com/backend-api/wham/usage',
-    })
+    }])
   })
 
   it('omits accounts without an explicit available credit', async () => {
@@ -70,7 +66,7 @@ describe('codex reset credits', () => {
     ['no_credit', 'noCredit'],
     ['unknown', 'failed'],
   ] as const)('maps the %s consume response to %s', async (code, outcome) => {
-    const { client, apiCall } = createManagementClientFake([], queuedApiCallResponses([
+    const { client, callAs } = createManagementClientFake([], queuedApiCallResponses([
       { statusCode: 200, body: JSON.stringify({ code }) },
     ]))
     const option = {
@@ -80,9 +76,8 @@ describe('codex reset credits', () => {
     }
 
     await expect(claimCodexReset(client, option, 'redeem-1')).resolves.toBe(outcome)
-    expect(apiCall).toHaveBeenCalledTimes(1)
-    expect(apiCall.mock.calls[0]![0]).toEqual({
-      auth_index: 'codex-1',
+    expect(callAs).toHaveBeenCalledTimes(1)
+    expect(callAs.mock.calls[0]!.slice(0, 2)).toEqual(['codex-1', {
       method: 'POST',
       url: 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume',
       header: {
@@ -94,7 +89,7 @@ describe('codex reset credits', () => {
         'ChatGPT-Account-Id': 'acct-1',
       },
       data: JSON.stringify({ redeem_request_id: 'redeem-1', credit_id: 'credit-1' }),
-    })
+    }])
   })
 
   it('fails closed for transport, HTTP, and malformed responses', async () => {

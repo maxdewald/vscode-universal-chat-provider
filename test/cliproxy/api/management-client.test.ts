@@ -129,19 +129,25 @@ describe('management client', () => {
     vi.stubGlobal('fetch', fetchMock)
     const client = createClient()
 
-    await expect(client.apiCall({ auth_index: 'a1', method: 'GET', url: 'https://example.com' })).resolves.toEqual({
-      statusCode: 200,
-      header: {},
-      body: '{}',
-    })
+    await expect(client.callAs('a1', { url: 'https://example.com' })).resolves.toBe('{}')
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('throws the upstream status, headers, and body for a non-2xx reply', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ status_code: 429, header: { 'Retry-After': ['30'] }, body: 'slow down' })))
+
+    await expect(createClient().callAs('a1', { url: 'https://example.com' })).rejects.toMatchObject({
+      status: 429,
+      headers: { 'Retry-After': ['30'] },
+      message: 'HTTP 429 — slow down',
+    })
   })
 
   it('exposes the supported login providers in picker order', () => {
     expect(LOGIN_PROVIDERS.map(provider => provider.provider)).toEqual([
       'codex',
       'claude',
-      'antigravity',
+      'agy',
       'kimi',
       'xai',
       'devin',

@@ -20,7 +20,7 @@ const grant = { id: 'grant-1', resets_left: 1, resets_total: 1, usable_now: true
 
 describe('claude reset grants', () => {
   it('lists the recommended grant for each Claude account', async () => {
-    const { client, apiCall } = createManagementClientFake([
+    const { client, callAs } = createManagementClientFake([
       { provider: 'claude', auth_index: 'claude-1', email: 'one@example.com' },
       { provider: 'codex', auth_index: 'codex-1' },
     ], queuedApiCallResponses([usage({
@@ -35,13 +35,11 @@ describe('claude reset grants', () => {
       credit: { id: 'grant-2' },
       availableCount: 3,
     }])
-    expect(apiCall).toHaveBeenCalledTimes(1)
-    expect(apiCall.mock.calls[0]![0]).toEqual({
-      auth_index: 'claude-1',
-      method: 'GET',
+    expect(callAs).toHaveBeenCalledTimes(1)
+    expect(callAs.mock.calls[0]!.slice(0, 2)).toEqual(['claude-1', {
       url: 'https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1',
       header: HEADERS,
-    })
+    }])
   })
 
   it.each([
@@ -87,32 +85,29 @@ describe('claude reset grants', () => {
     ['ineligible', 'noCredit'],
     ['unexpected', 'failed'],
   ] as const)('maps the %s claim result to %s', async (result, outcome) => {
-    const { client, apiCall } = createManagementClientFake([], queuedApiCallResponses([
+    const { client, callAs } = createManagementClientFake([], queuedApiCallResponses([
       { statusCode: 200, body: JSON.stringify({ organization: { uuid: ORG.toUpperCase() } }) },
       { statusCode: 200, body: JSON.stringify({ result }) },
     ]))
 
     await expect(claimClaudeReset(client, OPTION, 'request-1')).resolves.toBe(outcome)
-    expect(apiCall.mock.calls[0]![0]).toEqual({
-      auth_index: 'claude-1',
-      method: 'GET',
+    expect(callAs.mock.calls[0]!.slice(0, 2)).toEqual(['claude-1', {
       url: 'https://api.anthropic.com/api/oauth/profile',
       header: HEADERS,
-    })
-    expect(apiCall.mock.calls[1]![0]).toEqual({
-      auth_index: 'claude-1',
+    }])
+    expect(callAs.mock.calls[1]!.slice(0, 2)).toEqual(['claude-1', {
       method: 'POST',
       url: `https://api.anthropic.com/api/organizations/${ORG}/reset_rate_limits`,
       header: HEADERS,
       data: JSON.stringify({ program: 'cedar_ember', grant_id: 'grant-1', request_id: 'request-1' }),
-    })
+    }])
   })
 
   it('fails closed without claiming when the organization is missing or malformed', async () => {
     for (const body of ['{}', JSON.stringify({ organization: { uuid: '../../evil' } })]) {
-      const { client, apiCall } = createManagementClientFake([], queuedApiCallResponses([{ statusCode: 200, body }]))
+      const { client, callAs } = createManagementClientFake([], queuedApiCallResponses([{ statusCode: 200, body }]))
       await expect(claimClaudeReset(client, OPTION, 'request-1')).resolves.toBe('failed')
-      expect(apiCall).toHaveBeenCalledTimes(1)
+      expect(callAs).toHaveBeenCalledTimes(1)
     }
   })
 

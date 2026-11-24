@@ -1,7 +1,8 @@
 import type { ManagedPaths } from '@src/cliproxy/managed/config'
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { SECRET_KEY } from '@src/cliproxy/configuration/credentials'
+import { agyPluginConfig } from '@src/cliproxy/managed/antigravity-plugin'
 import {
   buildManagedConfig,
   DEFAULT_HOST,
@@ -45,16 +46,21 @@ export async function provisionManagedState(options: ProvisionOptions): Promise<
     const apiKey = await ensureSecret(context, SECRET_KEY)
     managementKey = await ensureSecret(context, MGMT_KEY_SECRET)
     const providers = await openAICompatibility.get()
-    await writeFile(paths.configPath, buildManagedConfig({
+    const config = buildManagedConfig({
       host: DEFAULT_HOST,
       port,
       apiKey,
       managementKey,
       authDir: paths.authDir,
       openAICompatibility: providers,
+      plugins: await agyPluginConfig(paths.root, paths.authDir),
       extraConfig: workspace.getConfiguration('universalChatProvider').get<string>('server.extraConfig', ''),
       requestLogging: workspace.getConfiguration('universalChatProvider').get<string>('debugLevel', 'off') === 'requestLogging',
-    }))
+    })
+    // The server hot-reloads on every write, so skip writes that change nothing.
+    if (await readFile(paths.configPath, 'utf8').catch(() => undefined) === config)
+      return
+    await writeFile(paths.configPath, config)
     output.appendLine(`Wrote managed CLIProxyAPI config to ${paths.configPath}.`)
   }
   await writeConfig(context.globalState.get<number>(PORT_STATE_KEY) ?? DEFAULT_PORT)

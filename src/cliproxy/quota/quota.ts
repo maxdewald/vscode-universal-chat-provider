@@ -1,6 +1,7 @@
 import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
 import type { QuotaProvider, QuotaReport } from '@src/cliproxy/quota/providers/types'
 import { Type } from '@sinclair/typebox'
+import { UpstreamError } from '@src/cliproxy/api/management-client'
 import { isQuotaProvider, QUOTA_PROVIDERS } from '@src/cliproxy/quota/providers'
 import { parseReset } from '@src/cliproxy/quota/providers/types'
 import { errorMessage } from '@src/shared/errors'
@@ -19,6 +20,8 @@ export function quotaProviderForModel(model: { proxyOwner: string }): QuotaRepor
 const FETCH_INTERVAL_MS = 5 * 60_000
 // Providers with header signals stay fresh between fetches, so their usage endpoint is polled rarely.
 const SIGNAL_FETCH_INTERVAL_MS = 15 * 60_000
+// How long to sit out a 429 that carried no usable deadline, so we never hot-loop the upstream.
+const RATE_LIMIT_FLOOR_MS = 5 * 60_000
 
 // nextFetch maps authIndex -> earliest time to hit that account's usage endpoint again. Until then,
 // or when a fetch fails, the account keeps its previous report, overlaid with newer proxy signals.
@@ -31,7 +34,8 @@ export async function fetchQuotas(
   const files = await client.listAuthFilesRaw(signal)
   return Promise.all(files.flatMap((entry) => {
     const raw = (entry.provider ?? entry.type ?? '').trim().toLowerCase()
-    const provider = raw === 'xai' ? 'grok' : raw
+    // OAuth `antigravity` accounts are legacy and get no quota; the plugin's `agy` accounts take the name.
+    const provider = raw === 'xai' ? 'grok' : raw === 'agy' ? 'antigravity' : raw === 'antigravity' ? '' : raw
     if (!isQuotaProvider(provider))
       return []
     const source = QUOTA_PROVIDERS[provider]
@@ -40,7 +44,7 @@ export async function fetchQuotas(
       ?? { provider, windows: [], ...(account === undefined ? {} : { account }) }
     if ((nextFetch.get(account?.authIndex ?? '') ?? 0) > Date.now())
       return [Promise.resolve(withSignals(last, source, entry))]
-    return [fetchProviderQuota(source, client, entry, signal, nextFetch, last)]
+    return [loadQuota(source, client, signal, nextFetch, last)]
   }))
 }
 
@@ -77,8 +81,7 @@ export function formatResetCountdown(resetsAt: number | undefined): string | und
   return `${mins}m`
 }
 
-// Maps a model to its remaining-quota percent by handing the report to the provider that
-// bills its owner. Antigravity is keyed per model; the rest report account-level windows.
+// Maps a model to its remaining-quota percent by handing the report to the provider that bills its owner.
 export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: string, proxyModelId: string }): number | undefined {
   const name = quotaProviderForModel(model)
   if (name === undefined)
@@ -91,10 +94,9 @@ export function remainingForModel(reports: QuotaReport[], model: { proxyOwner: s
   return remaining.length > 0 ? Math.max(...remaining) : undefined
 }
 
-async function fetchProviderQuota(
+async function loadQuota(
   source: QuotaProvider,
   client: ManagementClient,
-  entry: AuthFileRaw,
   signal: AbortSignal | undefined,
   nextFetch: Map<string, number>,
   last: QuotaReport,
@@ -102,61 +104,32 @@ async function fetchProviderQuota(
   const authIndex = last.account?.authIndex
   if (authIndex === undefined)
     return { ...last, error: 'missing auth_index' }
-  const requestBody = source.body?.(entry)
-  if (requestBody !== undefined && 'error' in requestBody)
-    return { ...last, error: requestBody.error }
   // Claimed before awaiting so overlapping refreshes don't fetch the same account twice.
   nextFetch.set(authIndex, Date.now() + FETCH_INTERVAL_MS)
   try {
-    const { statusCode, header, body } = await client.apiCall({
-      auth_index: authIndex,
-      method: source.method,
-      url: source.url,
-      header: source.header,
-      ...requestBody,
-    }, signal)
-    const ok = statusCode >= 200 && statusCode < 300
-    const interval = ok && source.fromSignals !== undefined ? SIGNAL_FETCH_INTERVAL_MS : FETCH_INTERVAL_MS
-    nextFetch.set(authIndex, parseRetryAfter(header, statusCode) ?? Date.now() + interval)
-    if (!ok)
-      return { ...last, error: `HTTP ${statusCode} from ${source.url} — ${describeBody(body)}` }
+    const body = await source.load(client, authIndex, signal)
+    nextFetch.set(authIndex, Date.now() + (source.fromSignals !== undefined ? SIGNAL_FETCH_INTERVAL_MS : FETCH_INTERVAL_MS))
     const data = asJsonValue(ObjectSchema, body)
     if (data === undefined)
-      return { ...last, error: `invalid quota payload from ${source.url} — ${describeBody(body)}` }
+      return { ...last, error: `invalid quota payload from ${source.source} — ${String(body)}` }
     const report: QuotaReport = { provider: last.provider, windows: [], account: last.account!, updatedAt: Date.now() }
     source.apply(report, data)
     return report
   }
   catch (error) {
-    return { ...last, error: errorMessage(error) }
+    if (!(error instanceof UpstreamError))
+      return { ...last, error: errorMessage(error) }
+    if (error.status === 429)
+      nextFetch.set(authIndex, retryAfter(error.headers) ?? Date.now() + RATE_LIMIT_FLOOR_MS)
+    return { ...last, error: `${error.message} from ${source.source}` }
   }
 }
 
-// Upstream error bodies carry the useful detail (rate_limit_error, invalid_token, …).
-function describeBody(body: unknown): string {
-  const text = typeof body === 'string' ? body : JSON.stringify(body)
-  return text === undefined || text.trim() === '' ? 'empty body' : text
-}
-
-// How long to sit out a 429 that carried no usable deadline, so we never hot-loop the upstream.
-const RATE_LIMIT_FLOOR_MS = 5 * 60_000
-
-// Deadline to wait until before hitting this account again, in order of trust: Retry-After
-// (RFC 7231 delta-seconds or HTTP date), then Anthropic's -unified-reset once its -remaining
-// hits 0, then a floor for bare 429s.
-function parseRetryAfter(header: Record<string, string[]> | undefined, statusCode: number): number | undefined {
-  const retryAfter = headerValue(header, 'retry-after')
-  const seconds = Number(retryAfter)
-  return parseReset(Number.isNaN(seconds) ? retryAfter : Date.now() / 1000 + seconds)
-    ?? (headerValue(header, 'anthropic-ratelimit-unified-remaining') === '0'
-      ? parseReset(headerValue(header, 'anthropic-ratelimit-unified-reset'))
-      : undefined)
-    ?? (statusCode === 429 ? Date.now() + RATE_LIMIT_FLOOR_MS : undefined)
-}
-
-// CLIProxyAPI forwards Go's canonicalized http.Header, so values arrive as string arrays.
-function headerValue(header: Record<string, string[]> | undefined, name: string): string | undefined {
-  return Object.entries(header ?? {}).find(([key]) => key.toLowerCase() === name)?.[1]?.[0]?.trim()
+// Retry-After as RFC 7231 delta-seconds or an HTTP date; Go canonicalizes the header name.
+function retryAfter(headers: Record<string, string[]>): number | undefined {
+  const value = Object.entries(headers).find(([key]) => key.toLowerCase() === 'retry-after')?.[1]?.[0]?.trim()
+  const seconds = Number(value)
+  return parseReset(Number.isNaN(seconds) ? value : Date.now() / 1000 + seconds)
 }
 
 function accountOf(entry: AuthFileRaw): QuotaReport['account'] | undefined {

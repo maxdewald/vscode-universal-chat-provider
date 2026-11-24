@@ -1,6 +1,8 @@
+import type { AntigravityAccounts } from '@src/cliproxy/accounts/antigravity'
 import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityProvider } from '@src/cliproxy/api/management-client'
 import type { CancellationToken, Memento } from 'vscode'
 import { createServer } from 'node:http'
+import { AGY, agyCallbackUrl } from '@src/cliproxy/accounts/antigravity'
 import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { errorMessage } from '@src/shared/errors'
@@ -45,6 +47,7 @@ export interface AccountsDeps {
   state?: Pick<Memento, 'get' | 'update'>
   persistOpenAICompatibility?: (providers: OpenAICompatibilityProvider[]) => Promise<void>
   onAccountsChanged: (expectedModelIds?: readonly string[]) => Promise<void>
+  antigravity?: AntigravityAccounts
 }
 
 export class AccountsService {
@@ -57,29 +60,32 @@ export class AccountsService {
     this.loginPrompted = false
   }
 
-  async login(): Promise<void> {
-    this.loginPromise ??= this.doLogin().finally(() => {
+  async login(provider?: string): Promise<void> {
+    this.loginPromise ??= this.doLogin(provider).finally(() => {
       this.loginPromise = undefined
     })
     return this.loginPromise
   }
 
-  private async doLogin(): Promise<void> {
+  private async doLogin(preselected?: string): Promise<void> {
     const management = await this.deps.resolveManagement(true)
     if (management === undefined)
       return
 
-    const picked = await window.showQuickPick(
-      [
-        ...LOGIN_PROVIDERS.map(provider => ({ label: provider.label, detail: provider.detail, account: 'oauth' as const, provider })),
-        {
-          label: 'OpenAI-compatible endpoint',
-          detail: 'API key + base URL (OpenCode, OpenRouter, …)',
-          account: 'openai-compatibility' as const,
-        },
-      ],
-      { title: 'Connect a CLIProxyAPI Account', placeHolder: 'Choose a provider to sign in with' },
-    )
+    const preselectedProvider = LOGIN_PROVIDERS.find(provider => provider.provider === preselected)
+    const picked = preselectedProvider !== undefined
+      ? { account: 'oauth' as const, provider: preselectedProvider }
+      : await window.showQuickPick(
+          [
+            ...LOGIN_PROVIDERS.map(provider => ({ label: provider.label, detail: provider.detail, account: 'oauth' as const, provider })),
+            {
+              label: 'OpenAI-compatible endpoint',
+              detail: 'API key + base URL (OpenCode, OpenRouter, …)',
+              account: 'openai-compatibility' as const,
+            },
+          ],
+          { title: 'Connect a CLIProxyAPI Account', placeHolder: 'Choose a provider to sign in with' },
+        )
     if (picked === undefined)
       return
     if (picked.account === 'openai-compatibility') {
@@ -88,6 +94,15 @@ export class AccountsService {
     }
 
     const client = new ManagementClient(management.baseUrl, management.key)
+    if (picked.provider.provider === AGY && this.deps.antigravity !== undefined)
+      await this.deps.antigravity.signIn(client, async () => this.signIn(client, picked))
+    else
+      await this.signIn(client, picked)
+  }
+
+  private async signIn(client: ManagementClient, picked: { provider: typeof LOGIN_PROVIDERS[number] }): Promise<void> {
+    // agy's sign-in ends on a code page, so the relay and redirect paste never apply.
+    const agy = picked.provider.provider === AGY
     const remote = env.remoteName !== undefined
     let session: AuthSession
     let before: AuthFileRaw[]
@@ -95,10 +110,10 @@ export class AccountsService {
     try {
       before = await client.listAuthFilesRaw()
       session = await client.requestAuthUrl(picked.provider.provider, remote)
-      closeRelay = remote ? await relayCallback(client, session.url) : undefined
+      closeRelay = remote && !agy ? await relayCallback(client, session.url) : undefined
     }
     catch (error) {
-      void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}`)
+      void window.showErrorMessage(`Could not start ${picked.provider.label} login: ${errorMessage(error)}${agy ? ' Check that the Antigravity CLI (agy) is installed and runs in a terminal.' : ''}`)
       return
     }
 
@@ -116,7 +131,7 @@ export class AccountsService {
           if (session.userCode !== undefined && session.userCode !== '')
             progress.report({ message: `Enter code ${session.userCode} in your browser.` })
           else
-            void this.promptForRedirect(client, session, redirectPrompt.token)
+            void this.promptForCallback(client, session, agy, redirectPrompt.token)
           try {
             return await this.waitForLogin(client, session, picked.provider.provider, before, token)
           }
@@ -142,17 +157,22 @@ export class AccountsService {
     }
   }
 
-  private async promptForRedirect(client: ManagementClient, session: AuthSession, token: CancellationToken): Promise<void> {
-    const redirectUrl = await window.showInputBox({
-      title: 'Sign-in not finishing?',
-      prompt: 'If the browser ends on a page that fails to load, copy the full URL from its address bar and paste it here.',
-      placeHolder: 'http://localhost:…/callback?code=…&state=…',
+  // Google ends the Antigravity sign-in on a page that shows a code rather than redirecting back.
+  private async promptForCallback(client: ManagementClient, session: AuthSession, agy: boolean, token: CancellationToken): Promise<void> {
+    const toCallback = (input: string): string | undefined => agy
+      ? agyCallbackUrl(input, session.state)
+      : URL.parse(input.trim())?.searchParams.get('state') === session.state ? input.trim() : undefined
+    const value = await window.showInputBox({
+      ...agy
+        ? { title: 'Antigravity Sign-In', prompt: 'After signing in, copy the authorization code Google shows (or the page URL) and paste it here.' }
+        : { title: 'Sign-in not finishing?', prompt: 'If the browser ends on a page that fails to load, copy the full URL from its address bar and paste it here.', placeHolder: 'http://localhost:…/callback?code=…&state=…' },
       ignoreFocusOut: true,
-      validateInput: value => URL.parse(value.trim())?.searchParams.get('state') === session.state ? undefined : 'Paste the full redirect URL from this sign-in attempt.',
+      validateInput: input => toCallback(input) === undefined ? 'Paste what this sign-in attempt showed.' : undefined,
     }, token)
-    if (redirectUrl === undefined)
+    const callback = value === undefined ? undefined : toCallback(value)
+    if (callback === undefined)
       return
-    await client.submitAuthCallback(redirectUrl.trim()).catch((error: unknown) => {
+    await client.submitAuthCallback(callback).catch((error: unknown) => {
       void window.showErrorMessage(`Could not submit sign-in callback: ${errorMessage(error)}`)
     })
   }
@@ -280,6 +300,9 @@ export class AccountsService {
         await client.putOpenAICompatibility(remaining)
         await this.deps.persistOpenAICompatibility?.(remaining)
       }
+      else if (this.deps.antigravity !== undefined) {
+        await this.deps.antigravity.removeAccount(client, picked.label)
+      }
       else {
         await client.deleteAuthFile(picked.label)
       }
@@ -289,6 +312,12 @@ export class AccountsService {
     catch (error) {
       void window.showErrorMessage(`Could not remove ${picked.label}: ${errorMessage(error)}`)
     }
+  }
+
+  async maybeWarnLegacyAntigravity(): Promise<void> {
+    const management = this.deps.currentManagement()
+    if (management !== undefined)
+      await this.deps.antigravity?.maybeWarnLegacy(new ManagementClient(management.baseUrl, management.key), async () => this.login(AGY))
   }
 
   async maybePromptLogin(): Promise<void> {

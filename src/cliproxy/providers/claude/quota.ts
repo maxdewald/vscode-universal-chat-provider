@@ -1,6 +1,6 @@
 import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, minRemaining, Nullable, parseReset, signalNumber } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, Nullable, parseReset, signalNumber, usageEndpoint } from '@src/cliproxy/quota/providers/types'
 import { asValue } from '@src/shared/json'
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
@@ -38,9 +38,7 @@ const BodySchema = Type.Object({
 }, { additionalProperties: true })
 
 export const claudeProvider: QuotaProvider = {
-  method: 'GET',
-  url: USAGE_URL,
-  header: { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' },
+  ...usageEndpoint(USAGE_URL, { 'Authorization': 'Bearer $TOKEN$', 'Accept': 'application/json', 'anthropic-beta': 'oauth-2025-04-20' }),
   apply: (report, data) => {
     report.windows = parseWindows(data)
   },

@@ -73,12 +73,12 @@ function retryAfterMs(header: string | null): number | undefined {
 }
 
 export class CLIProxyClient {
-  private readonly fetcher: KyInstance
+  private readonly http: KyInstance
 
   constructor(baseUrl: string, apiKey: string) {
     // ponytail: retry:0/timeout:false keep the old raw-fetch behavior (streaming must
     // not time out); ky folds away the auth header, base url, and !ok error parsing.
-    this.fetcher = kyFetch.extend({
+    this.http = kyFetch.extend({
       prefix: baseUrl,
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       retry: 0,
@@ -89,8 +89,8 @@ export class CLIProxyClient {
 
   async discover(signal?: AbortSignal): Promise<DiscoveryResult> {
     const [available, metadata] = await Promise.all([
-      this.fetcher.get('/v1/models', { signal: signal ?? null }).json().then(payload => asValue(ModelsListSchema, payload)?.data ?? []),
-      this.fetcher.get('/v1/models?client_version=0.156.1', { signal: signal ?? null }).json().then(payload => asValue(ModelsMetadataSchema, payload)?.models ?? []).catch(() => []),
+      this.http.get('/v1/models', { signal: signal ?? null }).json().then(payload => asValue(ModelsListSchema, payload)?.data ?? []),
+      this.http.get('/v1/models?client_version=0.156.1', { signal: signal ?? null }).json().then(payload => asValue(ModelsMetadataSchema, payload)?.models ?? []).catch(() => []),
     ])
     return { available, metadata }
   }
@@ -100,7 +100,7 @@ export class CLIProxyClient {
     callbacks: StreamCallbacks,
     signal: AbortSignal,
   ): Promise<void> {
-    const response = await this.fetcher.post('/v1/responses', {
+    const response = await this.http.post('/v1/responses', {
       json: body,
       signal,
     })

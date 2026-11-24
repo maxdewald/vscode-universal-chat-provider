@@ -36,6 +36,14 @@ describe('pinAccountsToProviders', () => {
     ])
   })
 
+  it('leaves Antigravity CLI accounts unprefixed so their plugin can serve them', async () => {
+    const { client: management, setPrefix } = client([{ name: 'agy.json', type: 'agy' }], { 'agy.json': ['gemini-3.8-flash'] })
+
+    await pinAccountsToProviders(management, vi.fn())
+
+    expect(setPrefix).not.toHaveBeenCalled()
+  })
+
   it('keeps a prefix the user already chose', async () => {
     const { client: management, setPrefix } = client(
       [{ name: 'team.json', provider: 'claude' }],

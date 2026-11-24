@@ -8,7 +8,7 @@ import { isHTTPError } from 'ky'
 export const LOGIN_PROVIDERS = [
   { label: 'OpenAI Codex', detail: 'ChatGPT / Codex account', provider: 'codex' },
   { label: 'Anthropic Claude', detail: 'Claude Code account', provider: 'claude' },
-  { label: 'Antigravity', detail: 'Antigravity account', provider: 'antigravity' },
+  { label: 'Antigravity', detail: 'Google account, through the Antigravity CLI', provider: 'agy' },
   { label: 'Kimi', detail: 'Moonshot Kimi account', provider: 'kimi' },
   { label: 'xAI Grok', detail: 'Grok Build account', provider: 'xai' },
   { label: 'Devin', detail: 'Devin / Cognition account', provider: 'devin' },
@@ -63,7 +63,6 @@ export const AuthFileRawSchema = Type.Object({
   email: Type.Optional(Type.String()),
   label: Type.Optional(Type.String()),
   auth_index: Type.Optional(Type.String()),
-  project_id: Type.Optional(Type.String()),
   chatgpt_account_id: Type.Optional(Type.String()),
   account_id: Type.Optional(Type.String()),
   id_token: Type.Optional(IdTokenSchema),
@@ -114,6 +113,17 @@ const OpenAICompatibilityProviderSchema = Type.Object({
 
 const OpenAICompatibilityPayloadSchema = Type.Array(Type.Unknown())
 
+const PluginsPayloadSchema = Type.Object({
+  plugins: Type.Optional(Type.Array(Type.Object({ id: Type.String(), registered: Type.Optional(Type.Boolean()) }, { additionalProperties: true }))),
+}, { additionalProperties: true })
+
+// A non-2xx reply from a provider's API, reached through a signed-in account.
+export class UpstreamError extends Error {
+  constructor(readonly status: number, readonly headers: Record<string, string[]>, readonly body: string) {
+    super(`HTTP ${status} — ${body.trim() === '' ? 'empty body' : body}`)
+  }
+}
+
 const toManagementError: BeforeErrorHook = ({ error }) => {
   if (!isHTTPError(error))
     return error
@@ -123,12 +133,12 @@ const toManagementError: BeforeErrorHook = ({ error }) => {
 }
 
 export class ManagementClient {
-  private readonly fetcher: KyInstance
+  private readonly http: KyInstance
 
   constructor(baseUrl: string, key: string) {
     // ponytail: retry:0/timeout:false preserve the old raw-fetch behavior; ky just folds
     // away the bearer header, base path, and !ok error parsing (the beforeError hook).
-    this.fetcher = kyFetch.extend({
+    this.http = kyFetch.extend({
       prefix: `${baseUrl}/v8/management`,
       headers: { Authorization: `Bearer ${key}` },
       retry: 0,
@@ -140,7 +150,7 @@ export class ManagementClient {
   async requestAuthUrl(provider: string, relayCallback: boolean, signal?: AbortSignal): Promise<AuthSession> {
     const payload = asValue(
       AuthUrlPayloadSchema,
-      await this.fetcher.get(`/oauth/auth-url?provider=${encodeURIComponent(provider)}${relayCallback ? '' : '&is_webui=true'}`, { signal: signal ?? null }).json(),
+      await this.http.get(`/oauth/auth-url?provider=${encodeURIComponent(provider)}${relayCallback ? '' : '&is_webui=true'}`, { signal: signal ?? null }).json(),
     )
     if (typeof payload?.url !== 'string' || typeof payload.state !== 'string' || payload.state.trim() === '')
       throw new Error('CLIProxyAPI returned an invalid auth URL response.')
@@ -151,7 +161,7 @@ export class ManagementClient {
   async getAuthStatus(state: string, signal?: AbortSignal): Promise<AuthStatus> {
     const payload = asValue(
       AuthStatusPayloadSchema,
-      await this.fetcher.get(`/oauth/status?state=${encodeURIComponent(state)}`, { signal: signal ?? null }).json(),
+      await this.http.get(`/oauth/status?state=${encodeURIComponent(state)}`, { signal: signal ?? null }).json(),
     )
     if (payload?.status === 'wait' || payload?.status === 'ok')
       return { status: payload.status }
@@ -167,17 +177,17 @@ export class ManagementClient {
   }
 
   async submitAuthCallback(redirectUrl: string): Promise<void> {
-    await this.fetcher.post('/oauth/callback', { json: { redirect_url: redirectUrl } })
+    await this.http.post('/oauth/callback', { json: { redirect_url: redirectUrl } })
   }
 
   async cancelAuthSession(state: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.delete(`/oauth/session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
+    await this.http.delete(`/oauth/session?state=${encodeURIComponent(state)}`, { signal: signal ?? null })
   }
 
   async listAuthFileModels(name: string, signal?: AbortSignal): Promise<string[]> {
     const payload = asValue(
       AuthFileModelsPayloadSchema,
-      await this.fetcher.get(`/credentials/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
+      await this.http.get(`/credentials/models?name=${encodeURIComponent(name)}`, { signal: signal ?? null }).json(),
     )
     return (payload?.models ?? []).map(model => model.id)
   }
@@ -189,19 +199,19 @@ export class ManagementClient {
   }
 
   async deleteAuthFile(name: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.delete(`/credentials?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
+    await this.http.delete(`/credentials?name=${encodeURIComponent(name)}`, { signal: signal ?? null })
   }
 
   async setAuthFilePrefix(name: string, prefix: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.patch('/credentials/fields', { json: { name, prefix }, signal: signal ?? null })
+    await this.http.patch('/credentials/fields', { json: { name, prefix }, signal: signal ?? null })
   }
 
   async refreshAuthFile(name: string, signal?: AbortSignal): Promise<void> {
-    await this.fetcher.post('/credentials/refresh', { json: { name }, signal: signal ?? null })
+    await this.http.post('/credentials/refresh', { json: { name }, signal: signal ?? null })
   }
 
   async listAuthFilesRaw(signal?: AbortSignal): Promise<AuthFileRaw[]> {
-    const payload = asValue(AuthFilesPayloadSchema, await this.fetcher.get('/credentials', { signal: signal ?? null }).json())
+    const payload = asValue(AuthFilesPayloadSchema, await this.http.get('/credentials', { signal: signal ?? null }).json())
     return (payload?.files ?? []).flatMap((file) => {
       const entry = asValue(AuthFileRawSchema, file)
       return entry === undefined ? [] : [entry]
@@ -209,31 +219,49 @@ export class ManagementClient {
   }
 
   async serverVersion(signal?: AbortSignal): Promise<string | undefined> {
-    const response = await this.fetcher.get('/credentials', { signal: signal ?? null })
+    const response = await this.http.get('/credentials', { signal: signal ?? null })
     const version = response.headers.get('x-cpa-version')?.trim()
     return version === undefined || version === '' ? undefined : version
   }
 
-  // Proxies an upstream request through CLIProxyAPI using a stored credential.
-  // CPA substitutes the literal "$TOKEN$" in headers with the account's token.
-  async apiCall(payload: {
-    auth_index: string
-    method: string
+  // Calls a provider's API as one signed-in account; CLIProxyAPI puts its token in place of "$TOKEN$".
+  // Returns the body, or throws UpstreamError on a non-2xx reply.
+  async callAs(authIndex: string, request: {
     url: string
+    method?: 'GET' | 'POST'
     header?: Record<string, string>
     data?: string
-  }, signal?: AbortSignal): Promise<{ statusCode: number, header: Record<string, string[]>, body: unknown }> {
-    const json = asValue(ApiCallResponseSchema, await this.fetcher.post('/requests/api-call', {
-      json: payload,
+  }, signal?: AbortSignal): Promise<unknown> {
+    const json = asValue(ApiCallResponseSchema, await this.http.post('/requests/api-call', {
+      json: { auth_index: authIndex, method: 'GET', ...request },
       signal: signal ?? null,
       // 429/408 must reach the caller so it can honor the upstream's backoff instead of re-hitting it.
       retry: { limit: 2, methods: ['post'], statusCodes: [500, 502, 503, 504] },
     }).json())
-    return { statusCode: json?.status_code ?? json?.statusCode ?? 0, header: json?.header ?? {}, body: json?.body }
+    const status = json?.status_code ?? json?.statusCode ?? 0
+    if (status < 200 || status >= 300)
+      throw new UpstreamError(status, json?.header ?? {}, typeof json?.body === 'string' ? json.body : JSON.stringify(json?.body ?? ''))
+    return json?.body
+  }
+
+  async isPluginRegistered(pluginId: string, signal?: AbortSignal): Promise<boolean> {
+    const payload = asValue(PluginsPayloadSchema, await this.http.get('/plugins', { signal: signal ?? null }).json())
+    return payload?.plugins?.some(plugin => plugin.id === pluginId && plugin.registered === true) ?? false
+  }
+
+  async pluginQuota(pluginId: string, authIndex: string, signal?: AbortSignal): Promise<unknown> {
+    const response = await this.http.get(`/plugins/${encodeURIComponent(pluginId)}/quota?auth_index=${encodeURIComponent(authIndex)}`, {
+      signal: signal ?? null,
+      throwHttpErrors: false,
+    })
+    const body = await response.text()
+    if (!response.ok)
+      throw new UpstreamError(response.status, {}, body)
+    return body
   }
 
   async listOpenAICompatibility(signal?: AbortSignal): Promise<OpenAICompatibilityProvider[]> {
-    const response = await this.fetcher.get(OPENAI_COMPATIBILITY_PATH, {
+    const response = await this.http.get(OPENAI_COMPATIBILITY_PATH, {
       signal: signal ?? null,
       throwHttpErrors: status => status !== 404,
     })
@@ -246,7 +274,7 @@ export class ManagementClient {
   }
 
   async putOpenAICompatibility(providers: OpenAICompatibilityProvider[], signal?: AbortSignal): Promise<void> {
-    await this.fetcher.put(OPENAI_COMPATIBILITY_PATH, { json: providers, signal: signal ?? null })
+    await this.http.put(OPENAI_COMPATIBILITY_PATH, { json: providers, signal: signal ?? null })
   }
 }
 

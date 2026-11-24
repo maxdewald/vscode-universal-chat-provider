@@ -1,5 +1,5 @@
 import type { TNull, TOptional, TSchema, TUnion } from '@sinclair/typebox'
-import type { AuthFileRaw } from '@src/cliproxy/api/management-client'
+import type { ManagementClient } from '@src/cliproxy/api/management-client'
 import { Type } from '@sinclair/typebox'
 
 // These APIs null out fields rather than omitting them, and an absent value means the same as
@@ -18,26 +18,30 @@ export interface QuotaWindow {
 
 export interface QuotaReport {
   provider: 'codex' | 'antigravity' | 'claude' | 'grok' | 'kimi'
-  windows: QuotaWindow[] // codex/claude/grok/kimi: account-level windows (5h / 7d / …)
-  models?: Record<string, { remainingPercent: number, resetsAt?: number }> // antigravity: keyed by proxy model id
+  windows: QuotaWindow[]
   account?: { authIndex: string, label: string } // identifies which signed-in account the report belongs to
   updatedAt?: number // epoch ms of the data the windows reflect
   error?: string
 }
 
-// One upstream usage endpoint plus the two things only this provider knows: how to read its
+// One usage source plus the two things only this provider knows: how to read its
 // payload, and how to map one of its models back to a remaining-quota percent.
 export interface QuotaProvider {
-  method: 'GET' | 'POST'
-  url: string
-  header: Record<string, string>
-  // Request body. Returning an error reports it without calling the upstream.
-  body?: (entry: AuthFileRaw) => { data: string } | { error: string }
+  source: string // shown in fetch errors
+  load: (client: ManagementClient, authIndex: string, signal?: AbortSignal) => Promise<unknown>
   apply: (report: QuotaReport, data: unknown) => void
   owners: string[] // proxy `owned_by` values this provider bills for
   remaining: (report: QuotaReport, proxyModelId: string) => number | undefined
   // Windows rebuilt from the rate-limit headers CLIProxyAPI records after each upstream reply.
   fromSignals?: (signals: Record<string, string>) => QuotaWindow[]
+}
+
+// Calls the provider's usage endpoint with the account's token, which CLIProxyAPI puts in place of $TOKEN$.
+export function usageEndpoint(url: string, header: Record<string, string>): Pick<QuotaProvider, 'source' | 'load'> {
+  return {
+    source: url,
+    load: async (client, authIndex, signal) => client.callAs(authIndex, { url, header }, signal),
+  }
 }
 
 // CLIProxyAPI keys signals by Go's canonical header name and drops empty values.

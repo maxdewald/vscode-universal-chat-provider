@@ -10,7 +10,8 @@ export async function pinAccountsToProviders(
   for (const file of await client.listAuthFilesRaw(signal)) {
     const provider = (file.provider ?? file.type ?? '').trim().toLowerCase()
     const name = file.name
-    if (name === undefined || provider === '')
+    // Plugin models stay unprefixed: CLIProxyAPI cannot route a prefixed id to a plugin executor.
+    if (name === undefined || provider === '' || provider === 'agy')
       continue
     const models = await client.listAuthFileModels(name, signal).catch(() => [])
     // An account that already has a prefix, ours or the user's, keeps it.

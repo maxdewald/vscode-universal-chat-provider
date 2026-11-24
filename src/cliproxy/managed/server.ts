@@ -69,6 +69,11 @@ export class ManagedServer {
     })
   }
 
+  async rewriteConfig(): Promise<void> {
+    if (this.port !== undefined)
+      await this.deps.writeConfig(this.port)
+  }
+
   async acquireRequest(): Promise<() => void> {
     return withOperationLock(this.deps.paths.operationLockPath, async () => claimRequestLease(this.deps.paths.requestLeaseDir))
   }

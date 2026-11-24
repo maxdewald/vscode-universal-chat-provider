@@ -35,6 +35,26 @@ describe('model mapping', () => {
     })
   })
 
+  it('keeps one Antigravity CLI model per base model with an effort picker', () => {
+    const owned_by = 'google-antigravity-cli'
+    const catalog = new Map([['gemini-3.8-flash', {
+      id: 'gemini-3.8-flash',
+      display_name: 'Gemini 3.8 Flash',
+      context_length: 1_048_576,
+      max_completion_tokens: 65_536,
+      thinking: { levels: ['low', 'medium', 'high'] },
+    }]])
+    const models = mapProxyModels(
+      ['agy/default', 'gemini-3.8-flash', 'gemini-3.8-flash-high', 'gemini-3.8-flash-low'].map(id => ({ id, owned_by })),
+      [],
+      catalog,
+      {},
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({ proxyModelId: 'gemini-3.8-flash', detail: 'Antigravity', reasoningLevels: ['low', 'medium', 'high'] })
+  })
+
   it('uses models.dev exclusively for OpenAI-compatible models', () => {
     const [model] = mapModels(
       [{ id: 'opencode.ai/deepseek-v4-flash', owned_by: 'opencode.ai', context_length: 272_000 }],

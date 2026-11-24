@@ -82,7 +82,9 @@ export function upstreamModelId(id: string): string {
 }
 
 const REASONING_NAME_SUFFIX = /\s+\((?:thinking|none|minimal|low|medium|high|extra high|xhigh|max|ultra|auto)\)$/i
-const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity', 'cognition', 'meta'])
+const OAUTH_OWNERS = new Set(['openai', 'anthropic', 'google', 'moonshot', 'xai', 'antigravity', 'google-antigravity-cli', 'cognition', 'meta'])
+// The effort picker replaces these; a suffix would also override the picked effort.
+const AGY_ALIAS = /^agy\/default$|-(?:low|medium|med|high)$/
 const WEB_SEARCH_TOOL_TYPES = new Set(['text', 'text_and_image'])
 const PROVIDER_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/claude|anthropic/, 'chat-model-provider-claude'],
@@ -120,6 +122,8 @@ export function mapProxyModels(
     seen.add(entry.id)
 
     const owner = entry.owned_by?.toLowerCase()
+    if (owner === 'google-antigravity-cli' && AGY_ALIAS.test(entry.id))
+      continue
     const oauth = owner !== undefined && OAUTH_OWNERS.has(owner)
     const detail = oauth ? metadataById.get(entry.id) : undefined
     if (owner === 'openai' && isHiddenInCodexCatalog(detail)) {
@@ -398,10 +402,11 @@ function formatTokens(value: number): string {
 
 function formatProviderName(value: string): string {
   const apps: Record<string, string> = {
-    anthropic: 'Claude Code',
-    openai: 'Codex',
-    antigravity: 'Antigravity',
-    xai: 'Grok',
+    'anthropic': 'Claude Code',
+    'openai': 'Codex',
+    'antigravity': 'Antigravity',
+    'google-antigravity-cli': 'Antigravity',
+    'xai': 'Grok',
   }
   const normalized = value.trim()
   return apps[normalized.toLowerCase()]

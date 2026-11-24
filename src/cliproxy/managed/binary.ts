@@ -1,11 +1,8 @@
 import type { OutputChannel } from 'vscode'
-import { createHash } from 'node:crypto'
-import { access, chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, readdir, rm } from 'node:fs/promises'
 import { arch as osArch, platform as osPlatform } from 'node:os'
-import { dirname, join } from 'node:path'
-import { kyFetch } from '@src/shared/kyFetch'
-import { unzipSync } from 'fflate'
-import { parseTarGzip } from 'nanotar'
+import { join } from 'node:path'
+import { githubFetch, installReleaseAsset } from '@src/cliproxy/managed/github-release'
 import semver from 'semver'
 
 const REPO = 'router-for-me/CLIProxyAPI'
@@ -27,16 +24,6 @@ export function resolveAsset(platform: NodeJS.Platform, arch: string, version: s
   }
 }
 
-export function parseChecksums(text: string): Map<string, string> {
-  const result = new Map<string, string>()
-  for (const line of text.split('\n')) {
-    const match = /^([0-9a-f]{64})\s+\*?(\S.*)$/i.exec(line.trim())
-    if (match)
-      result.set(match[2]!.trim(), match[1]!.toLowerCase())
-  }
-  return result
-}
-
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, '')
 }
@@ -47,17 +34,10 @@ export function isSupportedVersion(version: string): boolean {
   return semver.satisfies(normalizeVersion(version), `>=${MIN_CLIPROXY_VERSION}`)
 }
 
-// ky retries transient failures (5xx/429/network) and honors Retry-After on rate limits.
-const fetcher = kyFetch.extend({
-  headers: { 'User-Agent': 'universal-chat-provider-vscode' },
-  retry: { limit: 3 },
-  timeout: false,
-})
-
 export async function resolveVersion(requested: string, signal?: AbortSignal): Promise<string> {
   if (requested.toLowerCase() !== 'latest')
     return normalizeVersion(requested)
-  const releases = await fetcher
+  const releases = await githubFetch
     .get(`https://api.github.com/repos/${REPO}/releases?per_page=10`, { signal: signal ?? null })
     .json<{ tag_name: string, prerelease: boolean, assets: { name: string }[] }[]>()
   // Upstream publishes the release before CI uploads its assets, so skip releases that aren't downloadable yet.
@@ -106,23 +86,8 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   }
 
   options.output.appendLine(`Downloading CLIProxyAPI ${version} (${asset.assetName})...`)
-  const base = `https://github.com/${REPO}/releases/download/v${version}`
-  const signal = options.signal ?? null
-  const [archiveResponse, checksumResponse] = await Promise.all([
-    fetcher.get(`${base}/${asset.assetName}`, { signal }),
-    fetcher.get(`${base}/checksums.txt`, { signal }),
-  ])
-  const archive = new Uint8Array(await archiveResponse.arrayBuffer())
-  const expected = parseChecksums(await checksumResponse.text()).get(asset.assetName)
-  if (expected === undefined)
-    throw new Error(`No checksum found for ${asset.assetName}.`)
-  const actual = createHash('sha256').update(archive).digest('hex')
-  if (actual !== expected)
-    throw new Error(`Checksum mismatch for ${asset.assetName} (expected ${expected}, got ${actual}).`)
-
   await rm(versionDir, { recursive: true, force: true })
-  await mkdir(versionDir, { recursive: true })
-  await extractArchive(archive, asset.isZip, versionDir)
+  await installReleaseAsset(REPO, version, asset.assetName, versionDir, options.signal)
 
   if (!(await access(binaryPath).then(() => true, () => false)))
     throw new Error(`Extracted archive did not contain ${asset.binaryName}.`)
@@ -132,22 +97,6 @@ export async function acquireBinary(options: AcquireOptions): Promise<AcquireRes
   options.output.appendLine(`Installed CLIProxyAPI ${version} at ${binaryPath}.`)
   await pruneOldVersions(options.binDir, version, options.output)
   return { binaryPath, version }
-}
-
-export async function extractArchive(archive: Uint8Array, isZip: boolean, dest: string): Promise<void> {
-  const entries = isZip
-    ? Object.entries(unzipSync(archive)).map(([name, data]) => ({ name, data }))
-    : (await parseTarGzip(archive)).map(item => ({ name: item.name, data: item.data }))
-
-  for (const { name, data } of entries) {
-    if (data === undefined || name.endsWith('/'))
-      continue
-    if (name.split('/').includes('..'))
-      throw new Error(`Refusing to extract unsafe path: ${name}`)
-    const target = join(dest, name)
-    await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, data)
-  }
 }
 
 export async function readInstalledVersion(binDir: string): Promise<string | undefined> {

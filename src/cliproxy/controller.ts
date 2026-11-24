@@ -11,6 +11,7 @@ import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { AccountsService } from '@src/cliproxy/accounts/accounts'
+import { AntigravityAccounts } from '@src/cliproxy/accounts/antigravity'
 import { pinAccountsToProviders } from '@src/cliproxy/accounts/provider-prefixes'
 import { ManagementClient } from '@src/cliproxy/api/management-client'
 import { normalizeBaseUrl, SECRET_KEY } from '@src/cliproxy/configuration/credentials'
@@ -71,6 +72,13 @@ export class ServerController implements ProxyConnection {
       onAccountsChanged: async (expectedModelIds) => {
         await this.notifyAccountsChanged(expectedModelIds)
       },
+      antigravity: new AntigravityAccounts({
+        managed: () => this.mode() === 'external' || this.paths === undefined || this.server === undefined
+          ? undefined
+          : { root: this.paths.root, authDir: this.paths.authDir, rewriteConfig: async () => this.server!.rewriteConfig() },
+        onAccountsChanged: async () => this.notifyAccountsChanged(),
+        output,
+      }),
     })
     this.disposables.push(workspace.onDidChangeConfiguration((event) => {
       const managedConfigChanged = event.affectsConfiguration('universalChatProvider.server.extraConfig')
@@ -138,6 +146,7 @@ export class ServerController implements ProxyConnection {
       if (!alreadyUp)
         await this.pinAccounts()
       void this.accounts.maybePromptLogin()
+      void this.accounts.maybeWarnLegacyAntigravity()
       void this.applyPendingUpdateWhenIdle()
       void this.maybeUpdateOnStartup()
     }
@@ -407,7 +416,11 @@ export class ServerController implements ProxyConnection {
     this.paths = state.paths
     this.server = state.server
     this.managementKey = state.managementKey
-    this.disposables.push(...watchCredentialFiles(state.paths.authDir, () => this.scheduleRefresh()))
+    this.disposables.push(...watchCredentialFiles(state.paths.authDir, () => {
+      // Turns the Antigravity plugin off once its last account is gone, and back on when one returns.
+      void this.server?.rewriteConfig().catch(error => this.output.appendLine(`Could not update the managed config: ${errorMessage(error)}`))
+      this.scheduleRefresh()
+    }))
     this.startLogMaintenance(join(state.paths.authDir, 'logs'), join(state.paths.root, 'log-maintenance.lock'))
     if (this.logTailer === undefined) {
       this.logTailer = new LogTailer(state.paths.logPath, this.serverOutput).start()

@@ -361,21 +361,17 @@ describe('server controller lifecycle', () => {
       { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
       { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
     ])
-    const apiCall = vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
-      statusCode: 200,
-      header: {},
-      body: JSON.stringify({ rate_limit: {} }),
-    })
+    const callAs = vi.spyOn(ManagementClient.prototype, 'callAs').mockResolvedValue(JSON.stringify({ rate_limit: {} }))
 
     await controller.refreshQuotas()
-    expect(apiCall).toHaveBeenCalledTimes(2)
+    expect(callAs).toHaveBeenCalledTimes(2)
 
     await controller.refreshQuotas()
-    expect(apiCall).toHaveBeenCalledTimes(2)
+    expect(callAs).toHaveBeenCalledTimes(2)
 
     await vi.advanceTimersByTimeAsync(15 * 60_000)
     await controller.refreshQuotas()
-    expect(apiCall).toHaveBeenCalledTimes(4)
+    expect(callAs).toHaveBeenCalledTimes(4)
     controller.dispose()
   })
 
@@ -404,11 +400,7 @@ describe('server controller lifecycle', () => {
       { name: 'codex.json', provider: 'codex', auth_index: 'c1' },
       { name: 'claude.json', provider: 'claude', auth_index: 'a1' },
     ])
-    vi.spyOn(ManagementClient.prototype, 'apiCall').mockResolvedValue({
-      statusCode: 200,
-      header: {},
-      body: JSON.stringify({ rate_limit: {} }),
-    })
+    vi.spyOn(ManagementClient.prototype, 'callAs').mockResolvedValue(JSON.stringify({ rate_limit: {} }))
 
     await controller.refreshQuotas()
 

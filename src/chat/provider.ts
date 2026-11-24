@@ -15,7 +15,6 @@ import type {
 } from 'vscode'
 import { CredentialFlows } from '@src/chat/credentials/credential-flows'
 import { CacheMetricsTracker, createContextUsagePart } from '@src/chat/diagnostics/cache-metrics'
-import { upstreamModelId } from '@src/chat/models/model'
 import { ModelRegistry } from '@src/chat/models/model-registry'
 import { detectCompaction } from '@src/chat/requests/compaction'
 import { streamCompletion } from '@src/chat/requests/completion'
@@ -74,7 +73,9 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
     this.cacheMetrics = new CacheMetricsTracker(context, output)
     this.disposables.push(
       this.registry.onDidChange(() => {
-        void runMigrations(context.globalState, { proxyModelIds: this.registry.snapshot().map(model => model.proxyModelId) }, message => output.appendLine(message))
+        // Antigravity CLI models are unprefixed by design, so they never hold the migration back.
+        const proxyModelIds = this.registry.snapshot().filter(model => model.proxyOwner !== 'google-antigravity-cli').map(model => model.proxyModelId)
+        void runMigrations(context.globalState, { proxyModelIds }, message => output.appendLine(message))
           .catch(error => output.appendLine(`Migrations failed: ${errorMessage(error)}`))
         this.modelsChanged.fire()
       }),
@@ -106,7 +107,7 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
 
   quotaSections(): Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> {
     const sections: Array<{ title: string, entries: Array<{ name: string, remainingPercent: number | undefined, balance?: { amount: number, currency: string, suffix: 'left' | 'used' }, resetsAt?: number }> }> = []
-    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['grok', 'Grok'], ['kimi', 'Kimi']] as const) {
+    for (const [provider, title] of [['codex', 'Codex'], ['claude', 'Claude'], ['antigravity', 'Antigravity'], ['grok', 'Grok'], ['kimi', 'Kimi']] as const) {
       const reports = this.quotaReports.filter(r => r.provider === provider)
       const multiple = reports.length > 1
       for (const report of reports) {
@@ -123,20 +124,6 @@ export class UniversalChatProvider implements LanguageModelChatProvider<Provider
               })),
         })
       }
-    }
-
-    const antigravity = this.quotaReports.find(report => report.provider === 'antigravity' && report.models !== undefined)
-    const models = antigravity?.models
-    if (models !== undefined) {
-      const entries = this.registry.snapshot()
-        .filter(model => model.proxyOwner.toLowerCase() === 'antigravity')
-        .flatMap((model) => {
-          const quota = models[upstreamModelId(model.proxyModelId)]
-          return quota === undefined ? [] : [{ name: model.name, remainingPercent: quota.remainingPercent, ...(quota.resetsAt === undefined ? {} : { resetsAt: quota.resetsAt }) }]
-        })
-        .sort((a, b) => (a.remainingPercent ?? 101) - (b.remainingPercent ?? 101))
-      if (entries.length > 0)
-        sections.push({ title: 'Antigravity', entries })
     }
     return sections
   }

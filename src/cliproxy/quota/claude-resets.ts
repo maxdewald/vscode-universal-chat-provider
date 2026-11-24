@@ -64,10 +64,7 @@ export async function listClaudeResets(client: ManagementClient, signal?: AbortS
   const accounts = (await client.listAuthFilesRaw(signal)).flatMap(entry => authAccount(entry, 'claude', 'Claude account'))
   const options = await Promise.all(accounts.map(async (account) => {
     try {
-      const response = await client.apiCall({ auth_index: account.authIndex, method: 'GET', url: STATUS_URL, header: HEADERS }, signal)
-      if (response.statusCode < 200 || response.statusCode >= 300)
-        return undefined
-      const block = asJsonValue(UsageBodySchema, response.body)?.cedar_ember
+      const block = asJsonValue(UsageBodySchema, await client.callAs(account.authIndex, { url: STATUS_URL, header: HEADERS }, signal))?.cedar_ember
       const status = block == null ? undefined : asValue(StatusSchema, block)
       return status === undefined ? undefined : toOption(account, status)
     }
@@ -84,22 +81,19 @@ export async function claimClaudeReset(
   requestId: string,
   signal?: AbortSignal,
 ): Promise<ResetOutcome> {
-  const auth_index = option.account.authIndex
+  const authIndex = option.account.authIndex
   try {
-    const profile = await client.apiCall({ auth_index, method: 'GET', url: PROFILE_URL, header: HEADERS }, signal)
-    const organization = asJsonValue(ProfileBodySchema, profile.body)?.organization.uuid.toLowerCase()
-    if (profile.statusCode < 200 || profile.statusCode >= 300 || organization === undefined)
+    const profile = await client.callAs(authIndex, { url: PROFILE_URL, header: HEADERS }, signal)
+    const organization = asJsonValue(ProfileBodySchema, profile)?.organization.uuid.toLowerCase()
+    if (organization === undefined)
       return 'failed'
-    const response = await client.apiCall({
-      auth_index,
+    const body = await client.callAs(authIndex, {
       method: 'POST',
       url: `${API_ORIGIN}/api/organizations/${organization}/reset_rate_limits`,
       header: HEADERS,
       data: JSON.stringify({ program: 'cedar_ember', grant_id: option.credit.id, request_id: requestId }),
     }, signal)
-    if (response.statusCode < 200 || response.statusCode >= 300)
-      return 'failed'
-    const result = asJsonValue(Type.Object({ result: Type.Optional(Type.String()) }), response.body)?.result
+    const result = asJsonValue(Type.Object({ result: Type.Optional(Type.String()) }), body)?.result
     return CLAIM_OUTCOMES[result ?? ''] ?? 'failed'
   }
   catch {

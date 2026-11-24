@@ -129,7 +129,9 @@ export function engineChoices(models: readonly ModelRef[]): Array<{ id: string, 
   return [
     { id: '', label: 'None', description: 'Dictation off' },
     ...Object.entries(LIVE_ENGINES).filter(() => codex).map(([id, description]) => ({ id, label: id, description })),
+    // The Antigravity CLI plugin drops audio input.
     ...models
+      .filter(model => model.proxyOwner !== 'google-antigravity-cli')
       .map(({ proxyModelId: id }) => ({ id, label: upstreamModelId(id) }))
       .filter(({ label }) => label.startsWith('gemini-') && !label.includes('image'))
       .map(choice => ({ ...choice, description: CLIP_HINTS[choice.label] ?? 'Gemini · transcribes after you stop' })),

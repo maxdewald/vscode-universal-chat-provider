@@ -45,6 +45,7 @@ export interface ManagedConfigOptions {
   managementKey: string
   authDir: string
   openAICompatibility?: OpenAICompatibilityProvider[]
+  plugins?: Record<string, unknown> | undefined
   requestLogging?: boolean
   extraConfig?: string
 }
@@ -73,6 +74,8 @@ export function buildManagedConfig(options: ManagedConfigOptions): string {
   }
   if (options.openAICompatibility !== undefined && options.openAICompatibility.length > 0)
     config['api-keys'] = { 'openai-compatibility': options.openAICompatibility.map(withSessionHeaderDefaults) }
+  if (options.plugins !== undefined)
+    config['plugins'] = options.plugins
   return stringify(merge(config, parseExtraConfig(options.extraConfig ?? '')))
 }
 

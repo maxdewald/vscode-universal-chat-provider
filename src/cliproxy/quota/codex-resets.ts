@@ -47,27 +47,19 @@ export async function listCodexResets(client: ManagementClient, signal?: AbortSi
   const accounts = (await client.listAuthFilesRaw(signal)).flatMap(toCodexAccount)
   const options = await Promise.all(accounts.map(async (account) => {
     try {
-      const response = await client.apiCall({
-        auth_index: account.authIndex,
-        method: 'GET',
-        url: RESET_CREDITS_URL,
-        header: headers(account),
-      }, signal)
-      if (response.statusCode < 200 || response.statusCode >= 300)
-        return undefined
-      const body = asJsonValue(ResetCreditsBodySchema, response.body)
+      const body = asJsonValue(ResetCreditsBodySchema, await client.callAs(account.authIndex, { url: RESET_CREDITS_URL, header: headers(account) }, signal))
       if (body === undefined)
         return undefined
       const credits = parseCredits(body.credits)
       const credit = credits[0]
       if (credit === undefined)
         return undefined
-      const hasRemainingUsage = await fetchHasRemainingUsage(client, account, signal)
+      const remaining = await hasRemainingUsage(client, account, signal)
       const option: CodexResetOption = {
         account,
         credit,
         availableCount: Math.max(body.available_count ?? credits.length, credits.length),
-        ...(hasRemainingUsage ? { hasRemainingUsage } : {}),
+        ...(remaining ? { hasRemainingUsage: remaining } : {}),
       }
       return option
     }
@@ -78,21 +70,13 @@ export async function listCodexResets(client: ManagementClient, signal?: AbortSi
   return options.filter((option): option is CodexResetOption => option !== undefined)
 }
 
-async function fetchHasRemainingUsage(
+async function hasRemainingUsage(
   client: ManagementClient,
   account: CodexResetOption['account'],
   signal?: AbortSignal,
 ): Promise<boolean> {
   try {
-    const response = await client.apiCall({
-      auth_index: account.authIndex,
-      method: 'GET',
-      url: USAGE_URL,
-      header: headers(account),
-    }, signal)
-    if (response.statusCode < 200 || response.statusCode >= 300)
-      return false
-    const rateLimit = asJsonValue(UsageBodySchema, response.body)?.rate_limit
+    const rateLimit = asJsonValue(UsageBodySchema, await client.callAs(account.authIndex, { url: USAGE_URL, header: headers(account) }, signal))?.rate_limit
     if (rateLimit === undefined)
       return false
     return [rateLimit.primary_window, rateLimit.secondary_window]
@@ -110,16 +94,13 @@ export async function claimCodexReset(
   signal?: AbortSignal,
 ): Promise<ResetOutcome> {
   try {
-    const response = await client.apiCall({
-      auth_index: option.account.authIndex,
+    const body = await client.callAs(option.account.authIndex, {
       method: 'POST',
       url: CONSUME_RESET_CREDIT_URL,
       header: { ...headers(option.account), 'Content-Type': 'application/json' },
       data: JSON.stringify({ redeem_request_id: redeemRequestId, credit_id: option.credit.id }),
     }, signal)
-    if (response.statusCode < 200 || response.statusCode >= 300)
-      return 'failed'
-    const code = asJsonValue(ConsumeBodySchema, response.body)?.code
+    const code = asJsonValue(ConsumeBodySchema, body)?.code
     if (code === 'reset' || code === 'already_redeemed')
       return 'success'
     if (code === 'nothing_to_reset')

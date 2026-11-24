@@ -11,14 +11,6 @@ const CODEX_BODY = JSON.stringify({
   },
 })
 
-const ANTIGRAVITY_BODY = JSON.stringify({
-  models: {
-    'claude-sonnet-4-6': { displayName: 'Claude Sonnet 4.6', quotaInfo: { remainingFraction: 0.1, resetTime: '2026-06-02T00:00:00Z' } },
-    'gemini-pro-agent': { displayName: 'Gemini 3.1 Pro (High)', quotaInfo: { remainingFraction: 1 } },
-    'chat_001': { quotaInfo: null },
-  },
-})
-
 const CLAUDE_BODY = JSON.stringify({
   five_hour: { utilization: 20, resets_at: '2026-06-25T12:00:00Z' },
   seven_day: { utilization: 5, resets_at: '2026-07-01T00:00:00Z' },
@@ -46,8 +38,6 @@ const KIMI_BODY = JSON.stringify({
 function respondOk(url: string) {
   if (url.includes('wham/usage'))
     return { statusCode: 200, body: CODEX_BODY }
-  if (url.includes('fetchAvailableModels'))
-    return { statusCode: 200, body: ANTIGRAVITY_BODY }
   if (url.includes('oauth/usage'))
     return { statusCode: 200, body: CLAUDE_BODY }
   if (url.includes('grok.com/v1/billing'))
@@ -117,15 +107,34 @@ describe('fetchQuotas', () => {
     expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 90 }])
   })
 
-  it('maps antigravity quota by model id, skipping entries without a fraction', async () => {
-    const { client } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1', project_id: 'p1' }], respondOk)
+  it('reads Antigravity quota from the plugin and scopes groups to their models', async () => {
+    const { client } = createManagementClientFake([
+      { name: 'agy.json', type: 'agy', auth_index: 'g1' },
+      { name: 'legacy.json', provider: 'antigravity', auth_index: 'a1' },
+    ], respondOk)
+    const pluginQuota = vi.fn(async () => JSON.stringify({ groups: [
+      { displayName: 'Gemini Models', buckets: [
+        { window: 'weekly', remainingFraction: 0.93, resetTime: '2026-06-05T00:00:00Z' },
+        { window: '5h', remainingFraction: 0.4 },
+      ] },
+      { displayName: 'Claude and GPT models', buckets: [{ window: '5h', remainingFraction: 0 }] },
+    ] }))
+    Object.assign(client, { pluginQuota })
 
-    const report = (await fetchQuotas(client))[0]!
+    const reports = await fetchQuotas(client)
+    const [report] = reports
 
-    expect(report.models).toEqual({
-      'claude-sonnet-4-6': { remainingPercent: 10, resetsAt: Date.parse('2026-06-02T00:00:00Z') },
-      'gemini-pro-agent': { remainingPercent: 100 },
-    })
+    expect(reports).toHaveLength(1)
+    expect(report!.provider).toBe('antigravity')
+    expect(pluginQuota).toHaveBeenCalledWith('cliproxy-antigravity', 'g1', undefined)
+    expect(report!.windows).toEqual([
+      { key: 'gemini', label: 'Gemini weekly Quota', remainingPercent: 93, resetsAt: Date.parse('2026-06-05T00:00:00Z') },
+      { key: 'gemini', label: 'Gemini 5h Quota', remainingPercent: 40 },
+      { key: 'claude,gpt', label: 'Claude and GPT 5h Quota', remainingPercent: 0 },
+    ])
+    const model = (id: string) => ({ proxyOwner: 'google-antigravity-cli', proxyModelId: id })
+    expect(remainingForModel([report!], model('gemini-3.8-flash'))).toBe(40)
+    expect(remainingForModel([report!], model('gpt-oss-120b'))).toBe(0)
   })
 
   it('parses claude account windows and enabled extra usage', async () => {
@@ -176,13 +185,13 @@ describe('fetchQuotas', () => {
   })
 
   it('parses the grok premium credit pool as a single window', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
+    const { client, callAs } = createManagementClientFake([{ name: 'grok.json', type: 'xai', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
     expect(report.provider).toBe('grok')
     expect(report.windows).toEqual([{ label: 'Credits', remainingPercent: 75, resetsAt: Date.parse('2026-08-01T00:00:00Z') }])
-    expect(apiCall.mock.calls[0]![0]).toMatchObject({
+    expect(callAs.mock.calls[0]![1]).toMatchObject({
       url: 'https://cli-chat-proxy.grok.com/v1/billing?format=credits',
       header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' },
     })
@@ -239,7 +248,7 @@ describe('fetchQuotas', () => {
   })
 
   it('parses kimi windows, labelling each from its own duration', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], respondOk)
+    const { client, callAs } = createManagementClientFake([{ name: 'kimi.json', type: 'kimi', auth_index: 'k1' }], respondOk)
 
     const report = (await fetchQuotas(client))[0]!
 
@@ -249,7 +258,7 @@ describe('fetchQuotas', () => {
       { label: '5h Quota', remainingPercent: 96 },
       { label: 'Total', remainingPercent: 99 },
     ])
-    expect(apiCall.mock.calls[0]![0]).toMatchObject({ url: 'https://api.kimi.com/coding/v1/usages' })
+    expect(callAs.mock.calls[0]![1]).toMatchObject({ url: 'https://api.kimi.com/coding/v1/usages' })
   })
 
   it('drops kimi windows without a usable limit', async () => {
@@ -341,14 +350,14 @@ describe('fetchQuotas', () => {
   })
 
   it('reports an HTTP error instead of throwing', async () => {
-    const { client, apiCall } = createManagementClientFake(
+    const { client, callAs } = createManagementClientFake(
       [{ name: 'codex.json', provider: 'codex', auth_index: 'c1' }],
       () => ({ statusCode: 401, body: 'unauthorized' }),
     )
 
     const report = (await fetchQuotas(client))[0]!
     expect(report).toMatchObject({ provider: 'codex', error: expect.stringContaining('HTTP 401') as string, windows: [] })
-    expect(apiCall).toHaveBeenCalledTimes(1)
+    expect(callAs).toHaveBeenCalledTimes(1)
   })
 
   it('includes the upstream url and error body in the reported error', async () => {
@@ -386,26 +395,6 @@ describe('fetchQuotas', () => {
     expect(backoff.get('x1')).toBe(Date.now() + 300_000)
   })
 
-  it('backs off from an exhausted unified rate limit on a successful response', async () => {
-    const reset = new Date(Date.now() + 90_000).toISOString()
-    const { client } = createManagementClientFake(
-      [{ name: 'claude.json', type: 'claude', auth_index: 'x1' }],
-      () => ({
-        statusCode: 200,
-        body: CLAUDE_BODY,
-        header: {
-          'Anthropic-Ratelimit-Unified-Remaining': ['0'],
-          'Anthropic-Ratelimit-Unified-Reset': [reset],
-        },
-      }),
-    )
-    const backoff = new Map<string, number>()
-
-    const report = (await fetchQuotas(client, undefined, backoff))[0]!
-    expect(report.error).toBeUndefined()
-    expect(backoff.get('x1')).toBe(Date.parse(reset))
-  })
-
   it('polls signal providers every 15 minutes and the rest every 5', async () => {
     const { client } = createManagementClientFake([
       { name: 'claude.json', type: 'claude', auth_index: 'x1' },
@@ -421,7 +410,7 @@ describe('fetchQuotas', () => {
   it('overlays newer proxy signals on the previous report instead of refetching', async () => {
     const observedAt = new Date(Date.now() + 1000).toISOString()
     const reset = Math.floor(Date.now() / 1000) + 3600
-    const { client, apiCall } = createManagementClientFake([
+    const { client, callAs } = createManagementClientFake([
       { name: 'claude.json', type: 'claude', auth_index: 'a1', quota: { observed_at: observedAt, signals: {
         'Anthropic-Ratelimit-Unified-5h-Utilization': '0.25',
         'Anthropic-Ratelimit-Unified-5h-Reset': String(reset),
@@ -444,7 +433,7 @@ describe('fetchQuotas', () => {
 
     const [claude, codex] = await fetchQuotas(client, undefined, nextFetch, previous)
 
-    expect(apiCall).not.toHaveBeenCalled()
+    expect(callAs).not.toHaveBeenCalled()
     expect(claude!.windows).toEqual([
       { key: 'five_hour', label: '5h Quota', remainingPercent: 75, resetsAt: reset * 1000 },
       { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 50 },
@@ -470,27 +459,19 @@ describe('fetchQuotas', () => {
   })
 
   it('skips the upstream call while an account is inside its Retry-After window', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const { client, callAs } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() + 60_000]])))[0]!
     expect(report).toMatchObject({ provider: 'claude', windows: [] })
-    expect(apiCall).not.toHaveBeenCalled()
+    expect(callAs).not.toHaveBeenCalled()
   })
 
   it('fetches normally once the Retry-After window has elapsed', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
+    const { client, callAs } = createManagementClientFake([{ name: 'claude.json', type: 'claude', auth_index: 'x1' }], respondOk)
 
     const report = (await fetchQuotas(client, undefined, new Map([['x1', Date.now() - 1]])))[0]!
     expect(report.error).toBeUndefined()
-    expect(apiCall).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports missing project_id without calling the upstream', async () => {
-    const { client, apiCall } = createManagementClientFake([{ name: 'anti.json', provider: 'antigravity', auth_index: 'a1' }], respondOk)
-
-    const report = (await fetchQuotas(client))[0]!
-    expect(report).toMatchObject({ error: 'missing project_id' })
-    expect(apiCall).not.toHaveBeenCalled()
+    expect(callAs).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -502,7 +483,6 @@ describe('remainingForModel', () => {
       { key: 'spark', label: 'Spark 5h Quota', remainingPercent: 2 },
       { key: 'credits', label: 'Credits', remainingPercent: 1 },
     ] },
-    { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 35 } } },
     { provider: 'grok', windows: [{ label: 'Credits', remainingPercent: 75 }] },
     { provider: 'kimi', windows: [{ label: 'Weekly Quota', remainingPercent: 60 }, { label: '5h Quota', remainingPercent: 22 }] },
     { provider: 'claude', windows: [
@@ -513,11 +493,6 @@ describe('remainingForModel', () => {
       { key: 'extra_usage', label: 'Extra Usage', remainingPercent: 5 },
     ] },
   ]
-
-  it('returns the antigravity per-model percent', () => {
-    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(35)
-    expect(remainingForModel(reports, { proxyOwner: 'antigravity', proxyModelId: 'antigravity/gemini-pro-agent' })).toBe(35)
-  })
 
   it('returns the tightest codex window for any openai model, ignoring spark and credits', () => {
     expect(remainingForModel(reports, { proxyOwner: 'openai', proxyModelId: 'gpt-5-codex' })).toBe(8)
@@ -556,11 +531,9 @@ describe('remainingForModel', () => {
         { key: 'seven_day_opus', label: '7d Opus', remainingPercent: 20 },
         { key: 'seven_day_sonnet', label: '7d Sonnet', remainingPercent: 5 },
       ] },
-      { provider: 'antigravity', windows: [], models: { 'gemini-pro-agent': { remainingPercent: 60 }, 'other': { remainingPercent: 100 } } },
     ]
     expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-opus-4-6' })).toBe(20)
     expect(remainingForModel(accounts, { proxyOwner: 'anthropic', proxyModelId: 'claude-sonnet-4-6' })).toBe(40)
-    expect(remainingForModel(accounts, { proxyOwner: 'antigravity', proxyModelId: 'gemini-pro-agent' })).toBe(60)
   })
 
   it('returns undefined when no account has known quota', () => {

@@ -1,4 +1,5 @@
 import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
+import { UpstreamError } from '@src/cliproxy/api/management-client'
 import { vi } from 'vitest'
 
 export interface ManagementApiResponse {
@@ -7,10 +8,10 @@ export interface ManagementApiResponse {
   header?: Record<string, string[]>
 }
 
-type ApiCallPayload = Parameters<ManagementClient['apiCall']>[0]
+type CallAsRequest = Parameters<ManagementClient['callAs']>[1]
 type ApiCallResponder = (
   url: string,
-  payload: ApiCallPayload,
+  request: CallAsRequest,
   signal?: AbortSignal,
 ) => ManagementApiResponse | Promise<ManagementApiResponse>
 
@@ -19,18 +20,20 @@ export function createManagementClientFake(
   respond: ApiCallResponder,
 ): {
   client: ManagementClient
-  apiCall: ReturnType<typeof vi.fn<ManagementClient['apiCall']>>
+  callAs: ReturnType<typeof vi.fn<ManagementClient['callAs']>>
 } {
-  const apiCall = vi.fn<ManagementClient['apiCall']>(async (payload, signal) => ({
-    header: {},
-    ...await respond(payload.url, payload, signal),
-  }))
+  const callAs = vi.fn<ManagementClient['callAs']>(async (_authIndex, request, signal) => {
+    const { statusCode, body, header } = await respond(request.url, request, signal)
+    if (statusCode < 200 || statusCode >= 300)
+      throw new UpstreamError(statusCode, header ?? {}, typeof body === 'string' ? body : JSON.stringify(body))
+    return body
+  })
   return {
     client: {
       listAuthFilesRaw: vi.fn(async () => authFiles),
-      apiCall,
+      callAs,
     } as unknown as ManagementClient,
-    apiCall,
+    callAs,
   }
 }
 
