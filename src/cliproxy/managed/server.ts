@@ -241,6 +241,8 @@ export class ManagedServer {
     try {
       const child = spawn(binaryPath, ['--config', this.deps.paths.configPath], {
         cwd: this.deps.paths.root,
+        // agy runs with per-account HOMEs, where macOS cannot find the login keychain and prompts.
+        env: { ...process.env, AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '1' },
         detached: true,
         stdio: ['ignore', logFd, logFd],
       })

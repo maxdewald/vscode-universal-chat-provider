@@ -2,6 +2,7 @@ import type { AuthFileRaw, AuthSession, ManagementEndpoint, OpenAICompatibilityP
 import type { AntigravityAccounts } from '@src/cliproxy/providers/antigravity/accounts'
 import type { CancellationToken, Memento } from 'vscode'
 import { createServer } from 'node:http'
+import process from 'node:process'
 import { buildOpenAICompatibilityProvider, promptOpenAICompatibilityEndpoint } from '@src/cliproxy/accounts/openai-compat-endpoint'
 import { LOGIN_PROVIDERS, ManagementClient } from '@src/cliproxy/api/management-client'
 import { AGY, agyCallbackUrl } from '@src/cliproxy/providers/antigravity/accounts'
@@ -118,7 +119,8 @@ export class AccountsService {
     }
 
     try {
-      const opened = await env.openExternal(Uri.parse(session.url))
+      // On macOS agy opens the sign-in page itself instead of handing it to $BROWSER.
+      const opened = (agy && !remote && process.platform === 'darwin') || await env.openExternal(Uri.parse(session.url))
       if (!opened) {
         void window.showWarningMessage(`Open this URL to finish signing in: ${session.url}`)
         return
