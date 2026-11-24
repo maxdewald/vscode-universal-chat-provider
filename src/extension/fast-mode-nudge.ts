@@ -1,9 +1,9 @@
 import type { ProviderModel } from '@src/chat/models/model'
 import type { ServerController } from '@src/cliproxy/controller'
-import type { CodexResetOption } from '@src/cliproxy/quota/codex-resets'
+import type { CodexResetOption } from '@src/cliproxy/providers/codex/resets'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import type { ExtensionContext } from 'vscode'
-import { QUOTA_PROVIDERS } from '@src/cliproxy/quota/providers'
+import { QUOTA_PROVIDERS } from '@src/cliproxy/providers'
 import { formatPercent, formatResetCountdown, quotaProviderForModel } from '@src/cliproxy/quota/quota'
 import { commands, ConfigurationTarget, window, workspace } from 'vscode'
 

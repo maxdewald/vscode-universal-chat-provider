@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { agyCallbackUrl } from '@src/cliproxy/accounts/antigravity'
-import { agyAccountHome, agyDirectories, agyPluginConfig, markAgySignIn } from '@src/cliproxy/managed/antigravity-plugin'
+import { agyCallbackUrl } from '@src/cliproxy/providers/antigravity/accounts'
+import { agyAccountHome, agyDirectories, agyPluginConfig, markAgySignIn } from '@src/cliproxy/providers/antigravity/plugin'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useTempDirectories } from '../../support/temp'
+import { useTempDirectories } from '../../../support/temp'
 
 const makeTempDirectory = useTempDirectories()
 

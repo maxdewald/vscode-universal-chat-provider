@@ -1,9 +1,9 @@
-import type { QuotaProvider, QuotaReport } from '@src/cliproxy/quota/providers/types'
-import { antigravityProvider } from '@src/cliproxy/quota/providers/antigravity'
-import { claudeProvider } from '@src/cliproxy/quota/providers/claude'
-import { codexProvider } from '@src/cliproxy/quota/providers/codex'
-import { grokProvider } from '@src/cliproxy/quota/providers/grok'
-import { kimiProvider } from '@src/cliproxy/quota/providers/kimi'
+import type { QuotaProvider, QuotaReport } from '@src/cliproxy/providers/types'
+import { antigravityProvider } from '@src/cliproxy/providers/antigravity/quota'
+import { claudeProvider } from '@src/cliproxy/providers/claude/quota'
+import { codexProvider } from '@src/cliproxy/providers/codex/quota'
+import { grokProvider } from '@src/cliproxy/providers/grok/quota'
+import { kimiProvider } from '@src/cliproxy/providers/kimi/quota'
 
 export const QUOTA_PROVIDERS = {
   codex: codexProvider,

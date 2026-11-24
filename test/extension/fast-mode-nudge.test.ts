@@ -1,4 +1,4 @@
-import type { CodexResetOption } from '@src/cliproxy/quota/codex-resets'
+import type { CodexResetOption } from '@src/cliproxy/providers/codex/resets'
 import type { QuotaReport } from '@src/cliproxy/quota/quota'
 import { createFastModeNudge, fastModeOpportunity, fastModeQuota } from '@src/extension/fast-mode-nudge'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

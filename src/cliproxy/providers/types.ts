@@ -28,20 +28,13 @@ export interface QuotaReport {
 // payload, and how to map one of its models back to a remaining-quota percent.
 export interface QuotaProvider {
   source: string // shown in fetch errors
+  // client.callAs swaps $TOKEN$ in headers for the account's token.
   load: (client: ManagementClient, authIndex: string, signal?: AbortSignal) => Promise<unknown>
   apply: (report: QuotaReport, data: unknown) => void
   owners: string[] // proxy `owned_by` values this provider bills for
   remaining: (report: QuotaReport, proxyModelId: string) => number | undefined
   // Windows rebuilt from the rate-limit headers CLIProxyAPI records after each upstream reply.
   fromSignals?: (signals: Record<string, string>) => QuotaWindow[]
-}
-
-// Calls the provider's usage endpoint with the account's token, which CLIProxyAPI puts in place of $TOKEN$.
-export function usageEndpoint(url: string, header: Record<string, string>): Pick<QuotaProvider, 'source' | 'load'> {
-  return {
-    source: url,
-    load: async (client, authIndex, signal) => client.callAs(authIndex, { url, header }, signal),
-  }
 }
 
 // CLIProxyAPI keys signals by Go's canonical header name and drops empty values.

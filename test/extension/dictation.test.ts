@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { clipPrompt, engineChoices, transcribeLive, untilLive, upsample16kTo24k, wav } from '@src/dictation/dictation'
+import { clipPrompt, engineChoices, transcribeLive, untilLive, upsample16kTo24k, wav } from '@src/extension/dictation'
 import { describe, expect, it, vi } from 'vitest'
 
 const codex = { proxyModelId: 'gpt-6-luna', proxyOwner: 'openai' }

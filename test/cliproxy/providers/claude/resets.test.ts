@@ -1,6 +1,6 @@
-import { claimClaudeReset, listClaudeResets } from '@src/cliproxy/quota/claude-resets'
+import { claimClaudeReset, listClaudeResets } from '@src/cliproxy/providers/claude/resets'
 import { describe, expect, it } from 'vitest'
-import { createManagementClientFake, queuedApiCallResponses } from '../support/management'
+import { createManagementClientFake, queuedApiCallResponses } from '../../support/management'
 
 const HEADERS = {
   'Authorization': 'Bearer $TOKEN$',

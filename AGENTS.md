@@ -8,8 +8,8 @@ background flows (commit messages, chat titles, summaries) run through them.
 ## Layout
 
 - `src/chat/` — the language-model chat provider: model registry, requests, completion.
-- `src/cliproxy/` — talks to CLIProxyAPI (client, SSE, credentials, and the `managed/` server lifecycle).
-- `src/extension/` — activation, commands, menus, status bar.
+- `src/cliproxy/` — talks to CLIProxyAPI (client, SSE, credentials, the `managed/` server lifecycle, and vendor-specific code in `providers/<vendor>/`).
+- `src/extension/` — activation, commands, menus, status bar, dictation.
 - `src/shared/` — small cross-cutting helpers.
 
 ## Rules

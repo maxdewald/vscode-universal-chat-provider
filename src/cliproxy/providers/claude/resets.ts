@@ -1,8 +1,8 @@
 import type { ManagementClient } from '@src/cliproxy/api/management-client'
-import type { ResetOutcome } from '@src/cliproxy/quota/codex-resets'
+import type { ResetOutcome } from '@src/cliproxy/providers/resets'
 import { Type } from '@sinclair/typebox'
-import { authAccount } from '@src/cliproxy/quota/codex-resets'
-import { Nullable, parseReset } from '@src/cliproxy/quota/providers/types'
+import { authAccount } from '@src/cliproxy/providers/resets'
+import { Nullable, parseReset } from '@src/cliproxy/providers/types'
 import { asJsonValue, asValue } from '@src/shared/json'
 
 const API_ORIGIN = 'https://api.anthropic.com'

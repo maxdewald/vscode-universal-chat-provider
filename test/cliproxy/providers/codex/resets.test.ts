@@ -1,6 +1,6 @@
-import { claimCodexReset, listCodexResets } from '@src/cliproxy/quota/codex-resets'
+import { claimCodexReset, listCodexResets } from '@src/cliproxy/providers/codex/resets'
 import { describe, expect, it } from 'vitest'
-import { createManagementClientFake, queuedApiCallResponses } from '../support/management'
+import { createManagementClientFake, queuedApiCallResponses } from '../../support/management'
 
 describe('codex reset credits', () => {
   it('lists the soonest available reset for each Codex account', async () => {

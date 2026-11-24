@@ -1,5 +1,5 @@
-import type { ClaudeResetOption } from '@src/cliproxy/quota/claude-resets'
-import type { CodexResetOption } from '@src/cliproxy/quota/codex-resets'
+import type { ClaudeResetOption } from '@src/cliproxy/providers/claude/resets'
+import type { CodexResetOption } from '@src/cliproxy/providers/codex/resets'
 import type { QuotaSection, ResetActions } from '@src/extension/ui/quota-menu'
 import type { QuickPickItem } from 'vscode'
 import { showQuotaMenu } from '@src/extension/ui/quota-menu'

@@ -1,6 +1,6 @@
-import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
+import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, parseReset, percentOf, usageEndpoint } from '@src/cliproxy/quota/providers/types'
+import { clamp, parseReset, percentOf } from '@src/cliproxy/providers/types'
 import { asValue } from '@src/shared/json'
 
 // Current Grok billing exposes the shared premium pool through this endpoint.
@@ -25,7 +25,8 @@ const BodySchema = Type.Object({
 })
 
 export const grokProvider: QuotaProvider = {
-  ...usageEndpoint(BILLING_URL, { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' }),
+  source: BILLING_URL,
+  load: async (client, authIndex, signal) => client.callAs(authIndex, { url: BILLING_URL, header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' } }, signal),
   apply: (report, data) => {
     report.windows = parseWindows(data)
   },

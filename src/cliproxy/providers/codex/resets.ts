@@ -1,5 +1,7 @@
 import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
+import type { ResetOutcome } from '@src/cliproxy/providers/resets'
 import { Type } from '@sinclair/typebox'
+import { authAccount } from '@src/cliproxy/providers/resets'
 import { asJsonValue, asValue } from '@src/shared/json'
 
 const RESET_CREDITS_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits'
@@ -12,8 +14,6 @@ export interface CodexResetOption {
   availableCount: number
   hasRemainingUsage?: boolean
 }
-
-export type ResetOutcome = 'success' | 'nothingToReset' | 'noCredit' | 'failed'
 
 const CreditSchema = Type.Object({
   status: Type.Optional(Type.String()),
@@ -112,15 +112,6 @@ export async function claimCodexReset(
   catch {
     return 'failed'
   }
-}
-
-export function authAccount(entry: AuthFileRaw, provider: string, fallbackLabel: string): Array<{ authIndex: string, label: string }> {
-  if ((entry.provider ?? entry.type ?? '').trim().toLowerCase() !== provider)
-    return []
-  const authIndex = entry.auth_index?.trim() ?? ''
-  if (authIndex === '')
-    return []
-  return [{ authIndex, label: entry.email?.trim() ?? entry.label?.trim() ?? entry.name?.trim() ?? fallbackLabel }]
 }
 
 function toCodexAccount(entry: AuthFileRaw): Array<CodexResetOption['account']> {

@@ -1,7 +1,7 @@
-import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
+import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/providers/types'
 import { Type } from '@sinclair/typebox'
 import { upstreamModelId } from '@src/chat/models/model'
-import { clamp, minRemaining, parseReset } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, parseReset } from '@src/cliproxy/providers/types'
 import { asValue } from '@src/shared/json'
 
 const BodySchema = Type.Object({

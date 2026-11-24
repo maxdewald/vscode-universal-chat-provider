@@ -1,7 +1,7 @@
 import type { Static } from '@sinclair/typebox'
-import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
+import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, minRemaining, parseReset, percentOf, usageEndpoint } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, parseReset, percentOf } from '@src/cliproxy/providers/types'
 import { asValue } from '@src/shared/json'
 
 const USAGE_URL = 'https://api.kimi.com/coding/v1/usages'
@@ -33,7 +33,8 @@ const BodySchema = Type.Object({
 })
 
 export const kimiProvider: QuotaProvider = {
-  ...usageEndpoint(USAGE_URL, { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' }),
+  source: USAGE_URL,
+  load: async (client, authIndex, signal) => client.callAs(authIndex, { url: USAGE_URL, header: { Authorization: 'Bearer $TOKEN$', Accept: 'application/json' } }, signal),
   apply: (report, data) => {
     report.windows = parseWindows(data)
   },

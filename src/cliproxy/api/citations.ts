@@ -19,7 +19,7 @@ const SearchResultCitationSchema = Type.Object({
 const AnnotationSchema = Type.Union([CitationSchema, SearchResultCitationSchema])
 
 // ChatGPT-backend models wrap citations in private-use glyphs: U+E200 cite U+E202 id U+E201.
-export const codexCitations: TextRenderer = {
+export const citations: TextRenderer = {
   marker: '\uE200',
   render: renderCitations,
 }

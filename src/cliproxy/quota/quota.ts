@@ -1,13 +1,13 @@
 import type { AuthFileRaw, ManagementClient } from '@src/cliproxy/api/management-client'
-import type { QuotaProvider, QuotaReport } from '@src/cliproxy/quota/providers/types'
+import type { QuotaProvider, QuotaReport } from '@src/cliproxy/providers/types'
 import { Type } from '@sinclair/typebox'
 import { UpstreamError } from '@src/cliproxy/api/management-client'
-import { isQuotaProvider, QUOTA_PROVIDERS } from '@src/cliproxy/quota/providers'
-import { parseReset } from '@src/cliproxy/quota/providers/types'
+import { isQuotaProvider, QUOTA_PROVIDERS } from '@src/cliproxy/providers'
+import { parseReset } from '@src/cliproxy/providers/types'
 import { errorMessage } from '@src/shared/errors'
 import { asJsonValue } from '@src/shared/json'
 
-export type { QuotaReport, QuotaWindow } from '@src/cliproxy/quota/providers/types'
+export type { QuotaReport, QuotaWindow } from '@src/cliproxy/providers/types'
 
 const ObjectSchema = Type.Object({}, { additionalProperties: true })
 

@@ -1,7 +1,7 @@
 import type { Static } from '@sinclair/typebox'
-import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/quota/providers/types'
+import type { QuotaProvider, QuotaWindow } from '@src/cliproxy/providers/types'
 import { Type } from '@sinclair/typebox'
-import { clamp, minRemaining, Nullable, parseReset, percentOf, signalNumber, usageEndpoint } from '@src/cliproxy/quota/providers/types'
+import { clamp, minRemaining, Nullable, parseReset, percentOf, signalNumber } from '@src/cliproxy/providers/types'
 import { asValue } from '@src/shared/json'
 
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
@@ -40,8 +40,9 @@ const BodySchema = Type.Object({
 })
 
 export const codexProvider: QuotaProvider = {
+  source: USAGE_URL,
   // The credential identifies the account; no Chatgpt-Account-Id header needed.
-  ...usageEndpoint(USAGE_URL, { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' }),
+  load: async (client, authIndex, signal) => client.callAs(authIndex, { url: USAGE_URL, header: { 'Authorization': 'Bearer $TOKEN$', 'Content-Type': 'application/json' } }, signal),
   apply: (report, data) => {
     report.windows = parseWindows(data)
   },

@@ -2,7 +2,6 @@ import type { ManagedPaths } from '@src/cliproxy/managed/config'
 import type { Disposable, ExtensionContext, OutputChannel } from 'vscode'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { SECRET_KEY } from '@src/cliproxy/configuration/credentials'
-import { agyPluginConfig } from '@src/cliproxy/managed/antigravity-plugin'
 import {
   buildManagedConfig,
   DEFAULT_HOST,
@@ -13,6 +12,7 @@ import {
 import { claimLease } from '@src/cliproxy/managed/leases'
 import { OpenAICompatibilityStore } from '@src/cliproxy/managed/openai-compatibility-store'
 import { ManagedServer } from '@src/cliproxy/managed/server'
+import { agyPluginConfig } from '@src/cliproxy/providers/antigravity/plugin'
 import { RelativePattern, Uri, workspace } from 'vscode'
 
 export const MGMT_KEY_SECRET = 'universalChatProvider.managementKey'

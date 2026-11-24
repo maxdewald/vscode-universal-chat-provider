@@ -6,7 +6,7 @@ import type { ProxyRequestBody } from '@src/chat/requests/request-builder'
 import type { BeforeErrorHook, KyInstance } from 'ky'
 import { Type } from '@sinclair/typebox'
 import { ProxyModelListEntrySchema, ProxyModelMetadataSchema } from '@src/chat/models/model'
-import { codexCitations } from '@src/cliproxy/api/codex-citations'
+import { citations } from '@src/cliproxy/api/citations'
 import { ProxyHttpError } from '@src/cliproxy/api/errors'
 import {
   streamErrorMessage,
@@ -107,7 +107,7 @@ export class CLIProxyClient {
     if (!response.body)
       throw new Error('CLIProxyAPI returned an empty streaming response.')
 
-    const text = textPartBuffer(callbacks.onText, codexCitations)
+    const text = textPartBuffer(callbacks.onText, citations)
     const tools = toolCallAssembler(callbacks.onToolCall)
     let lastThinkingKey: string | undefined
     const thinking = (delta: string, key: string): void => {
