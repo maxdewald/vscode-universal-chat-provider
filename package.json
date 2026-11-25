@@ -274,7 +274,7 @@
             "type": "string",
             "default": "",
             "order": 1,
-            "markdownDescription": "Speech-to-text via unofficial endpoints; may break. Empty is off. Codex models (`gpt-transcribe`, `gpt-live-transcribe`) are the most accurate and fastest; Gemini models such as `gemini-3-flash` work too but are slower. [$(mic) Select Engine…](command:universalChatProvider.selectDictationEngine)"
+            "markdownDescription": "Speech-to-text via unofficial endpoints; may break. Empty is off. Uses Codex transcription models (`gpt-transcribe`, `gpt-live-transcribe`). [$(mic) Select Engine…](command:universalChatProvider.selectDictationEngine)"
           },
           "universalChatProvider.dictation.microphone": {
             "type": "string",
