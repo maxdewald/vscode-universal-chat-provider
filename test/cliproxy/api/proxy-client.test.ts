@@ -138,7 +138,7 @@ describe('cLIProxyClient', () => {
     expect(request.headers.get('content-type')).toBe('application/json')
     expect(request.headers.has('x-session-id')).toBe(false)
     expect(handlers.onText).toHaveBeenCalledWith('hello')
-    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith('think', 'output-unknown:0')
+    expect(handlers.onThinking.mock.calls).toEqual([['think', 'output-unknown:0'], ['', 'output-unknown:0']])
     expect(handlers.onToolCall).toHaveBeenCalledTimes(1)
     expect(handlers.onToolCall).toHaveBeenCalledWith('call-1', 'lookup', { q: 'x' })
     expect(handlers.onUsage).toHaveBeenCalledWith({ input_tokens: 10, output_tokens: 2 })
@@ -343,7 +343,7 @@ describe('cLIProxyClient', () => {
     await stream(body, handlers)
 
     expect(handlers.onText).toHaveBeenCalledExactlyOnceWith('Version 2 shipped.')
-    expect(handlers.onThinking.mock.calls).toEqual([['Search: current release', 'ws_1']])
+    expect(handlers.onThinking.mock.calls).toEqual([['Search: current release', 'ws_1'], ['', 'ws_1']])
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
@@ -368,7 +368,7 @@ describe('cLIProxyClient', () => {
       item: { type: 'web_search_call', status: 'completed', action },
     }), handlers)
 
-    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith(expected, 'output-unknown')
+    expect(handlers.onThinking.mock.calls).toEqual([[expected, 'output-unknown'], ['', 'output-unknown']])
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
 
@@ -404,14 +404,11 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.reasoning_summary_part.done' }),
       event({ type: 'response.completed' }),
     ].join('')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
-    await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse(emptyBody, handlers, new AbortController().signal)
+    await stream(body, handlers)
 
-    expect(handlers.onThinking.mock.calls).toEqual(deltas.map(delta => [delta, 'output-unknown:0']))
+    expect(handlers.onThinking.mock.calls).toEqual([...deltas, ''].map(delta => [delta, 'output-unknown:0']))
   })
 
   it('streams full reasoning_text deltas as thinking', async () => {
@@ -421,35 +418,40 @@ describe('cLIProxyClient', () => {
       event({ type: 'response.reasoning_text.done' }),
       event({ type: 'response.completed' }),
     ].join('')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
-    const { CLIProxyClient } = await import('@src/cliproxy/api/proxy-client')
     const handlers = callbacks()
 
-    await new CLIProxyClient('http://proxy', 'key')
-      .streamResponse(emptyBody, handlers, new AbortController().signal)
+    await stream(body, handlers)
 
-    expect(handlers.onThinking.mock.calls).toEqual([['step one ', 'output-unknown:0'], ['step two', 'output-unknown:0']])
+    expect(handlers.onThinking.mock.calls).toEqual([['step one ', 'output-unknown:0'], ['step two', 'output-unknown:0'], ['', 'output-unknown:0']])
   })
 
-  it('tags thinking deltas with the reasoning item and summary index', async () => {
-    const summary = (summary_index: number, delta: string) =>
-      event({ type: 'response.reasoning_summary_text.delta', item_id: 'rs_1', summary_index, delta })
+  it('streams all eight consecutive Astra summaries as one thinking block before the tool call', async () => {
+    const items = [
+      ['Evaluating release alternatives', 'Assessing source pinning', 'Evaluating release pinning'],
+      ['Evaluating OCI catalog bundle', 'Selecting trimmed vendor source', 'Testing generated manifests'],
+      ['Rendering manifests with overlays', 'Selecting a reproducible snapshot'],
+    ]
     const handlers = callbacks()
 
     await stream([
-      summary(0, 'Planning'),
-      summary(0, ' status line'),
-      event({ type: 'response.reasoning_summary_part.done', item_id: 'rs_1', summary_index: 0 }),
-      summary(1, 'Refining header'),
+      ...items.flatMap((titles, itemIndex) => titles.flatMap((title, summary_index) => {
+        const part = { item_id: `rs_${itemIndex}`, summary_index }
+        return [
+          event({ ...part, type: 'response.reasoning_summary_text.delta', delta: `**${title}` }),
+          event({ ...part, type: 'response.reasoning_summary_text.delta', delta: '**' }),
+          event({ ...part, type: 'response.reasoning_summary_part.done' }),
+        ]
+      })),
+      event({ type: 'response.output_item.done', item: { type: 'function_call', id: 'tool_1', name: 'inspect' } }),
       event({ type: 'response.completed' }),
     ].join(''), handlers)
 
-    expect(handlers.onThinking.mock.calls).toEqual([
-      ['Planning', 'rs_1:0'],
-      [' status line', 'rs_1:0'],
-      ['', 'rs_1:0'],
-      ['Refining header', 'rs_1:1'],
-    ])
+    const parts = handlers.onThinking.mock.calls
+    expect(new Set(parts.map(([, id]) => id))).toEqual(new Set(['rs_0:0']))
+    expect(parts.map(([delta]) => delta).join('')).toBe(items.flat().map(title => `**${title}**`).join('\n\n'))
+    expect(parts.filter(([delta]) => delta === '')).toHaveLength(1)
+    expect(parts.at(-1)).toEqual(['', 'rs_0:0'])
+    expect(handlers.onThinking.mock.invocationCallOrder.at(-1)).toBeLessThan(handlers.onToolCall.mock.invocationCallOrder[0]!)
   })
 
   it('does not emit an empty thinking block for an empty part', async () => {
@@ -543,7 +545,7 @@ describe('cLIProxyClient', () => {
       .toBeUndefined()
 
     expect(handlers.onText).toHaveBeenCalledWith('partial answer')
-    expect(handlers.onThinking).toHaveBeenCalledExactlyOnceWith('final thought', 'output-unknown:0')
+    expect(handlers.onThinking.mock.calls).toEqual([['final thought', 'output-unknown:0'], ['', 'output-unknown:0']])
     expect(handlers.onUsage).toHaveBeenCalledWith(usage)
     expect(handlers.onToolCall).not.toHaveBeenCalled()
   })
@@ -618,7 +620,7 @@ describe('cLIProxyClient', () => {
 function callbacks() {
   return {
     onText: vi.fn(),
-    onThinking: vi.fn(),
+    onThinking: vi.fn<(delta: string, id: string) => void>(),
     onToolCall: vi.fn(),
     onUsage: vi.fn(),
   }

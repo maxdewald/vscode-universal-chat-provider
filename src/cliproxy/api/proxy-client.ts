@@ -107,15 +107,22 @@ export class CLIProxyClient {
     if (!response.body)
       throw new Error('CLIProxyAPI returned an empty streaming response.')
 
-    const text = textPartBuffer(callbacks.onText, citations)
-    const tools = toolCallAssembler(callbacks.onToolCall)
+    let thinkingId: string | undefined
     let lastThinkingKey: string | undefined
-    const thinking = (delta: string, key: string): void => {
-      if (lastThinkingKey !== undefined && lastThinkingKey !== key)
-        callbacks.onThinking?.('', lastThinkingKey)
-      lastThinkingKey = key
-      callbacks.onThinking?.(delta, key)
+    const endThinking = (): void => {
+      if (thinkingId !== undefined)
+        callbacks.onThinking?.('', thinkingId)
+      thinkingId = undefined
+      lastThinkingKey = undefined
     }
+    const text = textPartBuffer((delta) => {
+      endThinking()
+      callbacks.onText(delta)
+    }, citations)
+    const tools = toolCallAssembler((callId, name, input) => {
+      endThinking()
+      callbacks.onToolCall(callId, name, input)
+    })
 
     const events = response.body
       .pipeThrough(new TextDecoderStream())
@@ -136,8 +143,13 @@ export class CLIProxyClient {
           text.end(streamKey(payload, undefined, payload.content_index ?? 0), payload.part)
         }
         else if (type === 'response.reasoning_summary_text.delta' || type === 'response.reasoning_text.delta') {
-          if (payload.delta !== undefined && payload.delta.length > 0)
-            thinking(payload.delta, streamKey(payload, undefined, payload.summary_index ?? payload.content_index ?? 0))
+          if (payload.delta !== undefined && payload.delta.length > 0) {
+            const key = streamKey(payload, undefined, payload.summary_index ?? payload.content_index ?? 0)
+            thinkingId ??= key
+            const separator = lastThinkingKey !== undefined && lastThinkingKey !== key ? '\n\n' : ''
+            callbacks.onThinking?.(separator + payload.delta, thinkingId)
+            lastThinkingKey = key
+          }
         }
         else if (type === 'response.output_item.added') {
           const item = asValue(StreamItemSchema, payload.item)
@@ -153,7 +165,10 @@ export class CLIProxyClient {
             tools.end(streamKey(payload, item), item)
           }
           else if (item?.type === 'web_search_call') {
-            thinking(webSearchStepLabel(item.action), streamKey(payload, item))
+            endThinking()
+            thinkingId = streamKey(payload, item)
+            callbacks.onThinking?.(webSearchStepLabel(item.action), thinkingId)
+            endThinking()
           }
           else if (item?.type === 'message') {
             item.content?.forEach((content, contentIndex) => {
@@ -184,6 +199,7 @@ export class CLIProxyClient {
       }
     }
     finally {
+      endThinking()
       text.flush()
     }
   }
