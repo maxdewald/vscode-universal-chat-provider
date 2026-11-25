@@ -1,51 +1,21 @@
-import { Buffer } from 'node:buffer'
-import { clipPrompt, engineChoices, transcribeLive, untilLive, upsample16kTo24k, wav } from '@src/extension/dictation'
+import { engineChoices, transcribeLive, untilLive, upsample16kTo24k } from '@src/extension/dictation'
 import { describe, expect, it, vi } from 'vitest'
 
-const codex = { proxyModelId: 'gpt-6-luna', proxyOwner: 'openai' }
 const gemini = { proxyModelId: 'gemini-3-flash', proxyOwner: 'antigravity' }
-const geminiImage = { proxyModelId: 'gemini-3.1-flash-image', proxyOwner: 'antigravity' }
 const claude = { proxyModelId: 'claude-sonnet-5-5', proxyOwner: 'anthropic' }
 
 describe('engineChoices', () => {
-  it('offers None, the Codex transcription models, and every Gemini model that can hear audio', () => {
-    const newGemini = { proxyModelId: 'gemini-9-flash', proxyOwner: 'antigravity' }
-    const choices = engineChoices([claude, geminiImage, gemini, newGemini, codex])
-    expect(choices.map(choice => choice.id)).toEqual(['', 'gpt-transcribe', 'gpt-live-transcribe', 'gemini-3-flash', 'gemini-9-flash'])
-    expect(choices.at(-1)?.description).toBe('Gemini · transcribes after you stop')
+  it('offers None and the Codex transcription models, never Gemini', () => {
+    const choices = engineChoices([claude, gemini, { proxyModelId: 'codex/gpt-6-luna', proxyOwner: 'openai' }])
+    expect(choices.map(choice => choice.id)).toEqual(['', 'gpt-transcribe', 'gpt-live-transcribe'])
   })
 
-  it('recognizes provider-prefixed model ids', () => {
-    const choices = engineChoices([
-      { proxyModelId: 'codex/gpt-6-luna', proxyOwner: 'openai' },
-      { proxyModelId: 'antigravity/gemini-3-flash', proxyOwner: 'antigravity' },
-    ])
-    expect(choices.map(choice => choice.id)).toEqual(['', 'gpt-transcribe', 'gpt-live-transcribe', 'antigravity/gemini-3-flash'])
-    expect(choices.at(-1)).toMatchObject({ label: 'gemini-3-flash', description: 'Gemini · good on plain speech, weaker on code terms · slower' })
-  })
-
-  it('offers only None without an audio-capable account', () => {
-    expect(engineChoices([claude]).map(choice => choice.id)).toEqual([''])
-  })
-})
-
-describe('clipPrompt', () => {
-  it('names the expected language and keeps the vocabulary hint', () => {
-    expect(clipPrompt('de')).toContain('most likely speaking German')
-    expect(clipPrompt(undefined)).not.toContain('most likely')
-    expect(clipPrompt(undefined)).toContain('Software development dictation')
+  it('offers only None without a Codex account', () => {
+    expect(engineChoices([claude, gemini]).map(choice => choice.id)).toEqual([''])
   })
 })
 
 describe('audio helpers', () => {
-  it('writes a 16-bit mono WAV header', () => {
-    const file = wav(Buffer.alloc(32000), 16000)
-    expect(file.toString('ascii', 0, 4)).toBe('RIFF')
-    expect(file.readUInt32LE(24)).toBe(16000)
-    expect(file.readUInt32LE(40)).toBe(32000)
-    expect(file.length).toBe(32044)
-  })
-
   it('upsamples 16 kHz to 24 kHz by interpolation', () => {
     expect([...upsample16kTo24k(Int16Array.from([0, 300, 600, 900]))]).toEqual([0, 200, 400, 600, 800, 900])
   })

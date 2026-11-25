@@ -11,7 +11,6 @@ import { upstreamModelId } from '@src/chat/models/model'
 import { CredentialStore } from '@src/cliproxy/configuration/credentials'
 import { errorMessage } from '@src/shared/errors'
 import { asValue } from '@src/shared/json'
-import { kyFetch } from '@src/shared/kyFetch'
 import { commands, ConfigurationTarget, StatusBarAlignment, ThemeColor, window, workspace } from 'vscode'
 
 const SAMPLE_RATE = 16000
@@ -82,15 +81,6 @@ export async function selectLanguage(): Promise<void> {
     await dictationSettings().update('language', picked.code, ConfigurationTarget.Global)
 }
 
-export function clipPrompt(language: string | undefined): string {
-  const languageName = language === undefined ? undefined : englishNames.of(language)
-  return [
-    'Transcribe this audio verbatim. Output only the transcript, nothing else.',
-    languageName === undefined ? '' : `The speaker is most likely speaking ${languageName}; transcribe in the language actually spoken.`,
-    VOCABULARY_HINT,
-  ].filter(Boolean).join(' ')
-}
-
 const NATIVE_DIRS: Partial<Record<string, string>> = {
   'darwin-arm64': 'mac/arm64',
   'darwin-x64': 'mac/x86_64',
@@ -115,12 +105,6 @@ const LIVE_ENGINES: Record<string, string> = {
   'gpt-transcribe': 'Codex · most accurate overall · fastest',
   'gpt-live-transcribe': 'Codex · best on long dictation, weaker on casual speech · fastest',
 }
-const CLIP_HINTS: Record<string, string> = {
-  'gemini-3-flash': 'Gemini · good on plain speech, weaker on code terms · slower',
-  'gemini-3.1-flash-lite': 'Gemini · like 3 Flash · slower',
-  'gemini-3.5-flash-lite': 'Gemini · like 3 Flash · slower',
-  'gemini-3.8-flash-high': 'Gemini · slowest, not more accurate',
-}
 
 export const isLiveEngine = (engine: string): boolean => /transcribe|whisper/.test(engine)
 
@@ -129,12 +113,6 @@ export function engineChoices(models: readonly ModelRef[]): Array<{ id: string, 
   return [
     { id: '', label: 'None', description: 'Dictation off' },
     ...Object.entries(LIVE_ENGINES).filter(() => codex).map(([id, description]) => ({ id, label: id, description })),
-    // The Antigravity CLI plugin drops audio input.
-    ...models
-      .filter(model => model.proxyOwner !== 'google-antigravity-cli')
-      .map(({ proxyModelId: id }) => ({ id, label: upstreamModelId(id) }))
-      .filter(({ label }) => label.startsWith('gemini-') && !label.includes('image'))
-      .map(choice => ({ ...choice, description: CLIP_HINTS[choice.label] ?? 'Gemini · transcribes after you stop' })),
   ]
 }
 
@@ -203,23 +181,6 @@ export function upsample16kTo24k(input: Int16Array): Int16Array {
     output[index] = Math.round(from + (to - from) * (position - left))
   }
   return output
-}
-
-export function wav(pcm: Buffer, sampleRate: number): Buffer {
-  const header = Buffer.alloc(44)
-  header.write('RIFF', 0)
-  header.writeUInt32LE(36 + pcm.length, 4)
-  header.write('WAVEfmt ', 8)
-  header.writeUInt32LE(16, 16)
-  header.writeUInt16LE(1, 20)
-  header.writeUInt16LE(1, 22)
-  header.writeUInt32LE(sampleRate, 24)
-  header.writeUInt32LE(sampleRate * 2, 28)
-  header.writeUInt16LE(2, 32)
-  header.writeUInt16LE(16, 34)
-  header.write('data', 36)
-  header.writeUInt32LE(pcm.length, 40)
-  return Buffer.concat([header, pcm])
 }
 
 const LiveEventSchema = Type.Object({
@@ -335,28 +296,6 @@ export async function transcribeLive(baseUrl: string, apiKey: string, model: str
   finally {
     socket.close()
   }
-}
-
-const ChatCompletionSchema = Type.Object({
-  choices: Type.Optional(Type.Array(Type.Object({ message: Type.Optional(Type.Object({ content: Type.Optional(Type.String()) })) }))),
-})
-
-export async function transcribeClip(baseUrl: string, apiKey: string, model: string, audio: AsyncIterable<Int16Array>, language?: string): Promise<string> {
-  const frames: Buffer[] = []
-  for await (const frame of audio)
-    frames.push(Buffer.from(frame.buffer, frame.byteOffset, frame.byteLength))
-  const response = await kyFetch.post(`${baseUrl}/v1/chat/completions`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    json: {
-      model,
-      messages: [{ role: 'user', content: [
-        { type: 'text', text: clipPrompt(language) },
-        { type: 'input_audio', input_audio: { data: wav(Buffer.concat(frames), SAMPLE_RATE).toString('base64'), format: 'wav' } },
-      ] }],
-    },
-    timeout: 60_000,
-  }).json()
-  return asValue(ChatCompletionSchema, response)?.choices?.[0]?.message?.content?.trim() ?? ''
 }
 
 export async function selectEngine(models: readonly ModelRef[], state: Memento): Promise<void> {
@@ -489,8 +428,6 @@ export function createDictateCommand(
 
   async function transcribe(engine: string, apiKey: string, audio: AsyncIterable<Int16Array>, language: string | undefined): Promise<string> {
     const baseUrl = connection.baseUrl()
-    if (!isLiveEngine(engine))
-      return transcribeClip(baseUrl, apiKey, engine, audio, language)
     const recorded: Int16Array[] = []
     async function* keepCopy(): AsyncGenerator<Int16Array> {
       for await (const frame of audio) {
@@ -532,7 +469,7 @@ export function createDictateCommand(
       return
     }
     const engine = dictationEngine()
-    if (!engine) {
+    if (!isLiveEngine(engine)) {
       await selectEngine(await models(false), context.globalState)
       return
     }
