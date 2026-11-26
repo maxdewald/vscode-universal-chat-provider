@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.9.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.6...v1.9.0) (2026-11-25)
+
+
+### Features
+
+* **antigravity:** sign in through the Antigravity CLI plugin ([5319c7b](https://github.com/maxdewald/vscode-universal-chat-provider/commit/5319c7b6b8ebd68da428b7dee449249720acadfb))
+* **dictation:** drop Gemini engines, keep Codex transcription only ([b12b659](https://github.com/maxdewald/vscode-universal-chat-provider/commit/b12b6590bdc8eddbf7a4d4f0816d9e7b8674dfff))
+
+
+### Bug Fixes
+
+* **antigravity:** open the sign-in page once and keep agy out of the macOS keychain ([9da4455](https://github.com/maxdewald/vscode-universal-chat-provider/commit/9da44553b7106b69304bb2ec306895d7577a4032))
+* **streaming:** group consecutive reasoning summaries into one thinking block ([adb89ea](https://github.com/maxdewald/vscode-universal-chat-provider/commit/adb89eac467a89e756483baddd75155b1cf61373))
+
+
+### Refactoring
+
+* group vendor code under cliproxy/providers and dictation under extension ([34c04c6](https://github.com/maxdewald/vscode-universal-chat-provider/commit/34c04c6d7ca55f443b2b734fd344621af1704f44))
+
 ## [1.8.6](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.5...v1.8.6) (2026-11-23)
 
 
