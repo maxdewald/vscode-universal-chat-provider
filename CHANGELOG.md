@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.1](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.9.0...v1.9.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **images:** fix image tool call ingestion ([f25e7c9](https://github.com/maxdewald/vscode-universal-chat-provider/commit/f25e7c9834ad1acd52fadbad891edef98302581a))
+* **migrations:** handle duplicate provider model IDs ([27c76ff](https://github.com/maxdewald/vscode-universal-chat-provider/commit/27c76ff6d3583d0be2094c0ea59ecd60e7a7819d))
+
 ## [1.9.0](https://github.com/maxdewald/vscode-universal-chat-provider/compare/v1.8.6...v1.9.0) (2026-11-25)
 
 
