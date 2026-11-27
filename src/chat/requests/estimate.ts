@@ -1,5 +1,5 @@
 import type { LanguageModelChatRequestMessage } from 'vscode'
-import { serializeToolResult } from '@src/chat/requests/request-builder'
+import { isImagePart, serializeToolResult } from '@src/chat/requests/request-builder'
 import { estimateTokenCount } from 'tokenx'
 import {
   LanguageModelDataPart,
@@ -26,7 +26,7 @@ export function estimateTokens(value: string | LanguageModelChatRequestMessage):
     else if (part instanceof LanguageModelToolCallPart)
       total += estimateTokenCount(`${part.name}(${JSON.stringify(part.input)})`)
     else if (part instanceof LanguageModelToolResultPart)
-      total += estimateTokenCount(serializeToolResult(part))
+      total += estimateTokenCount(serializeToolResult(part)) + part.content.filter(isImagePart).length * IMAGE_TOKENS
   }
   return total
 }

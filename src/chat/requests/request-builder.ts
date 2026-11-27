@@ -131,27 +131,7 @@ export async function convertMessage(message: LanguageModelChatRequestMessage): 
       })
     }
     else if (part instanceof LanguageModelDataPart) {
-      // Providers sniff the bytes and reject a mismatched mimeType, so the declared one is never trusted.
-      const detected = await fileTypeFromBuffer(part.data)
-      if (detected === undefined) {
-        content.push({
-          type: role === 'assistant' ? 'output_text' : 'input_text',
-          text: new TextDecoder().decode(part.data),
-        })
-      }
-      else if (detected.mime.startsWith('image/')) {
-        content.push({
-          type: 'input_image',
-          image_url: `data:${detected.mime};base64,${Buffer.from(part.data).toString('base64')}`,
-        })
-      }
-      else {
-        content.push({
-          type: 'input_file',
-          filename: `document.${detected.ext}`,
-          file_data: `data:${detected.mime};base64,${Buffer.from(part.data).toString('base64')}`,
-        })
-      }
+      content.push(await dataPartContent(part.data, role === 'assistant' ? 'output_text' : 'input_text'))
     }
     else if (part instanceof LanguageModelToolCallPart) {
       items.push({
@@ -165,7 +145,7 @@ export async function convertMessage(message: LanguageModelChatRequestMessage): 
       items.push({
         type: 'function_call_output',
         call_id: part.callId,
-        output: serializeToolResult(part),
+        output: await toolResultOutput(part),
       })
     }
   }
@@ -173,6 +153,31 @@ export async function convertMessage(message: LanguageModelChatRequestMessage): 
   if (content.length)
     items.unshift({ role, content })
   return items
+}
+
+async function dataPartContent(data: Uint8Array, textType: 'input_text' | 'output_text'): Promise<ProxyRequestItem> {
+  // Providers sniff the bytes and reject a mismatched mimeType, so the declared one is never trusted.
+  const detected = await fileTypeFromBuffer(data)
+  if (detected === undefined)
+    return { type: textType, text: new TextDecoder().decode(data) }
+  const url = `data:${detected.mime};base64,${Buffer.from(data).toString('base64')}`
+  return detected.mime.startsWith('image/')
+    ? { type: 'input_image', image_url: url }
+    : { type: 'input_file', filename: `document.${detected.ext}`, file_data: url }
+}
+
+export function isImagePart(value: unknown): value is LanguageModelDataPart {
+  return value instanceof LanguageModelDataPart && value.mimeType.startsWith('image/')
+}
+
+async function toolResultOutput(part: LanguageModelToolResultPart): Promise<string | ProxyRequestItem[]> {
+  if (!part.content.some(isImagePart))
+    return serializeToolResult(part)
+  return Promise.all(part.content.filter(value => !isCacheControlPart(value)).map(async value =>
+    value instanceof LanguageModelDataPart
+      ? dataPartContent(value.data, 'input_text')
+      : { type: 'input_text', text: value instanceof LanguageModelTextPart ? value.value : JSON.stringify(value) },
+  ))
 }
 
 export function serializeToolResult(part: LanguageModelToolResultPart): string {

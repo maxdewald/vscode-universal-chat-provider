@@ -23,6 +23,12 @@ describe('estimateTokens', () => {
     expect(estimateTokens('Hello, world!')).toBe(estimateTokenCount('Hello, world!'))
   })
 
+  it('budgets for the pixels in each tool screenshot', () => {
+    const image = LanguageModelDataPart.image(new Uint8Array([1, 2, 3]), 'image/png')
+    const result = new LanguageModelToolResultPart('id', [image, image])
+    expect(estimateTokens(message([result]))).toBeGreaterThanOrEqual(2 * IMAGE_TOKENS)
+  })
+
   it.each([
     [
       'text parts with framing overhead',

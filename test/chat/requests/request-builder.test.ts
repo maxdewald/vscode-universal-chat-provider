@@ -120,6 +120,23 @@ describe('response request conversion', () => {
     ])
   })
 
+  it('keeps tool screenshots on their call, interleaved with text and other images', async () => {
+    const image = new LanguageModelDataPart(PNG_BYTES, 'image/jpeg')
+    const result = new LanguageModelToolResultPart('screenshot', [
+      new LanguageModelTextPart('before'),
+      image,
+      LanguageModelDataPart.text('after'),
+      image,
+    ])
+    const input = await convertMessage({ role: LanguageModelChatMessageRole.User, content: [result], name: undefined })
+    const expectedImage = { type: 'input_image', image_url: `data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}` }
+    expect(input).toEqual([{
+      type: 'function_call_output',
+      call_id: 'screenshot',
+      output: [{ type: 'input_text', text: 'before' }, expectedImage, { type: 'input_text', text: 'after' }, expectedImage],
+    }])
+  })
+
   it('corrects a mislabelled image mime type from the actual bytes', async () => {
     const messages = [{
       role: LanguageModelChatMessageRole.User,
