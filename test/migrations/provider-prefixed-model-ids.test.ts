@@ -19,6 +19,14 @@ describe('providerPrefixedModelIds', () => {
     expect(vscodeMock.settings.get('universalChatProvider.dictation.engine')).toBe('antigravity/gemini-3-flash')
   })
 
+  it('migrates a model whose Fast variant repeats its proxy id', async () => {
+    vscodeMock.settings.set('chat.utilityModel', 'universal-chat-provider/gpt-6-luna:fast:utility-low')
+
+    await providerPrefixedModelIds.run({ proxyModelIds: ['codex/gpt-6-luna', 'codex/gpt-6-luna'] })
+
+    expect(vscodeMock.settings.get('chat.utilityModel')).toBe('universal-chat-provider/codex/gpt-6-luna:fast:utility-low')
+  })
+
   it('leaves ambiguous, foreign, already migrated and unknown values alone', async () => {
     vscodeMock.settings.set('chat.utilityModel', 'universal-chat-provider/claude-sonnet-4-6')
     vscodeMock.settings.set('chat.utilitySmallModel', 'copilot/gpt-5-mini')

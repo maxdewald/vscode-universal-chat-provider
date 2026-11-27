@@ -10,12 +10,12 @@ const SETTINGS = [
 ] as const
 
 export const providerPrefixedModelIds: Migration = {
-  id: 'provider-prefixed-model-ids',
+  id: 'provider-prefixed-model-ids-v2',
   run: async ({ proxyModelIds }) => {
     // Waits until every account is pinned, so a bare id that is still served is never rewritten.
     if (proxyModelIds.length === 0 || !proxyModelIds.every(id => id.includes('/')))
       return false
-    const byUpstream = Map.groupBy(proxyModelIds, upstreamModelId)
+    const byUpstream = Map.groupBy(new Set(proxyModelIds), upstreamModelId)
     for (const [section, key, prefix] of SETTINGS) {
       const settings = workspace.getConfiguration(section)
       const value = settings.get<string>(key, '').trim()
